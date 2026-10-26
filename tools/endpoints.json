@@ -120,7 +120,7 @@
    "id": 19,
    "type": "uint16",
    "access": "rw",
-   "unit": "position: max speed rpm; 0/65535 = default 100"
+   "unit": "velocity limit (vel_limit) in position and velocity modes, rpm; 0/65535 = default 300"
   },
   "config.motorr": {
    "id": 20,
@@ -163,6 +163,12 @@
    "type": "uint16",
    "access": "rw",
    "unit": "torque constant mNm/A (CANSimple torque units); 0/65535 = 8270 / sine kv"
+  },
+  "config.curtrip": {
+   "id": 27,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current trip (current_hard_max) 0.1 A; 0/65535 = 2 x focimax, at least 15 A"
   },
   "config.magicnum": {
    "id": 32,

@@ -21,6 +21,7 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas);    //rpm -> q current reference,
 void FocSpeedReset(void);
 void FocClearTrip(void);
 int32_t FocIqSetpoint(void);         //mA
+int32_t CurrentHardMax(void);        //mA, phase current trip
 
 extern volatile int32_t focIdRef;     //d current reference, mA (field weakening, tests over SWD)
 extern volatile int16_t focId, focIq; //measured, mA

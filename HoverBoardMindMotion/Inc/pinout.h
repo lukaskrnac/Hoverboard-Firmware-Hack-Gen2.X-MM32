@@ -34,12 +34,13 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define IPHASEBPIN pinstorage[17]
 //18-22 are unused pin slots, used for numbers; 0 or 65535 (an unset pin slot) = default / off
 #define POS_KP pinstorage[18]      //position: 0.1 rpm per hall step of error, default 20
-#define POS_RPM pinstorage[19]     //position: max speed, rpm, default 100
+#define POS_RPM pinstorage[19]     //velocity limit (vel_limit) in position and velocity modes, rpm, default 300
 #define MOTOR_R pinstorage[20]     //phase resistance incl. the mosfets, mOhm, default 300 (sine torque)
 #define FW_IMAX pinstorage[21]     //FOC field weakening: max negative d current, 0.1 A; default off
 #define FW_ADVANCE pinstorage[22]  //sine field weakening: max phase advance, degrees electrical; default off. No current
                                    //control: 15 deg ran the bench wheel at 914 instead of 586 rpm but drew 3.1 A instead of
                                    //0.66 A from the supply (~12 A phase current) unloaded; FOC field weakening is controlled
+#define CUR_TRIP pinstorage[27]      //phase current trip (current_hard_max), 0.1 A; 0/65535 = 2 x focimax, >= 15 A
 #define TORQUE_CONST pinstorage[26]  //Nm per A x 1000 (CANSimple torque units); 0/65535 = 8.27 / sine kv
 #define OCPPIN pinstorage[23]
 #define ITOTAL_ZERO pinstorage[25] //shunt zero below adc 0 (the adc clips it), 0.01 counts; 0/65535 = 0 (bench board: 145)

@@ -7,13 +7,18 @@
 //offsets are measured with the gates on and the zero vector applied, and the modulation is limited to
 //90 % of the linear range (low side time at the sample >= ~5 us). Measured gain: 19.4 counts/A
 //(51.5 mA per count), offset ~1520 counts.
-//Edges on the uart lines (the RemoteUartBus) couple into the op-amp outputs: about one sample per second
-//with UART traffic reads ~170 counts (~9 A) off on one channel, 0 without traffic; a longer adc sample
-//time does not help. Each channel is the median of its last 3 samples (one period delay), and a trip
-//needs two periods in a row.
+//Received UART traffic (the master transmitting on the RemoteUartBus) couples into the op-amp outputs:
+//at 115200 ~5 samples per second read ~170 counts (~9 A) off on one channel, mostly for one period,
+//sometimes for 4 in a row; nothing without traffic, a longer adc sample time does not help. A median of
+//3 let the 4 period events through (false CURRENT_LIMIT_VIOLATION trips), and comparing with the last
+//accepted sample locked onto a borderline glitch (then rejected the true values). Now each channel keeps
+//its last 9 raw samples: the newest is used when it is within GLITCH counts (~3 A) of their median,
+//otherwise the median (runs of up to 4 bad samples do not move it). No delay normally; a real step
+//(> ~1 A per period is not possible here at these voltages anyway) shows after up to 4 periods.
+//A trip needs two filtered samples in a row.
 //
 //Loop: every pwm period in the adc isr. Park angle = hall estimator angle minus its 1.5 period lead
-//(for the pwm output) and one period for the median; PI per axis in mV with back emf feed
+//(that lead is for the pwm output; the currents were sampled now); PI per axis in mV with back emf feed
 //forward on q; d voltage first, q gets the rest of the voltage circle; integration stops in saturation.
 #include "foc.h"
 #include "main.h"
@@ -29,7 +34,6 @@
 #define TS_US        228          //pwm period = 2*PWM_RES/72 MHz = 227.6 us
 #define MOD_MAX      29491        //90 % of the linear svpwm range (32768)
 #define INV_SQRT3_Q15 18919
-#define TRIP_FACTOR  2            //phase current trip = 2 * the current limit
 
 static int32_t cfg(uint16_t v, int32_t def){ return v ? v : def; }
 #define GAIN()   cfg(IPHASE_GAIN, 515)    //0.1 mA per adc count
@@ -42,9 +46,11 @@ static volatile u32* adc2;
 static int32_t off1, off2;         //zero current, adc counts << 4
 static int32_t calSum1, calSum2;
 static uint8_t calN, offValid, armedPeriods, tripN;
-static int32_t h1[2], h2[2];       //previous two samples per channel, for the median
-static uint16_t ccrPrev[3];        //duties of the period the median sample was taken in
-volatile uint16_t focGlitches;     //samples the median rejected (> 100 counts from it), diagnostic
+#define GLITCH 60                  //adc counts (~3 A)
+#define HIST 9
+static int16_t hist1[HIST], hist2[HIST];    //raw samples per channel, ring
+static uint8_t histPos;
+volatile uint16_t focGlitches;     //samples replaced by the median, diagnostic
 static int32_t ia, ib, ic;         //mA, this period
 static int32_t intD, intQ;         //integrators, uV
 static int32_t fwId;               //field weakening d current, mA (<= 0)
@@ -66,9 +72,14 @@ volatile int16_t focTrace[FOC_TRACE_N][6];
 volatile uint8_t focTraceN = FOC_TRACE_N;
 volatile uint8_t focTracePos;
 volatile int16_t focTripI[3];    //phase currents of the sample that tripped, mA
-static int32_t med3(int32_t a, int32_t b, int32_t c){
-	int32_t lo = a<b ? a : b, hi = a<b ? b : a;
-	return c<lo ? lo : (c>hi ? hi : c);
+static int32_t median9(const int16_t* h){    //insertion sort of a copy
+	int16_t v[HIST];
+	for(uint8_t i=0;i<HIST;i++){
+		int16_t x = h[i]; int8_t j = (int8_t)(i-1);
+		while(j>=0&&v[j]>x){ v[j+1] = v[j]; j--; }
+		v[j+1] = x;
+	}
+	return v[HIST/2];
 }
 
 static volatile u32* adcResultReg(uint16_t io){
@@ -83,6 +94,12 @@ static volatile u32* adcResultReg(uint16_t io){
 
 int32_t FocIqSetpoint(void){    //mA, motor frame (voltage mode: the limit in the command's direction)
 	return focVoltMode ? (focVCmd>0 ? IMAX() : (focVCmd<0 ? -IMAX() : 0)) : focIqRef;
+}
+
+int32_t CurrentHardMax(void){    //mA: phase current trip (ODrive current_hard_max)
+	int32_t t = cfgOrDefault(CUR_TRIP, 0)*100;
+	if(!t){ t = IMAX()*2; if(t<15000) t = 15000; }    //default: twice the limit, at least 15 A
+	return t;
 }
 
 uint8_t FocAvailable(void){
@@ -121,20 +138,15 @@ void FocMeasure(void){
 	}
 	ia = ib = ic = 0;
 	if(armedPeriods<2){    //outputs saturated, or the first period after arming
-		h1[0] = h1[1] = r1; h2[0] = h2[1] = r2;
+		for(uint8_t k=0;k<HIST;k++){ hist1[k] = (int16_t)r1; hist2[k] = (int16_t)r2; }
 		return;
 	}
-	//median of three: the middle sample (previous period) unless it is the odd one out
-	int32_t m1 = med3(h1[0], h1[1], r1), m2 = med3(h2[0], h2[1], r2);
-	int32_t g1 = r1-m1, g2 = r2-m2;
-	if(g1>100||g1<-100||g2>100||g2<-100) focGlitches++;
-	h1[0] = h1[1]; h1[1] = r1; h2[0] = h2[1]; h2[1] = r2;
-	uint16_t ccr[3] = {ccrPrev[0], ccrPrev[1], ccrPrev[2]};
-	ccrPrev[0] = TIM1->CCR1; ccrPrev[1] = TIM1->CCR2; ccrPrev[2] = TIM1->CCR3;
-	r1 = m1; r2 = m2;
-	if(armedPeriods<3){    //the median needs two valid samples before this one
-		return;
-	}
+	if(armedPeriods==2){ for(uint8_t k=0;k<HIST;k++){ hist1[k] = (int16_t)r1; hist2[k] = (int16_t)r2; } }
+	hist1[histPos] = (int16_t)r1; hist2[histPos] = (int16_t)r2;
+	histPos = (uint8_t)((histPos+1)%HIST);
+	int32_t m1 = median9(hist1), m2 = median9(hist2);
+	if(r1-m1>GLITCH||m1-r1>GLITCH){ r1 = m1; focGlitches++; }
+	if(r2-m2>GLITCH||m2-r2>GLITCH){ r2 = m2; focGlitches++; }
 	if(!offValid){    //FocControl() applies the zero vector until the offsets are known
 		if(armedPeriods>=4&&realspeed==0){
 			calSum1 += r1; calSum2 += r2;
@@ -155,7 +167,7 @@ void FocMeasure(void){
 		case 2: ia = c1; ic = c2; ib = -ia-ic; break;
 		default: ia = c1; ib = c2; ic = -ia-ib; break;
 	}
-	int32_t trip = IMAX()*TRIP_FACTOR;
+	int32_t trip = CurrentHardMax();
 	if(ia>trip||ia<-trip||ib>trip||ib<-trip||ic>trip||ic<-trip){
 		if(++tripN>=2){
 			focTrip = 1;
@@ -165,9 +177,9 @@ void FocMeasure(void){
 	}else{
 		tripN = 0;
 	}
-	//bus current = sum of duty * phase current, with the duties of the period the sample is from
+	//bus current = sum of duty * phase current; the CCRs read back are the ones active in this period
 	int32_t n = PWM_RES;
-	itotal = ((n-ccr[0])*ia+(n-ccr[1])*ib+(n-ccr[2])*ic)/n/10;
+	itotal = ((n-(int32_t)TIM1->CCR1)*ia+(n-(int32_t)TIM1->CCR2)*ib+(n-(int32_t)TIM1->CCR3)*ic)/n/10;
 }
 
 static void zeroVector(void){
@@ -187,7 +199,7 @@ void FocControl(void){
 	int32_t v = vbat>1000 ? vbat : 2400;    //0.01 V
 	int32_t vmax = MOD_MAX*v/5676;          //mV; phase amplitude Vbus/sqrt(3) at modulation 32768
 	int16_t th = HALL1.Angle;
-	int16_t thS = fastspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*5/2)) : th;
+	int16_t thS = fastspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*3/2)) : th;
 	Trig_Components sc = MCM_Trig_Functions(thS);
 	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
 	int32_t id = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);

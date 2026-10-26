@@ -134,7 +134,13 @@ void HALLModuleCalc(HALLType *u){
 	//angle on the sector centre at the edge (30 deg ahead) and interpolated as if this ran every 62.5 us
 	//instead of every pwm period (2*PWM_RES/72 MHz = 227.6 us), so the angle lagged and jumped.
 	if(!com){
-		if(edge){
+		if(edge&&u->HallTimeSum>=6*65535){
+			//no speed known (below ~10 rpm, after a reversal): the middle of the sector, error <= 30 deg.
+			//Starting at the boundary with a crawling interpolation the error grew to 60 deg until the next
+			//edge snapped it: in FOC a current transient that tripped (position hold near its target).
+			u->Angle = (int16_t)u->CWAngleTab[raw];
+			u->IncAngleMax = 0;
+		}else if(edge){
 			int32_t s = u->MoveDir;
 			u->IncAngle = ((uint32_t)PWM_RES*16384/9)/u->HallTimeSum;    //per pwm period: 65536*2*PWM_RES/72/HallTimeSum
 			u->IncAngleMax = 10922;

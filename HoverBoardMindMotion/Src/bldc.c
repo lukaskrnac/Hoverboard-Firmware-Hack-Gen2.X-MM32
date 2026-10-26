@@ -29,7 +29,8 @@ static uint8_t posHeld;
 
 //position mode: hall step error -> speed set point (P, limited)
 static int32_t PositionSpeed(int32_t err){
-	int32_t vmax = cfgOrDefault(POS_RPM, 100);
+	int32_t vmax = cfgOrDefault(POS_RPM, 300);
+	if(err<=1&&err>=-1) return 0;    //at the target within the hall step: hold, the speed integrator decays
 	int32_t v = err*cfgOrDefault(POS_KP, 20)/10;
 	if(v>vmax) v = vmax; else if(v<-vmax) v = -vmax;
 	return v;
@@ -174,6 +175,8 @@ void speedupdate(void){
 		//position: the command is the target odometer (hall steps, like the Gen2.x-GD32 iOdom input);
 		//without commands the wheel holds where it is instead of going back to target 0
 		int32_t posErr = 0, posSpeed = 0;
+		int32_t vlim = cfgOrDefault(POS_RPM, 300);    //vel_limit, rpm
+		int32_t spd = speed>vlim ? vlim : (speed<-vlim ? -vlim : speed);    //velocity set point
 		if(CONTROL(DRIVEMODE)==CTRL_POSITION){
 			if(RemoteTimedOut()){
 				if(!posHeld){ posHold = iOdom; posHeld = 1; }
@@ -206,7 +209,7 @@ void speedupdate(void){
 					//below 10 rpm the last hall interval is > 65 ms old: the loop limit-cycled +-55 rpm
 					//around a 0 rpm set point on it. Read as 0 there, as before the ms interval timing.
 					int32_t m = fastspeed;
-					FocSetCurrent(FocSpeedCtrl(speed, (m<10&&m>-10) ? 0 : m));
+					FocSetCurrent(FocSpeedCtrl(spd, (m<10&&m>-10) ? 0 : m));
 					break;
 				}
 			}
@@ -236,7 +239,7 @@ void speedupdate(void){
 						SpeedPlant p;
 						SpeedParams(DRIVEMODE, &p);
 						//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
-						pwm = SpeedCtrl(speed,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
+						pwm = SpeedCtrl(spd,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
 					}
 					break;
 				case CTRL_TORQUE:    //0.01 A; command 0 coasts
