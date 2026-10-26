@@ -1,13 +1,13 @@
 #include "../Inc/hardware.h"
 
-GPIO_InitTypeDef GPIO_InitStruct;
+static GPIO_InitTypeDef GPIO_InitStruct;
 
 
 
 
 #ifdef TARGET_MM32SPIN25
 
-const MM32GPIO pins[PINCOUNT] = {   // port,pin,pinsrc
+static const MM32GPIO pins[PINCOUNT] = {   // port,pin,pinsrc
 {IOA,GPIO_Pin_0,GPIO_PinSource0},
 {IOA,GPIO_Pin_1,GPIO_PinSource1},
 {IOA,GPIO_Pin_2,GPIO_PinSource2},
@@ -105,7 +105,7 @@ const MM32TIMBK ocps[TIMBKCOUNT] = {
 
 #else
 
-const MM32GPIO pins[PINCOUNT] = {   // port,pin,pinsrc
+static const MM32GPIO pins[PINCOUNT] = {   // port,pin,pinsrc
 {IOA,GPIO_Pin_0,GPIO_PinSource0},
 {IOA,GPIO_Pin_1,GPIO_PinSource1},
 {IOA,GPIO_Pin_2,GPIO_PinSource2},

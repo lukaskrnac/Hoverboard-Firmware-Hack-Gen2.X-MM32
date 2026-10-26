@@ -38,10 +38,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 /// @defgroup MM32_Exported_Functions
 /// @{
-void FLASH_SIM_EEPROM_Init(void);
 s32 EEPROM_Write(u8* ptr, u16 len);
-s32 EEPROM_Read(u8* ptr, u16 len);
-s32 FLASH_SIM_EEPROM_Test(void);
 uint8_t restorecfg(void);
 /// @}
 

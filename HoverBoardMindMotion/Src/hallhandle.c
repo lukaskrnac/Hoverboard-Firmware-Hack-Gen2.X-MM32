@@ -7,7 +7,7 @@
 
 /*------------------- Private variables ---------------*/
 HALLType HALL1;
-int16_t CWShift = 0;
+static volatile int16_t CWShift = 0;    //extra sine angle advance in the direction of motion (65536 = 360 deg el), tuning over SWD
 /*------------------ Private functions ----------------*/
 void HALLModuleInit(HALLType *u);
 void HALLModuleCalc(HALLType *u);
@@ -57,7 +57,6 @@ void HALLModuleInit(HALLType *u)
 	Input��HALL--Structure HALLType
 	Output��none
 ****************************************************************/
-uint32_t ChangeTime = 0;
 
 void HALLModuleCalc(HALLType *u){
 	static uint8_t i = 0;
@@ -95,7 +94,6 @@ void HALLModuleCalc(HALLType *u){
 			tim->SR = ~TIM_SR_UI;
 			u->HallTime[i] = 250000;
 		}
-		ChangeTime = u->HallTime[i];
 				
 		//Calculate rotor electrical angle speed and mechanical speed
 		u->HallTimeSum = 0;

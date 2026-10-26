@@ -13,7 +13,6 @@
 #define STATE_DISABLE        64     //gates off, motor coasts (disarmed)
 #define STATE_SHUTOFF        128    //not implemented
 
-void AnswerMaster(void);
 void RemoteUpdate(void);
 void serialit(void);    //uart rx dma interrupt, one byte in sRxBuffer[0]
 

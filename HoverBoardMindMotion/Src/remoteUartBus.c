@@ -28,7 +28,7 @@
 #include "../Inc/calculation.h"
 
 
-volatile uint8_t bAnswerMaster = 0;
+static volatile uint8_t bAnswerMaster = 0;
 static int16_t iReceivePos = -1;    //-1: waiting for the start byte
 
 
@@ -90,7 +90,7 @@ _Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 
 
 
 
-volatile uint32_t iTimeLastRx = 0;
+static volatile uint32_t iTimeLastRx = 0;
 
 
 static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
@@ -120,7 +120,8 @@ static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
 
 
 // a config frame is only copied in the rx interrupt and applied here in the main loop: it
-// reinitialises TIM1/PID and writes flash, which stalls the cpu (and the commutation interrupt)
+// reinitialises TIM1 and the controllers and writes flash, which stalls the cpu (and the commutation interrupt)
+static void AnswerMaster(void);
 static SerialServer2HoverConfig oConfigRx;
 static volatile uint8_t bConfigRx = 0;
 static uint8_t bConfigSave = 0;
@@ -170,9 +171,8 @@ void RemoteUpdate(void){
 }
 
 
-uint32_t iAnswerMaster = 0;
 
-void AnswerMaster(void){
+static void AnswerMaster(void){
 	
 	// Ask for steer input
 	SerialHover2Server oData;
@@ -182,7 +182,6 @@ void AnswerMaster(void){
 	oData.iAmp = (int16_t) 	(fitotal);
 	oData.iSpeed = (int16_t) (realspeed	*10);
 	oData.iOdom = (int32_t) iOdom;	//pwm	;
-	//oData.iOdom = iAnswerMaster++;
 
 	oData.checksum = 	CalcCRC((uint8_t*) &oData, sizeof(oData) - 2);	// (first bytes except crc)
 
@@ -193,8 +192,8 @@ void AnswerMaster(void){
 }
 
 
-uint8_t iRxDataType;
-uint8_t iRxDataSize;
+static uint8_t iRxDataType;
+static uint8_t iRxDataSize;
 
 // Update USART steer input
 // static int16_t iReceivePos = -1;		// if >= 0 incoming bytes are recorded until message size reached

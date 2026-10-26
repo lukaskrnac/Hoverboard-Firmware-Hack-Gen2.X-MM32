@@ -33,11 +33,9 @@ volatile int vbat;
 volatile int itotal;
 volatile int fvbat;
 volatile int fitotal;
-uint8_t hallposprev=1;
 volatile int speed=0;
 volatile int pwm=0;
 volatile int realspeed=0;
-volatile int frealspeed=0;
 volatile uint8_t  wState = STATE_LED_BATTLEVEL;    //battery LEDs until the remote sends a state
 static uint8_t flicker=0;
 uint8_t uarten=1;
@@ -153,7 +151,6 @@ s32 main(void){
 	MovingAvgInit(&IDData);
 	MovingAvgInit(&IQData);
 	MovingAvgInit(&SpeedFdk);
-	PID_Init();
   while(1) {
 		uint8_t state = wState;
 		digitalWrite(LEDUPIN, (state&STATE_LED_UP)!=0);    //unconfigured pins are ignored

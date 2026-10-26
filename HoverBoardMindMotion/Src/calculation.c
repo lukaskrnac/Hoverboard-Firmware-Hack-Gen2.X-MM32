@@ -4,92 +4,14 @@
 #include "../Inc/pinout.h"   
 #include "../Inc/bldc.h"   
 
-uint8_t Kp=4;
-uint8_t Ki=10;
-uint8_t Kd=180;
-int max = 4000;
-int min = -4000;
-int qdSum = 0;
-int lasterr=0;
-int prevpwm=0;
+//running averages of the adc isr: 32 (vbat) and 64 (itotal) samples, one per pwm period
+static uint8_t vindex;
+static int vdatasum;
+static int vavgarr[32];
+static uint8_t aindex;
+static int adatasum;
+static int aavgarr[64];
 
-uint8_t sindex;
-int datasum;
-int avgarr[32];
-uint8_t vindex;
-int vdatasum;
-int vavgarr[32];
-uint8_t aindex;
-int adatasum;
-int aavgarr[64];
-
-void PID_Init(void){
-	switch(DRIVEMODE){
-		case COM_SPEED:
-			Kp=50;
-			Ki=100;
-			Kd=200;
-			max = 4000;
-			min = -4000;
-		break;
-		case SINE_SPEED:
-			Kp=50;
-			Ki=100;
-			Kd=200;
-			max = 40000;
-			min = -40000;
-		break;
-	}
-
-}
-void PIDrst(void){
-	lasterr=qdSum=prevpwm=0;
-}
-
-
-int PID(int setpoint,int real){
-	
-	int qOut = 0;
-	int Error;
-	signed long  Up;
-	signed long  Ui;
-	signed long  Ud;
-	//Calc Error
-	Error = setpoint - real;
-	//Calc proportional
-	Up = (Kp * Error);
-	//Calc integral
-	qdSum = qdSum + Ki * Error;
-	//Limit integral 
-	if(qdSum >= (max)){
-		qdSum = (max);
-	}else if(qdSum <= min){
-		qdSum = (min);
-	}
-	Ui = qdSum/100;
-	Ud=(Error-lasterr)*Kd;
-	lasterr=Error;
-	qOut = Up + Ui + Ud;		
-	//Out Limit
-	if(qOut > max){
-		qOut =max ;
-	}else if(qOut < min){
-		qOut = min;
-	}
-	return qOut;
-	
-}
-
-void avgspeed(void){
-	
-	if(sindex >= 32){
-    sindex = 0;
-  } 
-  datasum = datasum + realspeed - avgarr[sindex];
-  avgarr[sindex] = realspeed;
-  frealspeed = (int)(datasum>>5);
-  sindex++;
-}
 void avgvbat(void){
 	
 	if(vindex >= 32){
@@ -109,20 +31,6 @@ void avgItotal(void){
   aavgarr[aindex] = itotal;
   fitotal = (int)(adatasum>>6);
   aindex++;
-}
-int PID2PWM(int pid){
-	int pwm = prevpwm += pid;
-	if(pwm > max){
-		pwm =max ;
-	}else if(pwm < min){
-		pwm = min;
-	}
-	if(prevpwm > max){
-		prevpwm =max ;
-	}else if(prevpwm < min){
-		prevpwm = min;
-	}
-	return pwm*PWM_RES/4000;
 }
 
 //COM_SPEED / SINE_SPEED: PI with feed forward and a reference model, run from the main loop every ~2 ms.
@@ -195,10 +103,3 @@ int SpeedCtrl(int sp, int meas, const SpeedPlant* p){    //sp, meas in rpm; retu
 	spdU = u;
 	return u>>8;
 }
-
-uint32_t updateMotorRPM(uint32_t halltime){
-    return  60000000 / (halltime * WINDINGS);
-}
-
-
-

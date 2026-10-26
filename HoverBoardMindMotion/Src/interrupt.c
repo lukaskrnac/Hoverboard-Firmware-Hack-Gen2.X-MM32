@@ -18,17 +18,16 @@
 #include "../Inc/pwm_gen.h"
 #include "../Inc/hallhandle.h"
 
-uint32_t itotaloffset=0;
+static uint32_t itotaloffset=0;
 volatile uint8_t poweron=0;
-int iphasea;
-int iphaseb;
-uint32_t iphaseaoffset=0;
-uint32_t iphaseboffset=0;
-uint16_t vrefint;    //last internal 1.2V reference conversion
-volatile uint32_t adcticks;    //adc interrupts since boot (one per pwm period)
+static int iphasea;
+static int iphaseb;
+static uint32_t iphaseaoffset=0;
+static uint32_t iphaseboffset=0;
+static uint16_t vrefint;    //last internal 1.2V reference conversion
+static volatile uint32_t adcticks;    //adc interrupts since boot (one per pwm period)
 volatile uint8_t realdir=0;
 
-int16_t	TestAngle = 0;
 
 //commutation interrupt
 void TIM1_BRK_UP_TRG_COM_IRQHandler(void){
@@ -135,8 +134,6 @@ void ADC1_COMP_IRQHandler(void){
 						ipark1.Ds = CurID.qOut;
 						ipark1.Qs = CurIQ.qOut;	
 					}
-					//TestAngle += 50;
-					//ipark1.Theta = TestAngle;	
 					ipark1.Theta = HALL1.Angle;    
 					IPARK_MACRO1(&ipark1);
 					//SVPWM

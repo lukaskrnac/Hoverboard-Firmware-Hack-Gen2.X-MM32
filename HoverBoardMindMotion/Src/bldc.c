@@ -11,12 +11,9 @@
 #include "math.h"
 #include "../Inc/hallhandle.h"
 
-volatile uint16_t abspwm;
+static volatile uint16_t abspwm;
 volatile uint32_t lastcommutate;
 volatile uint8_t gatesoff=0;
-uint32_t lasttestrotate;
-int testrotatedir=1;
-bool lastdir=0;
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
@@ -144,7 +141,6 @@ void speedupdate(void){
 		gatesoff = lowbatperm || (wState & STATE_DISABLE);
 		if(gatesoff){
 			pwm=0;
-			PIDrst();    //no wind-up while the gates are off
 			SpeedCtrlReset();
 		}else{
 			if(DRIVEMODE==COM_VOLT){
@@ -192,6 +188,8 @@ void gatesOutput(uint8_t on){
 //counts / Q15 modulation: a sine value left in CCR1-3 is full duty in block mode). So the gates go
 //off and the isr is masked (a few us) while the mode, the outputs and the controllers are replaced;
 //the isr arms the gates again and the speed controllers restart from the measured speed.
+static void TIMOCInit(void);
+
 void SetDriveMode(uint8_t mode){
 	if(mode==DRIVEMODE){
 		return;
@@ -204,14 +202,12 @@ void SetDriveMode(uint8_t mode){
 	TIM1->CCR2 = 0;
 	TIM1->CCR3 = 0;
 	DRIVEMODE = mode;
-	PIDrst();
-	PID_Init();
 	SpeedCtrlReset();
 	TIMOCInit();
 	NVIC_EnableIRQ(ADC_COMP_IRQn);
 }
 
-void TIMOCInit(void){
+static void TIMOCInit(void){
 	if(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED){
 		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
 		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);

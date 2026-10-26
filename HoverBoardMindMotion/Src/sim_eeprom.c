@@ -150,18 +150,6 @@ static void FLASH_SIM_WriteEE(u16* buf, u32 pageAddress, u16 len)
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  Initialize eeprom.
-/// @note   This function can be used for all MM32 devices.
-/// @note   Erases the pages for EEPROM or continue to operate EEPROM.
-/// @param  None.
-/// @retval None.
-////////////////////////////////////////////////////////////////////////////////
-void FLASH_SIM_EEPROM_Init(void)
-{
-    FLASH_SIM_EraseEE((u32)(BASED_FLASH_SECTOR_ADDRESS) + 0x0000);
-    FLASH_SIM_EraseEE((u32)(BASED_FLASH_SECTOR_ADDRESS) + 0x0400);
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief  read the last set of data that was written in the specified EEPROM.
@@ -173,7 +161,7 @@ void FLASH_SIM_EEPROM_Init(void)
 ///         0: the instance does not exist
 ///         1: Read data operation succeeded
 ////////////////////////////////////////////////////////////////////////////////
-s32 EEPROM_Read(u8* ptr, u16 len)
+static s32 EEPROM_Read(u8* ptr, u16 len)
 {
     u32 pAddr;
     pAddr = FLASH_SIM_WriteLocate((u32)BASED_FLASH_SECTOR_ADDRESS, len);
@@ -209,31 +197,6 @@ s32 EEPROM_Write(u8* ptr, u16 len)
     return len;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  run the test that use FLASH simulate EEPROM
-/// @note   it need to be careful to the write data can not be all 0xFFFF ;
-/// @param  None.
-/// @retval None.
-////////////////////////////////////////////////////////////////////////////////
-s32 FLASH_SIM_EEPROM_Test(void)
-{
-    u16 testwrdata[16];
-    u16 testrddata[16];
-    u16 len = 16;
-    u16 i, j;
-    for(j = 0; j < 128; j++) {
-        for(i = 0; i < len; i++) {
-            if(i == 0)
-                testwrdata[i] = j;
-            else
-                testwrdata[i] = 0xfffe - j - i;
-        }
-        EEPROM_Write((u8*)testwrdata, 2 * len);
-        EEPROM_Read((u8*)testrddata, 2 * len);
-        __NOP();
-    }
-    return 0;
-}
 
 uint8_t restorecfg(void){
 	uint16_t tmp[64];

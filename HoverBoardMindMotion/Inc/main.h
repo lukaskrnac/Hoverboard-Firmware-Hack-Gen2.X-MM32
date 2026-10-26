@@ -13,11 +13,9 @@ extern volatile int vbat;                //battery voltage 0.01V
 extern volatile int itotal;              //bus current 0.01A
 extern volatile int fvbat;               //filtered vbat
 extern volatile int fitotal;             //filtered itotal
-extern uint8_t hallposprev;
 extern volatile int speed;               //setpoint from the remote
 extern volatile int pwm;
 extern volatile int realspeed;           //measured speed
-extern volatile int frealspeed;          //filtered realspeed
 extern volatile uint8_t wState;          //state byte from the remote
 extern uint8_t uarten;          //uart in use: 1 = UART1, 2 = UART2
 extern uint8_t halltimen;       //hall timer: 1 = TIM2, 0 = TIM3

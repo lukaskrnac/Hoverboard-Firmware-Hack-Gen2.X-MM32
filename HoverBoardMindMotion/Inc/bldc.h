@@ -6,12 +6,10 @@
 void commutate(void);
 uint8_t hallpos(uint8_t forward);    //1: raw hall state, else complemented (7-raw)
 void speedupdate(void);
-void TIMOCInit(void);
 void SetDriveMode(uint8_t mode);    //safe while running, see bldc.c
 void gatesOutput(uint8_t on);
 
 extern volatile uint8_t gatesoff;    //1: gates must stay off (disarmed by the remote, low battery), applied by the adc isr
-extern volatile uint16_t abspwm;
 extern volatile uint32_t lastcommutate;
 extern uint8_t lowbatcount;
 extern uint8_t lowbatperm;

@@ -102,7 +102,6 @@ typedef struct{
 
 
 //pin capability tables for the selected MCU, hardware.c
-extern const MM32GPIO pins[PINCOUNT];
 extern const MM32ADC adcs[ADCCOUNT];
 extern const MM32TIM23 halltims[TIMCOUNT];
 extern const MM32UART uarts[UARTCOUNT];
