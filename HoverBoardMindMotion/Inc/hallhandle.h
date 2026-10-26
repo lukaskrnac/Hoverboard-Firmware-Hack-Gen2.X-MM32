@@ -11,6 +11,7 @@ typedef struct
 {
   uint8_t RunHallValue;   	
   uint8_t PreHallValue;   
+  uint8_t PreRaw;             //hall state at the last call, direction independent
 	int8_t	CMDDIR;
 	int16_t	Angle;
 	int16_t IncAngle;
