@@ -261,12 +261,68 @@ enum{
 	EP_AXIS_STATE, EP_ACTIVE_ERRORS, EP_DISARM_REASON, EP_ODOMETER, EP_CONTROL_MODE, EP_INPUT_MODE,
 	EP_COMMUTATION, EP_INPUT_POS, EP_INPUT_VEL, EP_INPUT_TORQUE, EP_INPUT_VOLTAGE, EP_TORQUE_CONSTANT,
 	EP_ID_SETPOINT, EP_FAST_SPEED,
+	//ODrive parameters (float, ODrive units), stored in the config words
+	EP_VEL_LIMIT = 0x120, EP_POS_GAIN, EP_VEL_GAIN, EP_VEL_INTEGRATOR_GAIN, EP_CURRENT_SOFT_MAX,
+	EP_CURRENT_HARD_MAX, EP_TORQUE_CONSTANT_CFG, EP_POLE_PAIRS, EP_PHASE_RESISTANCE, EP_WATCHDOG_TIMEOUT,
+	EP_UNDERVOLTAGE, EP_OVERVOLTAGE, EP_NODE_ID, EP_UART_BAUDRATE,
 	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
 };
 
 static uint8_t controlModeOdrive(void){
 	static const uint8_t map[4] = { CM_VOLTAGE, CM_VELOCITY, CM_TORQUE, CM_POSITION };    //by CTRL_
 	return map[CONTROL(DRIVEMODE)];
+}
+
+static uint16_t toWord(float f){ return (uint16_t)clampF(f, 65534); }
+
+//ODrive parameter <-> config word, value in ODrive units; returns 0 if ep is not one of them
+static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
+	float kt = TorqueConstant(), spt = (float)StepsPerTurn();
+	switch(ep){
+		case EP_VEL_LIMIT:    //turns/s <- rpm
+			if(write) POS_RPM = toWord(f*60.0f);
+			*val = (float)cfgOrDefault(POS_RPM, 300)/60.0f; return 1;
+		case EP_POS_GAIN:    //(turns/s)/turn <- 0.1 rpm per hall step
+			if(write) POS_KP = toWord(f*600.0f/spt);
+			*val = (float)cfgOrDefault(POS_KP, 20)*spt/600.0f; return 1;
+		case EP_VEL_GAIN:    //Nm/(turns/s) <- FOC speed loop mA/rpm
+			if(write) FOC_SPD_KP = toWord(f/(0.06f*kt));
+			*val = (float)cfgOrDefault(FOC_SPD_KP, 30)*0.06f*kt; return 1;
+		case EP_VEL_INTEGRATOR_GAIN:    //(Nm/s)/(turns/s) <- mA/(rpm*s)
+			if(write) FOC_SPD_KI = toWord(f/(0.06f*kt));
+			*val = (float)cfgOrDefault(FOC_SPD_KI, 100)*0.06f*kt; return 1;
+		case EP_CURRENT_SOFT_MAX:    //A <- 0.1 A
+			if(write) FOC_IMAX = toWord(f*10.0f);
+			*val = (float)cfgOrDefault(FOC_IMAX, 100)/10.0f; return 1;
+		case EP_CURRENT_HARD_MAX:    //A <- 0.1 A
+			if(write) CUR_TRIP = toWord(f*10.0f);
+			*val = (float)CurrentHardMax()/1000.0f; return 1;
+		case EP_TORQUE_CONSTANT_CFG:    //Nm/A <- mNm/A
+			if(write) TORQUE_CONST = toWord(f*1000.0f);
+			*val = kt; return 1;
+		case EP_POLE_PAIRS:
+			if(write) WINDINGS = toWord(f*2.0f);
+			*val = (float)WINDINGS/2.0f; return 1;
+		case EP_PHASE_RESISTANCE:    //Ohm <- mOhm
+			if(write) MOTOR_R = toWord(f*1000.0f);
+			*val = (float)cfgOrDefault(MOTOR_R, 300)/1000.0f; return 1;
+		case EP_WATCHDOG_TIMEOUT:    //s <- ms
+			if(write) SERIAL_TIMEOUT = toWord(f*1000.0f);
+			*val = (float)SERIAL_TIMEOUT/1000.0f; return 1;
+		case EP_UNDERVOLTAGE:    //V <- mV (low battery cut-off; <= 20 V: off)
+			if(write) BAT_EMPTY = toWord(f*1000.0f);
+			*val = (float)BAT_EMPTY/1000.0f; return 1;
+		case EP_OVERVOLTAGE:    //V: coast above battery full + 3 V
+			if(write) BAT_FULL = toWord((f-3.0f)*1000.0f);
+			*val = (float)BAT_FULL/1000.0f+3.0f; return 1;
+		case EP_NODE_ID:
+			if(write) SLAVE_ID = toWord(f);
+			*val = (float)SLAVE_ID; return 1;
+		case EP_UART_BAUDRATE:    //baud <- baud/100 (after a restart)
+			if(write) BAUD = toWord(f/100.0f);
+			*val = (float)BAUD*100.0f; return 1;
+	}
+	return 0;
 }
 
 uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
@@ -277,7 +333,10 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 	uint8_t frame[8];
 	uint32_t r = 0;
 	if(write&&len<8&&ep<EP_SAVE_CONFIGURATION) return 0;
-	if(ep<64){
+	float pv;
+	if(odriveParam(ep, write, ep==EP_POLE_PAIRS||ep==EP_NODE_ID||ep==EP_UART_BAUDRATE ? (float)v : f, &pv)){
+		if(ep==EP_POLE_PAIRS||ep==EP_NODE_ID||ep==EP_UART_BAUDRATE) r = (uint32_t)pv; else wrF((uint8_t*)&r, pv);
+	}else if(ep<64){
 		if(write){
 			if(ep==MAGICNUM_POS||ep==63) return 0;
 			if(ep==44) SetDriveMode((uint8_t)v); else pinstorage[ep] = (uint16_t)v;

@@ -2,349 +2,349 @@
  "fw_version": "2.0.0",
  "protocol": 2,
  "endpoints": {
-  "config.halla": {
+  "hoverboard.config.halla": {
    "id": 0,
    "type": "uint16",
    "access": "rw",
    "unit": "hall sensor A"
   },
-  "config.hallb": {
+  "hoverboard.config.hallb": {
    "id": 1,
    "type": "uint16",
    "access": "rw",
    "unit": "hall sensor B"
   },
-  "config.hallc": {
+  "hoverboard.config.hallc": {
    "id": 2,
    "type": "uint16",
    "access": "rw",
    "unit": "hall sensor C"
   },
-  "config.ledr": {
+  "hoverboard.config.ledr": {
    "id": 3,
    "type": "uint16",
    "access": "rw",
    "unit": "red LED"
   },
-  "config.ledg": {
+  "hoverboard.config.ledg": {
    "id": 4,
    "type": "uint16",
    "access": "rw",
    "unit": "green LED"
   },
-  "config.ledb": {
+  "hoverboard.config.ledb": {
    "id": 5,
    "type": "uint16",
    "access": "rw",
    "unit": "blue / orange LED"
   },
-  "config.ledu": {
+  "hoverboard.config.ledu": {
    "id": 6,
    "type": "uint16",
    "access": "rw",
    "unit": "upper LED"
   },
-  "config.ledd": {
+  "hoverboard.config.ledd": {
    "id": 7,
    "type": "uint16",
    "access": "rw",
    "unit": "lower LED"
   },
-  "config.buzzer": {
+  "hoverboard.config.buzzer": {
    "id": 8,
    "type": "uint16",
    "access": "rw",
    "unit": "buzzer"
   },
-  "config.button": {
+  "hoverboard.config.button": {
    "id": 9,
    "type": "uint16",
    "access": "rw",
    "unit": "power button sense"
   },
-  "config.latch": {
+  "hoverboard.config.latch": {
    "id": 10,
    "type": "uint16",
    "access": "rw",
    "unit": "power self-hold"
   },
-  "config.charge": {
+  "hoverboard.config.charge": {
    "id": 11,
    "type": "uint16",
    "access": "rw",
    "unit": "charger detect"
   },
-  "config.vbat": {
+  "hoverboard.config.vbat": {
    "id": 12,
    "type": "uint16",
    "access": "rw",
    "unit": "battery voltage adc"
   },
-  "config.itotal": {
+  "hoverboard.config.itotal": {
    "id": 13,
    "type": "uint16",
    "access": "rw",
    "unit": "bus current adc"
   },
-  "config.tx": {
+  "hoverboard.config.tx": {
    "id": 14,
    "type": "uint16",
    "access": "rw",
    "unit": "uart tx"
   },
-  "config.rx": {
+  "hoverboard.config.rx": {
    "id": 15,
    "type": "uint16",
    "access": "rw",
    "unit": "uart rx"
   },
-  "config.iphasea": {
+  "hoverboard.config.iphasea": {
    "id": 16,
    "type": "uint16",
    "access": "rw",
    "unit": "phase current adc 1 (phase: iphasecfg)"
   },
-  "config.iphaseb": {
+  "hoverboard.config.iphaseb": {
    "id": 17,
    "type": "uint16",
    "access": "rw",
    "unit": "phase current adc 2 (phase: iphasecfg)"
   },
-  "config.poskp": {
+  "hoverboard.config.poskp": {
    "id": 18,
    "type": "uint16",
    "access": "rw",
    "unit": "position: 0.1 rpm per hall step of error; 0/65535 = default 20"
   },
-  "config.posrpm": {
+  "hoverboard.config.posrpm": {
    "id": 19,
    "type": "uint16",
    "access": "rw",
    "unit": "velocity limit (vel_limit) in position and velocity modes, rpm; 0/65535 = default 300"
   },
-  "config.motorr": {
+  "hoverboard.config.motorr": {
    "id": 20,
    "type": "uint16",
    "access": "rw",
    "unit": "phase resistance incl. mosfets, mOhm; 0/65535 = default 300"
   },
-  "config.fwimax": {
+  "hoverboard.config.fwimax": {
    "id": 21,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"
   },
-  "config.fwadvance": {
+  "hoverboard.config.fwadvance": {
    "id": 22,
    "type": "uint16",
    "access": "rw",
    "unit": "sine field weakening: max phase advance, degrees electrical; 0/65535 = off"
   },
-  "config.ocp": {
+  "hoverboard.config.ocp": {
    "id": 23,
    "type": "uint16",
    "access": "rw",
    "unit": "TIM1 break input (hardware overcurrent)"
   },
-  "config.ocpref": {
+  "hoverboard.config.ocpref": {
    "id": 24,
    "type": "uint16",
    "access": "rw",
    "unit": "overcurrent comparator reference"
   },
-  "config.itotalzero": {
+  "hoverboard.config.itotalzero": {
    "id": 25,
    "type": "uint16",
    "access": "rw",
    "unit": "shunt zero below adc 0 (the adc clips), 0.01 counts; 0/65535 = 0"
   },
-  "config.torqueconst": {
+  "hoverboard.config.torqueconst": {
    "id": 26,
    "type": "uint16",
    "access": "rw",
    "unit": "torque constant mNm/A (CANSimple torque units); 0/65535 = 8270 / sine kv"
   },
-  "config.curtrip": {
+  "hoverboard.config.curtrip": {
    "id": 27,
    "type": "uint16",
    "access": "rw",
    "unit": "phase current trip (current_hard_max) 0.1 A; 0/65535 = 2 x focimax, at least 15 A"
   },
-  "config.magicnum": {
+  "hoverboard.config.magicnum": {
    "id": 32,
    "type": "uint16",
    "access": "r",
    "unit": "0xDCAB = valid"
   },
-  "config.vbatdivider": {
+  "hoverboard.config.vbatdivider": {
    "id": 33,
    "type": "uint16",
    "access": "rw",
    "unit": "vbat = divider * Vadc"
   },
-  "config.itotaldivider": {
+  "hoverboard.config.itotaldivider": {
    "id": 34,
    "type": "uint16",
    "access": "rw",
    "unit": "itotal = divider * Vadc (1/shunt ohm); bench board 419"
   },
-  "config.baud": {
+  "hoverboard.config.baud": {
    "id": 36,
    "type": "uint16",
    "access": "rw",
    "unit": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200)"
   },
-  "config.pwmres": {
+  "hoverboard.config.pwmres": {
    "id": 37,
    "type": "uint16",
    "access": "rw",
    "unit": "TIM1 period"
   },
-  "config.slaveid": {
+  "hoverboard.config.slaveid": {
    "id": 38,
    "type": "uint16",
    "access": "rw",
    "unit": "RemoteUartBus slave id"
   },
-  "config.windings": {
+  "hoverboard.config.windings": {
    "id": 39,
    "type": "uint16",
    "access": "rw",
    "unit": "motor poles"
   },
-  "config.invlowside": {
+  "hoverboard.config.invlowside": {
    "id": 40,
    "type": "uint16",
    "access": "rw",
    "unit": "1 = low side gate drive inverted"
   },
-  "config.softocp": {
+  "hoverboard.config.softocp": {
    "id": 41,
    "type": "uint16",
    "access": "rw",
    "unit": "A, averaged bus current limit, 0 = off"
   },
-  "config.hardocp": {
+  "hoverboard.config.hardocp": {
    "id": 42,
    "type": "uint16",
    "access": "rw",
    "unit": "adc watchdog current limit, adc counts above zero"
   },
-  "config.drivemode": {
+  "hoverboard.config.drivemode": {
    "id": 44,
    "type": "uint16",
    "access": "rw",
    "unit": "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED, 3/7/11 COM/SINE/FOC_POSITION, 8 FOC_VOLT, 9 FOC_SPEED, 10 FOC_TORQUE (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"
   },
-  "config.batfull": {
+  "hoverboard.config.batfull": {
    "id": 45,
    "type": "uint16",
    "access": "rw",
    "unit": "mV"
   },
-  "config.batempty": {
+  "hoverboard.config.batempty": {
    "id": 46,
    "type": "uint16",
    "access": "rw",
    "unit": "mV, <= 20000 disables the low battery cut-off"
   },
-  "config.timeout": {
+  "hoverboard.config.timeout": {
    "id": 47,
    "type": "uint16",
    "access": "rw",
    "unit": "ms without a command until speed = 0"
   },
-  "config.speedkp": {
+  "hoverboard.config.speedkp": {
    "id": 48,
    "type": "uint16",
    "access": "rw",
    "unit": "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"
   },
-  "config.speedki": {
+  "hoverboard.config.speedki": {
    "id": 49,
    "type": "uint16",
    "access": "rw",
    "unit": "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"
   },
-  "config.speedkv": {
+  "hoverboard.config.speedkv": {
    "id": 50,
    "type": "uint16",
    "access": "rw",
    "unit": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 395"
   },
-  "config.speedd0": {
+  "hoverboard.config.speedd0": {
    "id": 51,
    "type": "uint16",
    "access": "rw",
    "unit": "COM_SPEED feed forward: dead band permille duty, 0 = default 185"
   },
-  "config.sinekp": {
+  "hoverboard.config.sinekp": {
    "id": 52,
    "type": "uint16",
    "access": "rw",
    "unit": "SINE_SPEED: 0.1 permille modulation per rpm, 0 = default 5"
   },
-  "config.sineki": {
+  "hoverboard.config.sineki": {
    "id": 53,
    "type": "uint16",
    "access": "rw",
    "unit": "SINE_SPEED: 0.1 permille per rpm*s, 0 = default 85"
   },
-  "config.sinekv": {
+  "hoverboard.config.sinekv": {
    "id": 54,
    "type": "uint16",
    "access": "rw",
    "unit": "SINE_SPEED feed forward: 0.1 rpm/V at 100% modulation, 0 = default 242"
   },
-  "config.sined0": {
+  "hoverboard.config.sined0": {
    "id": 55,
    "type": "uint16",
    "access": "rw",
    "unit": "SINE_SPEED feed forward: dead band permille, 0 = default 10"
   },
-  "config.iphasegain": {
+  "hoverboard.config.iphasegain": {
    "id": 56,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC: 0.1 mA per adc count, 0 = default 515"
   },
-  "config.iphasecfg": {
+  "hoverboard.config.iphasecfg": {
    "id": 57,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC: phases on iphasea/b 0 = A,B 1 = B,C 2 = A,C; +4: adc rises with current into the motor"
   },
-  "config.focimax": {
+  "hoverboard.config.focimax": {
    "id": 58,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC: phase current limit 0.1 A, 0 = default 100; trips at twice that"
   },
-  "config.curkp": {
+  "hoverboard.config.curkp": {
    "id": 59,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC current loop: mV per A, 0 = default 400"
   },
-  "config.curki": {
+  "hoverboard.config.curki": {
    "id": 60,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC current loop: V per A*s, 0 = default 300"
   },
-  "config.focspdkp": {
+  "hoverboard.config.focspdkp": {
    "id": 61,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC_SPEED: mA per rpm, 0 = default 30"
   },
-  "config.focspdki": {
+  "hoverboard.config.focspdki": {
    "id": 62,
    "type": "uint16",
    "access": "rw",
    "unit": "FOC_SPEED: mA per rpm*s, 0 = default 100"
   },
-  "config.cfgversion": {
+  "hoverboard.config.cfgversion": {
    "id": 63,
    "type": "uint16",
    "access": "r",
@@ -362,119 +362,203 @@
    "access": "r",
    "unit": "A, bus current"
   },
-  "pos_estimate": {
+  "axis0.pos_estimate": {
    "id": 258,
    "type": "float",
    "access": "rw",
-   "unit": "turns; writing sets the position (Set_Absolute_Position)"
+   "unit": "turns; writing shifts the position (Set_Absolute_Position)"
   },
-  "vel_estimate": {
+  "axis0.vel_estimate": {
    "id": 259,
    "type": "float",
    "access": "r",
    "unit": "turns/s"
   },
-  "iq_measured": {
+  "axis0.motor.foc.Iq_measured": {
    "id": 260,
    "type": "float",
    "access": "r",
    "unit": "A (FOC; NaN otherwise)"
   },
-  "iq_setpoint": {
+  "axis0.motor.foc.Iq_setpoint": {
    "id": 261,
    "type": "float",
    "access": "r",
    "unit": "A"
   },
-  "axis_state": {
+  "axis0.current_state": {
    "id": 262,
    "type": "uint8",
    "access": "rw",
-   "unit": "1 IDLE, 8 CLOSED_LOOP_CONTROL"
+   "unit": "1 IDLE, 8 CLOSED_LOOP_CONTROL; writing = requested_state"
   },
-  "active_errors": {
+  "axis0.active_errors": {
    "id": 263,
    "type": "uint32",
    "access": "r",
    "unit": "ODrive Error bits"
   },
-  "disarm_reason": {
+  "axis0.disarm_reason": {
    "id": 264,
    "type": "uint32",
    "access": "r",
    "unit": "ODrive Error bits"
   },
-  "odometer": {
+  "hoverboard.odometer": {
    "id": 265,
    "type": "int32",
    "access": "r",
    "unit": "hall steps since boot"
   },
-  "control_mode": {
+  "axis0.controller.config.control_mode": {
    "id": 266,
    "type": "uint8",
    "access": "rw",
    "unit": "0 VOLTAGE, 1 TORQUE, 2 VELOCITY, 3 POSITION"
   },
-  "input_mode": {
+  "axis0.controller.config.input_mode": {
    "id": 267,
    "type": "uint8",
    "access": "rw",
-   "unit": "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ"
+   "unit": "1 PASSTHROUGH (others not implemented yet)"
   },
-  "commutation": {
+  "hoverboard.commutation": {
    "id": 268,
    "type": "uint8",
    "access": "rw",
    "unit": "0 block, 1 sine, 2 FOC"
   },
-  "input_pos": {
+  "axis0.controller.input_pos": {
    "id": 269,
    "type": "float",
    "access": "rw",
    "unit": "turns"
   },
-  "input_vel": {
+  "axis0.controller.input_vel": {
    "id": 270,
    "type": "float",
    "access": "rw",
    "unit": "turns/s"
   },
-  "input_torque": {
+  "axis0.controller.input_torque": {
    "id": 271,
    "type": "float",
    "access": "rw",
    "unit": "Nm"
   },
-  "input_voltage": {
+  "hoverboard.input_voltage": {
    "id": 272,
    "type": "float",
    "access": "rw",
    "unit": "fraction of the maximum voltage, -1..1"
   },
-  "torque_constant": {
+  "hoverboard.torque_constant_in_use": {
    "id": 273,
    "type": "float",
    "access": "r",
-   "unit": "Nm/A in use"
+   "unit": "Nm/A"
   },
-  "id_setpoint": {
+  "hoverboard.id_setpoint": {
    "id": 274,
    "type": "int32",
    "access": "rw",
    "unit": "mA, FOC d current"
   },
-  "fast_speed": {
+  "hoverboard.fast_speed": {
    "id": 275,
    "type": "int32",
    "access": "r",
    "unit": "rpm, last hall interval"
   },
+  "axis0.controller.config.vel_limit": {
+   "id": 288,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s, position and velocity modes"
+  },
+  "axis0.controller.config.pos_gain": {
+   "id": 289,
+   "type": "float",
+   "access": "rw",
+   "unit": "(turns/s)/turn: position stiffness"
+  },
+  "axis0.controller.config.vel_gain": {
+   "id": 290,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/(turns/s), FOC velocity loop"
+  },
+  "axis0.controller.config.vel_integrator_gain": {
+   "id": 291,
+   "type": "float",
+   "access": "rw",
+   "unit": "(Nm/s)/(turns/s), FOC velocity loop"
+  },
+  "axis0.config.motor.current_soft_max": {
+   "id": 292,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, FOC current limit"
+  },
+  "axis0.config.motor.current_hard_max": {
+   "id": 293,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, phase current trip (CURRENT_LIMIT_VIOLATION)"
+  },
+  "axis0.config.motor.torque_constant": {
+   "id": 294,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/A; 0 = 8.27 / kv"
+  },
+  "axis0.config.motor.pole_pairs": {
+   "id": 295,
+   "type": "uint32",
+   "access": "rw",
+   "unit": "after a restart"
+  },
+  "axis0.config.motor.phase_resistance": {
+   "id": 296,
+   "type": "float",
+   "access": "rw",
+   "unit": "Ohm incl. mosfets (sine torque model)"
+  },
+  "axis0.config.watchdog_timeout": {
+   "id": 297,
+   "type": "float",
+   "access": "rw",
+   "unit": "s without a set point -> 0 / hold position"
+  },
+  "config.dc_bus_undervoltage_trip_level": {
+   "id": 298,
+   "type": "float",
+   "access": "rw",
+   "unit": "V, low battery cut-off; <= 20 V off"
+  },
+  "config.dc_bus_overvoltage_trip_level": {
+   "id": 299,
+   "type": "float",
+   "access": "rw",
+   "unit": "V, coasts above (battery full + 3 V)"
+  },
+  "axis0.config.can.node_id": {
+   "id": 300,
+   "type": "uint32",
+   "access": "rw",
+   "unit": "the bus id (slave id), after a restart"
+  },
+  "config.uart0_baudrate": {
+   "id": 301,
+   "type": "uint32",
+   "access": "rw",
+   "unit": "baud, after a restart"
+  },
   "save_configuration": {
    "id": 512,
    "type": "function",
    "access": "w",
-   "unit": "store the config words (when the wheel stands still)"
+   "unit": "store everything (when the wheel stands still)"
   },
   "clear_errors": {
    "id": 513,
