@@ -39,6 +39,12 @@ FIELDS = {
     21: ("fwimax", "num", "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"),
     22: ("fwadvance", "num", "sine field weakening: max phase advance, degrees electrical; 0/65535 = off"),
     23: ("ocp", "pin", "TIM1 break input (hardware overcurrent)"),
+    28: ("inputmode", "num", "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ; 0/65535 = 1"),
+    29: ("velramprate", "num", "VEL_RAMP 0.01 turns/s^2; 0/65535 = 100"),
+    30: ("filterbw", "num", "POS_FILTER bandwidth 0.01 /s; 0/65535 = 200"),
+    31: ("trajvel", "num", "TRAP_TRAJ velocity limit 0.01 turns/s; 0/65535 = 200"),
+    35: ("trajaccel", "num", "TRAP_TRAJ acceleration 0.01 turns/s^2; 0/65535 = 50"),
+    43: ("trajdecel", "num", "TRAP_TRAJ deceleration 0.01 turns/s^2; 0/65535 = 50"),
     27: ("curtrip", "num", "phase current trip (current_hard_max) 0.1 A; 0/65535 = 2 x focimax, at least 15 A"),
     26: ("torqueconst", "num", "torque constant mNm/A (CANSimple torque units); 0/65535 = 8270 / sine kv"),
     25: ("itotalzero", "num", "shunt zero below adc 0 (the adc clips), 0.01 counts; 0/65535 = 0"),
@@ -66,7 +72,7 @@ FIELDS = {
     60: ("curki", "num", "FOC current loop: V per A*s, 0 = default 300"),
     61: ("focspdkp", "num", "FOC_SPEED: mA per rpm, 0 = default 30"),
     62: ("focspdki", "num", "FOC_SPEED: mA per rpm*s, 0 = default 100"),
-    63: ("cfgversion", "num", "config layout: 0 = old drive mode numbers (2/3 = sine), migrated at boot"),
+    63: ("cfgversion", "num", "config layout version, migrated at boot: 1 drive mode numbers, 2 baud/100, 3 input mode words reset"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}
 

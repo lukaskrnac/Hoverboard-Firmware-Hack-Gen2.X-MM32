@@ -88,10 +88,17 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
   - Block: a current loop on the bus shunt, which carries the phase current at the sample time in
     block mode.
   - Sine: no current sensing; the voltage is computed from `motorr` and the back EMF.
-- **Field weakening** is off by default.
-  - FOC: `fwimax`, a negative d current up to that value.
+- **Field weakening** is off by default (CANSimple: `hoverboard.foc.field_weakening_current`,
+  `hoverboard.sine.field_weakening_advance`; the console's drive panel has both).
+  - FOC: `fwimax`, the most negative d current, at most 60 % of the current limit. A controller sets
+    the d current so the current loops keep 5 % voltage headroom. Bench wheel at 24 V: 520 rpm
+    without, ~720 rpm with 4 A, ~815 rpm with 6 A (then ~9.5 A phase current and ~180 W from the
+    supply, unloaded).
   - Sine: `fwadvance`, phase advance in degrees. Sine field weakening has no current control and is
     expensive; see `Inc/pinout.h`.
+  - Above the speed the battery voltage allows, the back EMF is higher than the bus: a coast (gates
+    off) then charges the bus through the MOSFET diodes, which a bench supply cannot take. Ramp down
+    (VEL_RAMP; voltage commands slew at 1 ‰/ms) instead of stopping at once.
 - **Overvoltage:** the board coasts while the bus is 3 V above `batfull`, so braking doesn't pump a
   bench supply.
 

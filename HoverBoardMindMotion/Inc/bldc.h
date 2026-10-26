@@ -28,6 +28,7 @@ extern const uint8_t hall_to_pos[8];
 #define ERR_WATCHDOG_TIMER_EXPIRED   0x1000000u
 #define ERR_ESTOP_REQUESTED          0x2000000u
 extern volatile int32_t posCmd;
+extern volatile int32_t posVelFf;    //Set_Input_Pos Vel_FF, rpm
 extern volatile uint8_t cmdSource;
 extern volatile uint8_t axisState;
 extern volatile uint32_t axisErrors;

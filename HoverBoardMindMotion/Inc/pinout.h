@@ -40,6 +40,13 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define FW_ADVANCE pinstorage[22]  //sine field weakening: max phase advance, degrees electrical; default off. No current
                                    //control: 15 deg ran the bench wheel at 914 instead of 586 rpm but drew 3.1 A instead of
                                    //0.66 A from the supply (~12 A phase current) unloaded; FOC field weakening is controlled
+//ODrive input modes (inputmode.c); 0/65535 = default
+#define INPUT_MODE pinstorage[28]       //1 PASSTHROUGH (default), 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ
+#define VEL_RAMP_RATE pinstorage[29]    //VEL_RAMP: 0.01 turns/s^2, default 100 (ODrive's 1.0)
+#define INPUT_FILTER_BW pinstorage[30]  //POS_FILTER bandwidth: 0.01 /s, default 200 (2.0)
+#define TRAJ_VEL pinstorage[31]         //TRAP_TRAJ: velocity limit 0.01 turns/s, default 200 (2.0)
+#define TRAJ_ACCEL pinstorage[35]       //TRAP_TRAJ: 0.01 turns/s^2, default 50 (0.5)
+#define TRAJ_DECEL pinstorage[43]       //TRAP_TRAJ: 0.01 turns/s^2, default 50 (0.5)
 #define CUR_TRIP pinstorage[27]      //phase current trip (current_hard_max), 0.1 A; 0/65535 = 2 x focimax, >= 15 A
 #define TORQUE_CONST pinstorage[26]  //Nm per A x 1000 (CANSimple torque units); 0/65535 = 8.27 / sine kv
 #define OCPPIN pinstorage[23]
@@ -83,7 +90,7 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 //config layout version: 0 = before the drive mode encoding commutation*4 + control (SINE_VOLT was 2,
 //SINE_SPEED 3); main.c migrates older layouts after loading
 #define CFG_VERSION pinstorage[63]
-#define CFG_VERSION_CURRENT 2    //2: BAUD in units of 100 baud
+#define CFG_VERSION_CURRENT 3    //2: BAUD in units of 100 baud, 3: input mode words 28-31, 35, 43
 
 static inline int32_t cfgOrDefault(uint16_t v, int32_t def){ return (v==0||v==0xFFFF) ? def : v; }
 

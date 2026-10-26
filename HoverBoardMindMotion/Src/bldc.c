@@ -11,6 +11,7 @@
 #include <math.h>
 #include "hallhandle.h"
 #include "foc.h"
+#include "inputmode.h"
 
 static volatile uint16_t abspwm;
 volatile uint32_t lastcommutate;
@@ -20,6 +21,10 @@ volatile uint8_t blockbrake=0;    //block commutation: low side short brake acti
 static uint16_t brakeduty;        //permille of the period the low sides are on while braking
 static int32_t posHold;           //position mode: target kept while the remote is silent
 volatile int32_t posCmd;          //position target from the CANSimple protocol, hall steps (int32)
+volatile int32_t posVelFf;        //its velocity feed forward, rpm
+static uint32_t inT;              //last speedupdate(), for the input modes
+static int32_t vRamp;             //pwm control: the applied command, permille, slewed (VOLT_SLEW)
+#define VOLT_SLEW 1               //permille per ms: full scale in 1 s
 volatile uint8_t cmdSource = 1;   //protocol of the last command frame: 1 v1 ('/'), 2 CANSimple
 volatile uint8_t axisState = AXIS_CLOSED_LOOP;    //ODrive AxisState: IDLE 1 = gates off, CLOSED_LOOP 8
 volatile uint32_t axisErrors;     //ODrive Error bits, the conditions active now (see bldc.h)
@@ -162,6 +167,10 @@ void speedupdate(void){
 		//armed: v1 frames arm and disarm with state bit 64, CANSimple with the axis state (a v1 master
 		//cannot set that). A disarm by error (Estop) holds for both until Clear_Errors.
 		uint8_t idle = cmdSource==1 ? (wState & STATE_DISABLE)!=0 : axisState==AXIS_IDLE;
+		//a phase current trip disarms a CANSimple axis until Clear_Errors (ODrive). Clearing it by itself
+		//at command 0 re-armed while the set point was still high (VEL_RAMP): the wheel shot off. v1
+		//masters have no Clear_Errors: there the trip still clears at command 0.
+		if(focTrip&&cmdSource==2) axisDisarm |= ERR_CURRENT_LIMIT_VIOLATION;
 		gatesoff = lowbatperm || axisDisarm || idle;
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
@@ -174,42 +183,74 @@ void speedupdate(void){
 		}
 		//position: the command is the target odometer (hall steps, like the Gen2.x-GD32 iOdom input);
 		//without commands the wheel holds where it is instead of going back to target 0
+		//set points through the input mode (inputmode.c), limited by vel_limit. Disarmed and in pwm/torque
+		//control they follow the wheel (bumpless start). A velocity command timeout sets speed 0, which
+		//VEL_RAMP ramps down too (a step to 0 brakes hard: regeneration a bench supply cannot take).
+		//pwm control: the command slews at VOLT_SLEW and coasts once the ramp is at 0 (it switched the
+		//gates off at once: above base speed with field weakening the back emf then charged the bus
+		//through the body diodes). Estop / IDLE still switch the gates off at once.
 		int32_t posErr = 0, posSpeed = 0;
 		int32_t vlim = cfgOrDefault(POS_RPM, 300);    //vel_limit, rpm
-		int32_t spd = speed>vlim ? vlim : (speed<-vlim ? -vlim : speed);    //velocity set point
-		if(CONTROL(DRIVEMODE)==CTRL_POSITION){
-			if(RemoteTimedOut()){
+		int32_t dtms = (int32_t)(millis-inT);
+		inT = millis;
+		if(dtms>20) dtms = 20;
+		uint8_t ctl = CONTROL(DRIVEMODE), timedOut = RemoteTimedOut();
+		uint8_t held = gatesoff||focTrip;    //gates off: set points and controllers follow the wheel
+		//regeneration limit: above the full battery voltage (BAT_FULL) the bus cannot take energy back (a
+		//full battery, a bench supply): ramps that slow the wheel down pause and FOC gives no braking
+		//current; the wheel slows by friction. Above BAT_FULL + 3 V it coasts (overvolt, below). A 1 s
+		//voltage ramp from 1200 rpm (sine field weakening) pumped a bench supply to 46.6 V.
+		uint8_t regen = BAT_FULL>20000&&BAT_FULL<65000&&fvbat*10>(int32_t)BAT_FULL;
+		if(held||ctl==CTRL_PWM||ctl==CTRL_TORQUE) InputTrack(iOdom, realspeed);
+		int32_t spd = ctl==CTRL_SPEED ? InputVel(speed, dtms, regen, realspeed) : speed;    //velocity set point
+		if(held||ctl!=CTRL_PWM){
+			vRamp = 0;
+		}else{
+			int32_t st = VOLT_SLEW*dtms, d = speed-vRamp;
+			if(regen&&vRamp&&(d>0)!=(vRamp>0)) st = 0;    //towards 0: pause while the bus is high
+			vRamp += d>st ? st : (d<-st ? -st : d);
+		}
+		if(spd>vlim) spd = vlim; else if(spd<-vlim) spd = -vlim;
+		if(ctl==CTRL_POSITION){
+			if(timedOut){
 				if(!posHeld){ posHold = iOdom; posHeld = 1; }
 			}else{
 				posHold = cmdSource==2 ? posCmd : speed;
 				posHeld = 0;
 			}
-			posErr = posHold-iOdom;
-			posDone = posErr<=1&&posErr>=-1;
-			posSpeed = PositionSpeed(posErr);
+			int32_t ff = 0, target = posHold;
+			if(!held) target = InputPos(posHold, cmdSource==2&&!timedOut ? posVelFf : 0, dtms, &ff);
+			posErr = target-iOdom;
+			posDone = InputPosDone()&&posErr<=1&&posErr>=-1;
+			posSpeed = ff+PositionSpeed(posErr);
+			if(posSpeed>vlim) posSpeed = vlim; else if(posSpeed<-vlim) posSpeed = -vlim;
 		}
-		if(gatesoff){
+		if(held){
 			pwm=0;
 			SpeedCtrlReset();
-			FocSpeedReset();
+			FocReset();
 		}else if(COMMUTATION(DRIVEMODE)==COMMUT_FOC){
 			//command 0: pwm coasts (gates off), torque 0 current, speed holds 0 rpm (brakes)
 			switch(CONTROL(DRIVEMODE)){
 				case CTRL_PWM:
-					coast = speed==0;
-					FocSetVoltage(speed);
-					break;
-				case CTRL_TORQUE:
-					FocSetCurrent((int32_t)speed*10);    //0.01 A
-					break;
-				case CTRL_POSITION:
-					FocSetCurrent(FocSpeedCtrl(posSpeed, fastspeed));
+					coast = vRamp==0;
+					FocSetVoltage(vRamp);
 					break;
 				default:{
-					//below 10 rpm the last hall interval is > 65 ms old: the loop limit-cycled +-55 rpm
-					//around a 0 rpm set point on it. Read as 0 there, as before the ms interval timing.
-					int32_t m = fastspeed;
-					FocSetCurrent(FocSpeedCtrl(spd, (m<10&&m>-10) ? 0 : m));
+					int32_t i;    //mA
+					if(ctl==CTRL_TORQUE){
+						i = (int32_t)speed*10;    //0.01 A
+					}else if(ctl==CTRL_POSITION){
+						i = FocSpeedCtrl(posSpeed, fastspeed);
+					}else{
+						//below 10 rpm the last hall interval is > 65 ms old: the loop limit-cycled +-55
+						//rpm around a 0 rpm set point on it. Read as 0 there, as before the ms timing.
+						int32_t m = fastspeed;
+						i = FocSpeedCtrl(spd, (m<10&&m>-10) ? 0 : m);
+					}
+					//regeneration limit (see above): no braking current while the bus is above BAT_FULL
+					if(regen&&((i>0&&realspeed<0)||(i<0&&realspeed>0))) i = 0;
+					FocSetCurrent(i);
 					break;
 				}
 			}
@@ -217,12 +258,12 @@ void speedupdate(void){
 		}else{
 			uint8_t blk = COMMUTATION(DRIVEMODE)==COMMUT_BLOCK;
 			switch(CONTROL(DRIVEMODE)){
-				case CTRL_PWM:    //command 0 coasts
-					coast = speed==0;
-					pwm = blk ? speed*PWM_RES/1000 : speed*40;    //duty counts / Q15 modulation (+-32000 linear)
+				case CTRL_PWM:    //command 0 coasts (after the ramp)
+					coast = vRamp==0;
+					pwm = blk ? vRamp*PWM_RES/1000 : vRamp*40;    //duty counts / Q15 modulation (+-32000 linear)
 					break;
 				case CTRL_SPEED:    //rpm; command 0 brakes and holds
-					if(speed==0){
+					if(spd==0){
 						//block: short the motor with the low sides (it cannot brake through its normal
 						//switching). Sine: the modulation ramps to 0 at the speed loop's slew rate (3 per
 						//mille/ms; the motor regenerates as it falls below the back emf), then the zero
@@ -263,7 +304,7 @@ void speedupdate(void){
 					}
 					break;
 				case CTRL_POSITION:    //holds at the target like the speed modes at 0 (short brake / zero vector)
-					if(posErr==0&&fastspeed==0){
+					if(posErr==0&&posSpeed==0&&fastspeed==0){
 						pwm = 0;
 						brake = blk;
 						SpeedCtrlReset();
@@ -279,7 +320,11 @@ void speedupdate(void){
 					break;
 			}
 		}
-		if(overvolt){
+		//overvoltage: coast, but only below ~90 % of the speed the bus voltage allows (sine kv). Above
+		//it the back emf is higher than the bus: with the gates off it charges the bus through the
+		//diodes (a bench supply went to 36 V and shut down); the regeneration limit acts there instead.
+		int32_t kvs = SINE_KV ? SINE_KV : 242, vbase = kvs*fvbat/1000;    //rpm at 100 % modulation
+		if(overvolt&&(realspeed<0 ? -realspeed : realspeed)<vbase*9/10){
 			coast = 1;
 			brake = 0;
 		}

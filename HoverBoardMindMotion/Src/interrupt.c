@@ -65,9 +65,11 @@ void ADC1_COMP_IRQHandler(void){
 				int32_t zero = cfgOrDefault(ITOTAL_ZERO, 0);
 				itotal = raw>0 ? (int32_t)ITOTAL_DIVIDER*(raw*100+zero)*120/vrefint/100 : 0;
 			}
-			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC;
-			if(foc){
-				FocMeasure();    //phase currents; itotal from them (the shunt reads ~0 at this sample time)
+			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC, sine = COMMUTATION(DRIVEMODE)==COMMUT_SINE;
+			if(foc||sine){
+				//phase currents (if the board has the pins); itotal from them: the shunt reads ~0 at this
+				//sample time (all low sides on)
+				FocMeasure();
 			}
 			avgvbat();
 			avgItotal();
@@ -75,7 +77,7 @@ void ADC1_COMP_IRQHandler(void){
 			//~0.3 A and the raw value spikes on switching noise. Fast faults are the adc watchdog's job (AWDG).
 			overcurrent = SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100;
 			//the only place the gates are switched while running
-			gatesOutput(!(gatesoff||coastreq||overcurrent||(foc&&FocHoldOff())));
+			gatesOutput(!(gatesoff||coastreq||overcurrent||(foc ? FocHoldOff() : sine&&focTrip)));
 			HALL1.CMDDIR = -dir;
 			HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
 			if(COMMUTATION(DRIVEMODE)==COMMUT_SINE){
@@ -96,6 +98,7 @@ void ADC1_COMP_IRQHandler(void){
 				pwm_gen.Beta  = ipark1.Beta;
 				PWM_GEN_calc(&pwm_gen);
 				Update_PWM(&pwm_gen);
+				FocObserve();
 			}else if(foc){
 				FocControl();
 			}

@@ -90,6 +90,10 @@ s32 main(void){
 		BAUD = BAUD>=1200 ? BAUD/100 : 1152;
 		CFG_VERSION=2;
 	}
+	if(CFG_VERSION<3){    //input mode words: PinFinder's "reserved" (35, 43 held 0 / 1), now default
+		INPUT_MODE = VEL_RAMP_RATE = INPUT_FILTER_BW = TRAJ_VEL = TRAJ_ACCEL = TRAJ_DECEL = 0xFFFF;
+		CFG_VERSION=3;
+	}
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
 
 	//initialize normal gpio

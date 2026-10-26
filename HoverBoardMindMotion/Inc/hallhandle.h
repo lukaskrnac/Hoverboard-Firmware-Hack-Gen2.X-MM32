@@ -28,6 +28,7 @@ HALLType;
 
 
 extern HALLType HALL1;
+extern volatile uint8_t hallAngleSure;    //sine/FOC angle known (hallhandle.c); FOC applies d current only then
 extern volatile int32_t fastspeed;    //rpm from the last hall interval (hallhandle.c), signed like realspeed
 
 extern void HALLModuleInit(HALLType *u);

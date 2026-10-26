@@ -25,25 +25,31 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       those fixes works (`~/.cache/opencode-scratch/mm32-hover/pinfinder/`). It has no float printf,
       so the battery-voltage menu prints blank values: print in mV with integers instead.
       Its power-latch detection gives wrong results when the MCU is powered from the debugger.
-- [ ] Bus current in sine mode: the shunt is sampled at the zero vector (all low sides on) and reads
-      ~0. Boards with phase current pins could use FOC's estimate (sum of duty * phase current) once
-      the op-amp offsets are known; others need a second sample inside an active vector.
+- [ ] Bus current in sine mode on boards **without** phase current pins: the shunt is sampled at the
+      zero vector and reads ~0 (noise); they need a second sample inside an active vector. (With the
+      pins, sine now uses the phase currents like FOC, up to 90 % modulation.)
 - [ ] Position: FOC settles 1-2 steps off (the speed set point near the target is below what the
       halls can measure); the target is int16 (the command field). Sine takes 1.6-2.2 s per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
       same command; block torque depends on the shunt calibration.
-- [ ] FOC: I_d/I_q noise ~±0.3 A at standstill (±5 counts on the op-amp outputs) and ~±1 A at
-      500 rpm; the median filter delays the current by one period. Check the angle estimate at speed
-      (park angle lead), and filter id/iq for telemetry.
+- [ ] FOC field weakening: the most negative d current is capped at 60 % of the current limit
+      because on the voltage circle the q current is not regulated (7 of 10 A ran to 12.7 A and
+      tripped). A d current floor from the back emf (enough field weakening for the speed, also while
+      the speed loop releases torque) would let it hold more and brake from above base speed without
+      the bus rising (bench supply: ~33 V braking from 850 rpm, ramps paused above `batfull`).
+- [ ] At high current and speed (field weakening) the ST-Link and the FTDI drop off USB now and then
+      (ground noise through the shared USB ground, the hub resets). Test scripts read over the bus
+      there; an isolator on the SWD/UART link would help.
 - [ ] **Low-battery cut-off** is disabled on the bench (`batempty` 19.0 V). Set real limits for a
       battery (e.g. 42.0 / 32.0 V for 10S) with the web console or `mm32config.py`.
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
       `main` deploys GitLab Pages). Try the console once in Firefox (WebSerial add-on, over http).
 
-- [ ] CANSimple input modes: only PASSTHROUGH. VEL_RAMP (ramp rate), POS_FILTER (bandwidth) and
-      TRAP_TRAJ (velocity/acceleration limits) like ODrive, with their parameters in config words
-      27-31. Position resolution is one hall step (1/90 turn): interpolate with the sine/FOC angle.
-- [ ] Flash: 25.9 of 30 KB used (soft float in the CANSimple parser ~5 KB). Check before adding more.
+- [ ] Position resolution is one hall step (1/90 turn). Interpolating the estimate with the sine/FOC
+      angle only helps while moving; holding between hall edges needs a sensor or holding the
+      electrical angle (stepper-like, costs current).
+- [ ] TORQUE_RAMP input mode (no config word left; words 28-31, 35, 43 hold the other input modes).
+- [ ] Flash: 27.3 of 30 KB with LTO (-flto saved 3 KB). Check before adding more.
 - [ ] Bus line above 230400 baud: the open-drain TX needs a stronger pull-up (or push-pull for a
       single board: config option).
 

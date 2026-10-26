@@ -17,7 +17,8 @@ START = 0xA5
 BROADCAST = 0x3F
 CMD = dict(GET_VERSION=0x00, HEARTBEAT=0x01, ESTOP=0x02, GET_ERROR=0x03, RXSDO=0x04, TXSDO=0x05,
            SET_AXIS_STATE=0x07, GET_ENCODER_ESTIMATES=0x09, SET_CONTROLLER_MODE=0x0B, SET_INPUT_POS=0x0C,
-           SET_INPUT_VEL=0x0D, SET_INPUT_TORQUE=0x0E, SET_LIMITS=0x0F, GET_IQ=0x14, GET_TEMPERATURE=0x15,
+           SET_INPUT_VEL=0x0D, SET_INPUT_TORQUE=0x0E, SET_LIMITS=0x0F, SET_TRAJ_VEL_LIMIT=0x11,
+           SET_TRAJ_ACCEL_LIMITS=0x12, GET_IQ=0x14, GET_TEMPERATURE=0x15,
            REBOOT=0x16, GET_BUS_VOLTAGE_CURRENT=0x17, CLEAR_ERRORS=0x18, SET_ABSOLUTE_POSITION=0x19,
            SET_POS_GAIN=0x1A, SET_VEL_GAINS=0x1B, GET_TORQUES=0x1C, GET_POWERS=0x1D, SET_INPUT_VOLTAGE=0x1E)
 AXIS_STATE = dict(IDLE=1, CLOSED_LOOP_CONTROL=8)
@@ -129,6 +130,8 @@ class Bus:
     def set_input_torque(self, node, torque): self.send(node, "SET_INPUT_TORQUE", struct.pack("<f", torque))
     def set_input_voltage(self, node, fraction): self.send(node, "SET_INPUT_VOLTAGE", struct.pack("<f", fraction))
     def set_limits(self, node, vel_limit, current_limit): self.send(node, "SET_LIMITS", struct.pack("<ff", vel_limit, current_limit))
+    def set_traj_vel_limit(self, node, v): self.send(node, "SET_TRAJ_VEL_LIMIT", struct.pack("<f", v))
+    def set_traj_accel_limits(self, node, a, d): self.send(node, "SET_TRAJ_ACCEL_LIMITS", struct.pack("<ff", a, d))
     def set_absolute_position(self, node, pos): self.send(node, "SET_ABSOLUTE_POSITION", struct.pack("<f", pos))
     def set_pos_gain(self, node, g): self.send(node, "SET_POS_GAIN", struct.pack("<f", g))
     def set_vel_gains(self, node, g, gi): self.send(node, "SET_VEL_GAINS", struct.pack("<ff", g, gi))

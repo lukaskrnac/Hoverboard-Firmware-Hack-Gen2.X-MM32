@@ -170,6 +170,30 @@
    "access": "rw",
    "unit": "phase current trip (current_hard_max) 0.1 A; 0/65535 = 2 x focimax, at least 15 A"
   },
+  "hoverboard.config.inputmode": {
+   "id": 28,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ; 0/65535 = 1"
+  },
+  "hoverboard.config.velramprate": {
+   "id": 29,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "VEL_RAMP 0.01 turns/s^2; 0/65535 = 100"
+  },
+  "hoverboard.config.filterbw": {
+   "id": 30,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "POS_FILTER bandwidth 0.01 /s; 0/65535 = 200"
+  },
+  "hoverboard.config.trajvel": {
+   "id": 31,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TRAP_TRAJ velocity limit 0.01 turns/s; 0/65535 = 200"
+  },
   "hoverboard.config.magicnum": {
    "id": 32,
    "type": "uint16",
@@ -187,6 +211,12 @@
    "type": "uint16",
    "access": "rw",
    "unit": "itotal = divider * Vadc (1/shunt ohm); bench board 419"
+  },
+  "hoverboard.config.trajaccel": {
+   "id": 35,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TRAP_TRAJ acceleration 0.01 turns/s^2; 0/65535 = 50"
   },
   "hoverboard.config.baud": {
    "id": 36,
@@ -229,6 +259,12 @@
    "type": "uint16",
    "access": "rw",
    "unit": "adc watchdog current limit, adc counts above zero"
+  },
+  "hoverboard.config.trajdecel": {
+   "id": 43,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TRAP_TRAJ deceleration 0.01 turns/s^2; 0/65535 = 50"
   },
   "hoverboard.config.drivemode": {
    "id": 44,
@@ -348,7 +384,7 @@
    "id": 63,
    "type": "uint16",
    "access": "r",
-   "unit": "config layout: 0 = old drive mode numbers (2/3 = sine), migrated at boot"
+   "unit": "config layout version, migrated at boot: 1 drive mode numbers, 2 baud/100, 3 input mode words reset"
   },
   "vbus_voltage": {
    "id": 256,
@@ -420,7 +456,7 @@
    "id": 267,
    "type": "uint8",
    "access": "rw",
-   "unit": "1 PASSTHROUGH (others not implemented yet)"
+   "unit": "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ"
   },
   "hoverboard.commutation": {
    "id": 268,
@@ -553,6 +589,66 @@
    "type": "uint32",
    "access": "rw",
    "unit": "baud, after a restart"
+  },
+  "axis0.controller.config.vel_ramp_rate": {
+   "id": 302,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, VEL_RAMP; 0 = default 1"
+  },
+  "axis0.controller.config.input_filter_bandwidth": {
+   "id": 303,
+   "type": "float",
+   "access": "rw",
+   "unit": "1/s, POS_FILTER; 0 = default 2"
+  },
+  "axis0.trap_traj.config.vel_limit": {
+   "id": 304,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s, TRAP_TRAJ; 0 = default 2"
+  },
+  "axis0.trap_traj.config.accel_limit": {
+   "id": 305,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, TRAP_TRAJ; 0 = default 0.5"
+  },
+  "axis0.trap_traj.config.decel_limit": {
+   "id": 306,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, TRAP_TRAJ; 0 = default 0.5"
+  },
+  "hoverboard.foc.field_weakening_current": {
+   "id": 307,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, max negative d current at the voltage limit (FOC); 0 = off, at most 60 % of current_soft_max"
+  },
+  "hoverboard.sine.field_weakening_advance": {
+   "id": 308,
+   "type": "float",
+   "access": "rw",
+   "unit": "degrees electrical, max phase advance beyond 100 % modulation (sine); 0 = off"
+  },
+  "axis0.controller.pos_setpoint": {
+   "id": 309,
+   "type": "float",
+   "access": "r",
+   "unit": "turns, after the input mode"
+  },
+  "axis0.controller.vel_setpoint": {
+   "id": 310,
+   "type": "float",
+   "access": "r",
+   "unit": "turns/s, after the input mode (position: feed forward)"
+  },
+  "hoverboard.foc.Id_measured": {
+   "id": 311,
+   "type": "float",
+   "access": "r",
+   "unit": "A, d current (FOC, sine on phase current pins), ~7 ms average"
   },
   "save_configuration": {
    "id": 512,

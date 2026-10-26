@@ -1,6 +1,7 @@
 /*-------------------- Includes -----------------------*/
 #include "hallhandle.h"
 #include "main.h"
+#include "pinout.h"
 #include "interrupt.h"
 #include "bldc.h"
 #include "mcu.h"
@@ -8,6 +9,7 @@
 /*------------------- Private variables ---------------*/
 HALLType HALL1;
 volatile int32_t fastspeed;
+volatile uint8_t hallAngleSure;    //the angle is known: a regular edge, its interpolation not run out
 static uint32_t edgeMs;    //millis at the last hall edge: interval timing past the 65 ms of the us timer
 static volatile int16_t CWShift = 0;    //extra sine angle advance in the direction of motion (65536 = 360 deg el), tuning over SWD
 /*------------------ Private functions ----------------*/
@@ -72,6 +74,7 @@ void HALLModuleCalc(HALLType *u){
 	//measurement: only real hall edges. A change of the commanded direction also changes RunHallValue;
 	//counting that as an edge made a fake odometer step and a speed sample from a stale timer capture.
 	uint8_t edge = 0;
+	uint32_t since = 0;    //us from the hall edge to its detection here
 	if(raw!=u->PreRaw && hall_to_pos[raw] && hall_to_pos[u->PreRaw]){
 		uint8_t d = (hall_to_pos[raw]+6-hall_to_pos[u->PreRaw])%6;    //1 or 5 for adjacent positions
 		edge = 1;
@@ -93,6 +96,8 @@ void HALLModuleCalc(HALLType *u){
 			realdir=1;
 		}
 		u->HallTime[i] = tim->CCR1;    //us since the previous edge (the timer is reset by every edge)
+		since = tim->CNT;              //so this is the time since this edge
+		if(since>456) since = 456;
 		if(tim->SR&TIM_SR_UI){         //16 bit timer overflowed: more than 65 ms, the capture wrapped;
 			tim->SR = ~TIM_SR_UI;      //ms timing instead (it was a fixed 250 ms: below ~10 rpm the speed
 			uint32_t ms = millis-edgeMs;    //read 0 or far too low)
@@ -140,18 +145,36 @@ void HALLModuleCalc(HALLType *u){
 			//edge snapped it: in FOC a current transient that tripped (position hold near its target).
 			u->Angle = (int16_t)u->CWAngleTab[raw];
 			u->IncAngleMax = 0;
+			hallAngleSure = 0;
 		}else if(edge){
+			hallAngleSure = 1;
+			//the edge is seen here up to one pwm period (228 us) late: the angle at the boundary plus
+			//the time since the edge (the timer count), plus a lead for the output of 9/8 periods:
+			//measured with FOC at 300 and 510 rpm, where the d voltage the loops settle at (no d current)
+			//is 0, i.e. the frame is on the rotor. With 1.5 periods (right only while the detection
+			//delay was not counted) it ran 0.4 periods ahead: +3.7 deg at 510 rpm, growing with speed,
+			//the back emf on d that field weakening could not stand. The interpolation may run one period past the next boundary, whose
+			//detection is late as well. A fixed lead for both, as before, stalled the angle at the sector
+			//end and then jumped a double step: up to ~12 deg el of error at 500 rpm, current ripple that
+			//grew with speed (FOC, worst with field weakening).
 			int32_t s = u->MoveDir;
-			u->IncAngle = ((uint32_t)PWM_RES*16384/9)/u->HallTimeSum;    //per pwm period: 65536*2*PWM_RES/72/HallTimeSum
-			u->IncAngleMax = 10922;
-			//+1.5 periods: hall edge detection and the pwm update come that much late
-			u->Angle = (int16_t)(u->CWAngleTab[raw] - s*5461 + s*(u->IncAngle*3/2) + s*CWShift);
+			//speed of the last interval, not the average of six: that lagged ~3.5 intervals behind a speed
+			//change, the extrapolated angle ran ahead / behind, and a field weakening d current turned the
+			//error into torque that grew it (shook and tripped from 4 A). The sectors are equal within
+			//1.5 deg on the bench motor: the error of one interval's speed over a sector is about that.
+			u->IncAngle = (int16_t)(((uint32_t)PWM_RES*16384/54)/u->HallTime[i]);    //65536*2*PWM_RES/72/6/interval
+			int32_t done = (int32_t)(u->IncAngle*since/228);
+			u->IncAngleMax = 10922+u->IncAngle-done;
+			u->Angle = (int16_t)(u->CWAngleTab[raw] - s*5461 + s*(done+u->IncAngle*9/8) + s*CWShift);
 		}else if(millis-lastcommutate>250){    //standing: middle of the sector
 			u->Angle = (int16_t)u->CWAngleTab[raw];
 			u->IncAngleMax = 0;
+			hallAngleSure = 0;
 		}else if(u->IncAngleMax >= u->IncAngle){
 			u->IncAngleMax -= u->IncAngle;
 			u->Angle += u->MoveDir*u->IncAngle;
+		}else{
+			hallAngleSure = 0;    //no edge where one was due: the rotor is slower, the angle runs ahead
 		}
 	}
 	//block commutation: evaluated every time, so a direction change or a mode switch takes effect at

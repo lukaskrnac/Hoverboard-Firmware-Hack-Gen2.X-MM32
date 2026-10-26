@@ -9,7 +9,8 @@
 //it, none answers. Set_ messages are not answered; requests (bit 7) and RxSdo are, with the same framing
 //and cmd id (bit 7 clear). Little endian, float32 in physical units: turns, turns/s, Nm, A, V.
 //Supported: Get_Version, Heartbeat, Estop, Get_Error, RxSdo/TxSdo (cansimple_sdo.c), Set_Axis_State,
-//Get_Encoder_Estimates, Set_Controller_Mode, Set_Input_Pos/Vel/Torque, Set_Limits, Get_Iq,
+//Get_Encoder_Estimates, Set_Controller_Mode, Set_Input_Pos/Vel/Torque, Set_Limits, Set_Traj_Vel_Limit,
+//Set_Traj_Accel_Limits, Get_Iq,
 //Get_Temperature (NaN: no sensor), Reboot (action 1 save_configuration only: a reset releases the power
 //latch), Get_Bus_Voltage_Current, Clear_Errors, Set_Absolute_Position, Set_Pos_Gain, Set_Vel_Gains,
 //Get_Torques, Get_Powers. Extension: 0x1E Set_Input_Voltage (float, fraction of the maximum, for
@@ -25,6 +26,7 @@
 #include "hallhandle.h"
 #include "remoteUartBus.h"
 #include "interrupt.h"
+#include "inputmode.h"
 
 #define START 0xA5
 #define BROADCAST 0x3F
@@ -33,15 +35,37 @@ enum{
 	CMD_GET_VERSION = 0x00, CMD_HEARTBEAT = 0x01, CMD_ESTOP = 0x02, CMD_GET_ERROR = 0x03, CMD_RXSDO = 0x04,
 	CMD_TXSDO = 0x05, CMD_SET_AXIS_STATE = 0x07, CMD_GET_ENCODER_ESTIMATES = 0x09,
 	CMD_SET_CONTROLLER_MODE = 0x0B, CMD_SET_INPUT_POS = 0x0C, CMD_SET_INPUT_VEL = 0x0D,
-	CMD_SET_INPUT_TORQUE = 0x0E, CMD_SET_LIMITS = 0x0F, CMD_GET_IQ = 0x14, CMD_GET_TEMPERATURE = 0x15,
+	CMD_SET_INPUT_TORQUE = 0x0E, CMD_SET_LIMITS = 0x0F, CMD_SET_TRAJ_VEL_LIMIT = 0x11,
+	CMD_SET_TRAJ_ACCEL_LIMITS = 0x12, CMD_GET_IQ = 0x14, CMD_GET_TEMPERATURE = 0x15,
 	CMD_REBOOT = 0x16, CMD_GET_BUS_VOLTAGE_CURRENT = 0x17, CMD_CLEAR_ERRORS = 0x18,
 	CMD_SET_ABSOLUTE_POSITION = 0x19, CMD_SET_POS_GAIN = 0x1A, CMD_SET_VEL_GAINS = 0x1B,
 	CMD_GET_TORQUES = 0x1C, CMD_GET_POWERS = 0x1D, CMD_SET_INPUT_VOLTAGE = 0x1E,
 };
 enum{ CM_VOLTAGE = 0, CM_TORQUE = 1, CM_VELOCITY = 2, CM_POSITION = 3 };    //ODrive ControlMode
 
+//RxSdo / TxSdo: parameter access by endpoint id (the names, types and units are in tools/endpoints.json,
+//as ODrive's flat_endpoints.json). Request: opcode u8 (0 read, 1 write), endpoint u16, reserved u8,
+//value (4 bytes). Answer: 0, endpoint u16, 0, value (read); a write is confirmed without a value.
+//  0x000..0x03F  config words (pinstorage, u16 in a u32); in RAM, save_configuration stores them
+//  0x100..       runtime values, float32 unless noted
+//  0x200..       functions (write, no value)
+enum{
+	EP_VBUS = 0x100, EP_IBUS, EP_POS_ESTIMATE, EP_VEL_ESTIMATE, EP_IQ_MEASURED, EP_IQ_SETPOINT,
+	EP_AXIS_STATE, EP_ACTIVE_ERRORS, EP_DISARM_REASON, EP_ODOMETER, EP_CONTROL_MODE, EP_INPUT_MODE,
+	EP_COMMUTATION, EP_INPUT_POS, EP_INPUT_VEL, EP_INPUT_TORQUE, EP_INPUT_VOLTAGE, EP_TORQUE_CONSTANT,
+	EP_ID_SETPOINT, EP_FAST_SPEED,
+	//ODrive parameters (float, ODrive units), stored in the config words
+	EP_VEL_LIMIT = 0x120, EP_POS_GAIN, EP_VEL_GAIN, EP_VEL_INTEGRATOR_GAIN, EP_CURRENT_SOFT_MAX,
+	EP_CURRENT_HARD_MAX, EP_TORQUE_CONSTANT_CFG, EP_POLE_PAIRS, EP_PHASE_RESISTANCE, EP_WATCHDOG_TIMEOUT,
+	EP_UNDERVOLTAGE, EP_OVERVOLTAGE, EP_NODE_ID, EP_UART_BAUDRATE,
+	EP_VEL_RAMP_RATE, EP_INPUT_FILTER_BW, EP_TRAJ_VEL_LIMIT, EP_TRAJ_ACCEL_LIMIT, EP_TRAJ_DECEL_LIMIT,
+	EP_FW_CURRENT, EP_FW_ADVANCE, EP_POS_SETPOINT, EP_VEL_SETPOINT, EP_ID_MEASURED,
+	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
+};
+
 static int32_t posOffset;    //odometer at position 0 (Set_Absolute_Position), hall steps
-static uint8_t inputMode = 1;    //ODrive InputMode, PASSTHROUGH
+static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val);
+static void setInputMode(uint32_t m){ if(InputModeSupported(m)) INPUT_MODE = (uint16_t)m; }
 
 static float rdF(const uint8_t* p){ float f; memcpy(&f, p, 4); return f; }
 static uint32_t rdU32(const uint8_t* p){ return p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24; }
@@ -110,8 +134,9 @@ static uint8_t getMsg(uint8_t cmd, uint8_t* d){
 			return 8;
 		case CMD_GET_IQ:{
 			float set = __builtin_nanf(""), meas = __builtin_nanf("");
-			if(COMMUTATION(DRIVEMODE)==COMMUT_FOC){ set = (float)FocIqSetpoint()/1000.0f; meas = (float)focIq/1000.0f; }
-			else if(CONTROL(DRIVEMODE)==CTRL_TORQUE){ set = (float)speed/100.0f; }
+			if(COMMUTATION(DRIVEMODE)==COMMUT_FOC) set = (float)FocIqSetpoint()/1000.0f;
+			else if(CONTROL(DRIVEMODE)==CTRL_TORQUE) set = (float)speed/100.0f;
+			if(FocSensing()) meas = (float)focIqF/1000.0f;    //FOC, and sine on phase current pins
 			wrF(d, set); wrF(d+4, meas);
 			return 8;
 		}
@@ -128,7 +153,7 @@ static uint8_t getMsg(uint8_t cmd, uint8_t* d){
 		}
 		case CMD_GET_POWERS:{
 			float pe = (float)fvbat/100.0f*(float)BusCurrent()/100.0f;
-			float tq = COMMUTATION(DRIVEMODE)==COMMUT_FOC ? (float)focIq/1000.0f*kt : __builtin_nanf("");
+			float tq = FocSensing() ? (float)focIqF/1000.0f*kt : __builtin_nanf("");
 			wrF(d, pe); wrF(d+4, tq*(float)realspeed*(6.2831853f/60.0f));
 			return 8;
 		}
@@ -166,13 +191,14 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 		case CMD_SET_CONTROLLER_MODE:
 			if(len>=8){
 				setControlMode(rdU32(d));
-				inputMode = (uint8_t)rdU32(d+4);
+				setInputMode(rdU32(d+4));
 			}
 			break;
 		case CMD_SET_INPUT_POS:
 			if(len>=4){
 				float steps = rdF(d)*(float)StepsPerTurn();
 				posCmd = clampF(steps, 2000000000)+posOffset;
+				posVelFf = len>=6 ? (int16_t)(d[4]|d[5]<<8)*6/100 : 0;    //0.001 turns/s -> rpm
 				inputArrived();
 			}
 			break;
@@ -200,6 +226,12 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 				if(v>0) POS_RPM = (uint16_t)clampF(v*60.0f, 1000);    //position speed limit, rpm
 				if(i>0) FOC_IMAX = (uint16_t)clampF(i*10.0f, 600);    //0.1 A
 			}
+			break;
+		case CMD_SET_TRAJ_VEL_LIMIT:
+			if(len>=4){ float x; odriveParam(EP_TRAJ_VEL_LIMIT, 1, rdF(d), &x); }
+			break;
+		case CMD_SET_TRAJ_ACCEL_LIMITS:
+			if(len>=8){ float x; odriveParam(EP_TRAJ_ACCEL_LIMIT, 1, rdF(d), &x); odriveParam(EP_TRAJ_DECEL_LIMIT, 1, rdF(d+4), &x); }
 			break;
 		case CMD_REBOOT:
 			if(len>=1&&d[0]==1) RemoteSaveConfig();    //save_configuration (reboot/erase/DFU: not supported)
@@ -250,24 +282,6 @@ uint8_t CanSimpleFeed(uint8_t c){
 	return 1;
 }
 
-//RxSdo / TxSdo: parameter access by endpoint id (the names, types and units are in tools/endpoints.json,
-//as ODrive's flat_endpoints.json). Request: opcode u8 (0 read, 1 write), endpoint u16, reserved u8,
-//value (4 bytes). Answer: 0, endpoint u16, 0, value (read); a write is confirmed without a value.
-//  0x000..0x03F  config words (pinstorage, u16 in a u32); in RAM, save_configuration stores them
-//  0x100..       runtime values, float32 unless noted
-//  0x200..       functions (write, no value)
-enum{
-	EP_VBUS = 0x100, EP_IBUS, EP_POS_ESTIMATE, EP_VEL_ESTIMATE, EP_IQ_MEASURED, EP_IQ_SETPOINT,
-	EP_AXIS_STATE, EP_ACTIVE_ERRORS, EP_DISARM_REASON, EP_ODOMETER, EP_CONTROL_MODE, EP_INPUT_MODE,
-	EP_COMMUTATION, EP_INPUT_POS, EP_INPUT_VEL, EP_INPUT_TORQUE, EP_INPUT_VOLTAGE, EP_TORQUE_CONSTANT,
-	EP_ID_SETPOINT, EP_FAST_SPEED,
-	//ODrive parameters (float, ODrive units), stored in the config words
-	EP_VEL_LIMIT = 0x120, EP_POS_GAIN, EP_VEL_GAIN, EP_VEL_INTEGRATOR_GAIN, EP_CURRENT_SOFT_MAX,
-	EP_CURRENT_HARD_MAX, EP_TORQUE_CONSTANT_CFG, EP_POLE_PAIRS, EP_PHASE_RESISTANCE, EP_WATCHDOG_TIMEOUT,
-	EP_UNDERVOLTAGE, EP_OVERVOLTAGE, EP_NODE_ID, EP_UART_BAUDRATE,
-	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
-};
-
 static uint8_t controlModeOdrive(void){
 	static const uint8_t map[4] = { CM_VOLTAGE, CM_VELOCITY, CM_TORQUE, CM_POSITION };    //by CTRL_
 	return map[CONTROL(DRIVEMODE)];
@@ -275,9 +289,20 @@ static uint8_t controlModeOdrive(void){
 
 static uint16_t toWord(float f){ return (uint16_t)clampF(f, 65534); }
 
+//config words of EP_VEL_RAMP_RATE.. in ODrive units: value = word / scale, 0/65535 = def / scale
+static const struct{ uint8_t w, scale; uint16_t def; } scaled[] = {
+	{29, 100, 100}, {30, 100, 200}, {31, 100, 200}, {35, 100, 50}, {43, 100, 50},    //input modes
+	{21, 10, 0}, {22, 1, 0},    //field weakening: FW_IMAX 0.1 A, FW_ADVANCE degrees; 0 = off
+};
+
 //ODrive parameter <-> config word, value in ODrive units; returns 0 if ep is not one of them
 static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 	float kt = TorqueConstant(), spt = (float)StepsPerTurn();
+	if(ep>=EP_VEL_RAMP_RATE&&ep<=EP_FW_ADVANCE){
+		const uint8_t w = scaled[ep-EP_VEL_RAMP_RATE].w, sc = scaled[ep-EP_VEL_RAMP_RATE].scale;
+		if(write) pinstorage[w] = toWord(f*(float)sc);
+		*val = (float)cfgOrDefault(pinstorage[w], scaled[ep-EP_VEL_RAMP_RATE].def)/(float)sc; return 1;
+	}
 	switch(ep){
 		case EP_VEL_LIMIT:    //turns/s <- rpm
 			if(write) POS_RPM = toWord(f*60.0f);
@@ -362,7 +387,10 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_DISARM_REASON: r = axisDisarm; break;
 			case EP_ODOMETER: r = (uint32_t)iOdom; break;
 			case EP_CONTROL_MODE: if(write) setControlMode(v); r = controlModeOdrive(); break;
-			case EP_INPUT_MODE: if(write) inputMode = (uint8_t)v; r = inputMode; break;
+			case EP_INPUT_MODE: if(write) setInputMode(v); r = InputMode(); break;
+			case EP_POS_SETPOINT: wrF((uint8_t*)&r, (inPosSp-(float)posOffset)/(float)StepsPerTurn()); break;
+			case EP_VEL_SETPOINT: wrF((uint8_t*)&r, inVelSp/(float)StepsPerTurn()); break;
+			case EP_ID_MEASURED: wrF((uint8_t*)&r, FocSensing() ? (float)focIdF/1000.0f : __builtin_nanf("")); break;
 			case EP_COMMUTATION:
 				if(write&&v<=COMMUT_FOC) SetDriveMode((uint8_t)(v*4+CONTROL(DRIVEMODE)));
 				r = COMMUTATION(DRIVEMODE); break;
