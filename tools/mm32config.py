@@ -156,7 +156,7 @@ def main():
             mcu.soft_start()
             print("firmware restarted")
         else:
-            mcu.t.resume()
+            mcu.resume()
             print("takes effect at the next start (--restart or power cycle)")
     finally:
         try:

@@ -31,6 +31,7 @@ RCC = 0x40021000
 IWDG_KR, DBGMCU_CR = 0x40003000, 0x40013404
 RCC_APB2ENR_DBGMCU, DBGMCU_CR_IWDG_STOP = 1 << 22, 1 << 8
 DMA1_CCR = [0x40020008 + 0x14 * n for n in range(5)]      # channel 1..5 configuration (bit 0 = EN)
+CORE_REGS = ["r%d" % i for i in range(13)] + ["sp", "lr", "pc", "xpsr", "msp", "psp", "primask", "control"]
 
 # r0 = dst, r1 = src, r2 = halfword count, r3 = FLASH_REG:
 #   loop: ldrh r4,[r1]; strh r4,[r0]; wait: ldr r5,[r3,#12]; movs r6,#1; tst r5,r6; bne wait
@@ -38,6 +39,7 @@ DMA1_CCR = [0x40020008 + 0x14 * n for n in range(5)]      # channel 1..5 configu
 PROGRAM_STUB = struct.pack("<13H", 0x880C, 0x8004, 0x68DD, 0x2601, 0x4235, 0xD1FB,
                            0x3002, 0x3102, 0x3A01, 0xD1F5, 0xBE00, 0xBF00, 0xBF00)
 STUB_AT, BUF_AT, CHUNK, STACK_AT = 0x20000100, 0x20000400, 0x800, 0x20000FF0
+RAM, RAM_SIZE = 0x20000000, 0x1000                          # the routines use the firmware's RAM
 
 
 class Mm32:
@@ -58,11 +60,28 @@ class Mm32:
         A halt does not stop the firmware's UART RX DMA, which wrote received bus bytes into the
         programming buffer (its 1-byte target sRxBuffer was at BUF_AT + 0x18)."""
         self.t.halt()
-        for ccr in DMA1_CCR:
-            self.w(ccr, self.r(ccr) & ~1)
+        self.saved_regs = [(r, self.t.read_core_register(r)) for r in CORE_REGS]
+        self.saved_ram = self.t.read_memory_block32(RAM, RAM_SIZE // 4)
+        self.saved_dma = [(ccr, self.r(ccr)) for ccr in DMA1_CCR]
+        for ccr, v in self.saved_dma:
+            self.w(ccr, v & ~1)
         self.w(RCC + 0x18, self.r(RCC + 0x18) | RCC_APB2ENR_DBGMCU)
         self.w(DBGMCU_CR, self.r(DBGMCU_CR) | DBGMCU_CR_IWDG_STOP)
         self.feed()
+
+    def resume(self):
+        """Continue the firmware where halt() stopped it. The RAM routines overwrite core registers
+        (a plain resume ran into their bkpt: HardFault) and the firmware's RAM (resumed without the
+        restore, it ran with garbage in its filters: 60 A telemetry), so both are put back, then the
+        DMA and the watchdog."""
+        self.t.write_memory_block32(RAM, self.saved_ram)
+        for reg, val in self.saved_regs:
+            self.t.write_core_register(reg, val)
+        for ccr, v in self.saved_dma:
+            self.w(ccr, v)
+        self.w(DBGMCU_CR, self.r(DBGMCU_CR) & ~DBGMCU_CR_IWDG_STOP)
+        self.feed()
+        self.t.resume()
 
     def feed(self):
         self.w(IWDG_KR, 0xAAAA)                             # reload; harmless if it is not running
@@ -187,6 +206,9 @@ def main():
         if a.start == "soft":
             mcu.soft_start()
             print("started (soft start, board stays powered)")
+        elif a.start == "none":
+            session.options.set("resume_on_disconnect", False)
+            print("core left halted (watchdog frozen); start it with a soft start or a power cycle")
         elif a.start == "reset":
             print("reset: the board powers off if it is held on by its self-hold latch")
             try:
