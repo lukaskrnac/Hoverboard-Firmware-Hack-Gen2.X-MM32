@@ -51,9 +51,11 @@ class Mm32:
         self.t.write32(a, v)
 
     def halt(self):
-        """Halt the core with the independent watchdog frozen (the firmware runs it at ~200 ms; it
-        cannot be stopped once started, and its reset powers latched boards off) and the DMA stopped:
-        a halt does not stop the firmware's UART RX DMA, which wrote received bus bytes into the
+        """Halt the core with the independent watchdog frozen and the DMA stopped.
+        The firmware runs the watchdog at ~200 ms; it cannot be stopped once started and its reset
+        powers latched boards off. On this MM32 DBGMCU IWDG_STOP freezes it whenever debug is
+        enabled, not only while halted, so soft_start() clears the bit again.
+        A halt does not stop the firmware's UART RX DMA, which wrote received bus bytes into the
         programming buffer (its 1-byte target sRxBuffer was at BUF_AT + 0x18)."""
         self.t.halt()
         for ccr in DMA1_CCR:
@@ -142,6 +144,7 @@ class Mm32:
         for reg, val in (("msp", sp), ("sp", sp), ("pc", pc & ~1), ("xpsr", 0x01000000),
                          ("primask", 0), ("control", 0)):
             self.t.write_core_register(reg, val)
+        self.w(DBGMCU_CR, self.r(DBGMCU_CR) & ~DBGMCU_CR_IWDG_STOP)    # watchdog runs again
         self.feed()
         self.t.resume()
 

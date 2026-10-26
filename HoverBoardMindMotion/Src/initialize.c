@@ -7,6 +7,7 @@
 #include "../Inc/initialize.h"
 #include "hal_conf.h"
 #include "../Inc/hardware.h"
+#include "../Inc/main.h"
 #ifdef TARGET_MM32SPIN25
 #include "spin25-redefine.h"
 #include "HAL_device.h"
@@ -329,22 +330,29 @@ void adc_Init(void){
 	ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
 }
 
-void Iwdg_Init(u16 IWDG_Prescaler, u16 Reload){
-	//stop the watchdog while a debugger halts the core (tools/mm32flash.py also feeds it)
-	RCC->APB2ENR |= RCC_APB2ENR_DBGMCU;
-	DBGMCU->CR |= DBGMCU_CR_IWDG_STOP;
+//Waits are bounded: a pending prescaler/reload write only completes in the watchdog's LSI domain. On
+//this MM32 the DBGMCU IWDG_STOP bit freezes that domain while debug is enabled (from the first SWD
+//attach to power off), not only while halted, so the vendor PVU/RVU_CheckStatus() loops hung forever
+//after a soft start. The firmware does not set IWDG_STOP; tools/mm32flash.py sets it only while it holds
+//the core halted. A sync takes a few LSI cycles (25 us each).
+static void IwdgWait(u16 flag){
+	uint32_t t = millis;
+	while(IWDG_GetFlagStatus(flag) == SET && millis-t < 3);
+}
 
+void Iwdg_Init(u16 IWDG_Prescaler, u16 Reload){
 	//Start the internal low-speed clock and wait for the clock to be ready
 	RCC_LSICmd(ENABLE);
-	while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
+	uint32_t t = millis;
+	while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET && millis-t < 10);
 
 	//Setting Clock Pre-division Frequency
-	PVU_CheckStatus();
+	IwdgWait(IWDG_FLAG_PVU);
 	IWDG_WriteAccessCmd(0x5555);
 	IWDG_SetPrescaler(IWDG_Prescaler);
 
 	//Setting overload register values
-	RVU_CheckStatus();
+	IwdgWait(IWDG_FLAG_RVU);
 	IWDG_WriteAccessCmd(0x5555);
 	IWDG_SetReload(Reload);
 
