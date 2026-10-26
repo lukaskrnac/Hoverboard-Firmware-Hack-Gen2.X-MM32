@@ -277,7 +277,7 @@ void speedupdate(void){
 		}
 		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
 		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_RES*(1000-brakeduty)/1000) : abspwm;
+			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_RES*brakeduty/1000) : abspwm;
 			TIM1->CCR1=ccr;
 			TIM1->CCR2=ccr;
 			TIM1->CCR3=ccr;
@@ -285,8 +285,8 @@ void speedupdate(void){
 	}
 }
 
-//Block commutation short brake: high sides off, the three low sides switched together (PWM1: the
-//complementary output is on while CNT >= CCR), so the motor's phases are shorted for brakeduty of the
+//Block commutation short brake: high sides off, the three low sides switched together. With CCxE off
+//the complementary output follows OCxREF itself (on while CNT < CCR, as in commutate()), so the motor's phases are shorted for brakeduty of the
 //period. The duty ramps up over ~0.3 s (the brake torque is proportional to speed: a sudden full short
 //at speed is a current spike) and stays at 100 % while standing. The hall isr does not commutate
 //while blockbrake is set; ending the brake forces a commutation.
