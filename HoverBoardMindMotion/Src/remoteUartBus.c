@@ -137,10 +137,7 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 	}
 	if (pData->iDriveMode <= SINE_SPEED)
 	{
-		DRIVEMODE = pData->iDriveMode;
-		PIDrst();
-		PID_Init();
-		TIMOCInit();
+		SetDriveMode(pData->iDriveMode);
 	}
 	if (pData->iSlaveNew >= 0 && 0)    //disabled!
 		SLAVE_ID = pData->iSlaveNew;

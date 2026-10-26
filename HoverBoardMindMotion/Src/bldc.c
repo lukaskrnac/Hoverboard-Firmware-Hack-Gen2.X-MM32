@@ -188,6 +188,30 @@ void gatesOutput(uint8_t on){
 	}
 }
 
+//Change the drive mode while the motor may be running. The adc isr reads DRIVEMODE several times per
+//run and in block mode commutates (writes CCER) itself, and pwm has a different unit per mode (duty
+//counts / Q15 modulation: a sine value left in CCR1-3 is full duty in block mode). So the gates go
+//off and the isr is masked (a few us) while the mode, the outputs and the controllers are replaced;
+//the isr arms the gates again and the speed controllers restart from the measured speed.
+void SetDriveMode(uint8_t mode){
+	if(mode==DRIVEMODE){
+		return;
+	}
+	NVIC_DisableIRQ(ADC_COMP_IRQn);
+	gatesOutput(0);
+	pwm = 0;
+	abspwm = 0;
+	TIM1->CCR1 = 0;
+	TIM1->CCR2 = 0;
+	TIM1->CCR3 = 0;
+	DRIVEMODE = mode;
+	PIDrst();
+	PID_Init();
+	SpeedCtrlReset();
+	TIMOCInit();
+	NVIC_EnableIRQ(ADC_COMP_IRQn);
+}
+
 void TIMOCInit(){
 	if(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED){
 		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);

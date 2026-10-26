@@ -159,22 +159,29 @@ void SpeedCtrlReset(void){
 	spdT = millis;
 }
 
+static int32_t FeedForward(int32_t rpm, const SpeedPlant* p, int32_t v){    //permille<<8, |rpm| <= 1000
+	int32_t a = rpm < 0 ? -rpm : rpm;
+	int32_t ff = (p->d0<<8) + a*256000/(p->kv*v/1000);     //1000/(kv/10 * v/100) per rpm
+	return rpm < 0 ? -ff : ff;
+}
+
 int SpeedCtrl(int sp, int meas, const SpeedPlant* p){    //sp, meas in rpm; returns permille, signed
 	int32_t v = vbat > 1000 ? vbat : 2400;          //0.01 V; until measured assume 24 V
 	int32_t dt = millis - spdT;
-	int32_t e, a, ff, u, di;
+	int32_t e, ff, u, di;
 	if(sp > 1000) sp = 1000; else if(sp < -1000) sp = -1000;    //keeps the fixed point math in 32 bit
 	spdT = millis;
 	if(dt > 20) dt = 20;
-	if(!spdRun){    //(re)start from the speed the wheel has, e.g. while coasting
-		spdRef = meas<<8;
-		spdRun = 1;
+	if(meas > 1000) meas = 1000; else if(meas < -1000) meas = -1000;
+	if(!spdRun){    //(re)start bumpless from the speed the wheel has (coasting, drive mode change):
+		spdRef = meas<<8;    //reference and output from the measured speed. Starting the output at 0
+		spdU = meas ? FeedForward(meas, p, v) : 0;    //braked a turning wheel in sine mode (to 75 from
+		spdRun = 1;    //150 rpm) while it slewed up
 	}
 	di = ((sp<<8)-spdRef)*dt/p->tref;
 	spdRef = di ? spdRef+di : sp<<8;    //snap once the step rounds to 0
-	e = (spdRef>>8) - meas; a = sp < 0 ? -sp : sp;
-	ff = (p->d0<<8) + a*256000/(p->kv*v/1000);     //permille<<8: 1000/(kv/10 * v/100) per rpm
-	if(sp < 0) ff = -ff;
+	e = (spdRef>>8) - meas;
+	ff = FeedForward(sp, p, v);
 	di = p->ki*e*256/10*dt/1000;
 	u = ff + p->kp*e*256/10 + spdI + di;
 	if((u < SPD_UMAX || di < 0) && (u > -SPD_UMAX || di > 0)){    //anti windup: no integration into saturation
