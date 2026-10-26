@@ -8,8 +8,8 @@ uint8_t hallpos(uint8_t dir);
 void speedupdate();
 void TIMOCInit();
 
-extern uint16_t abspwm;
-extern uint32_t lastcommutate;
+extern volatile uint16_t abspwm;
+extern volatile uint32_t lastcommutate;
 extern uint8_t lowbatcount;
 extern uint8_t lowbatperm;
 extern const uint8_t hall_to_pos[8];

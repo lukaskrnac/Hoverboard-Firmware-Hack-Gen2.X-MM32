@@ -19,13 +19,13 @@
 #include "../Inc/hallhandle.h"
 
 uint32_t itotaloffset=0;
-uint8_t poweron=0;
+volatile uint8_t poweron=0;
 int iphasea;
 int iphaseb;
 uint32_t iphaseaoffset=0;
 uint32_t iphaseboffset=0;
 uint16_t vrefint;    //last internal 1.2V reference conversion
-uint8_t realdir=0;
+volatile uint8_t realdir=0;
 
 int16_t	TestAngle = 0;
 

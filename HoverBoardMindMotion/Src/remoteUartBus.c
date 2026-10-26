@@ -31,7 +31,7 @@
 #pragma pack(1)
 
 
-uint8_t bAnswerMaster = 0;
+volatile uint8_t bAnswerMaster = 0;
 static int16_t iReceivePos = 0;	
 
 
@@ -91,7 +91,7 @@ _Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 
 
 
 
-uint32_t iTimeLastRx = 0;
+volatile uint32_t iTimeLastRx = 0;
 
 
 uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation

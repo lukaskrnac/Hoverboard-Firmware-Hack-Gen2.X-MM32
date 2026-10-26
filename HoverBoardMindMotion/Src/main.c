@@ -21,23 +21,23 @@
 #include "../Inc/PID.h"
 #include "../Inc/hallhandle.h"
 
-uint8_t step=1;//very importatnt to set to 1 or it will not work
-uint32_t millis;
+volatile uint8_t step=1;//very importatnt to set to 1 or it will not work
+volatile uint32_t millis;
 static uint32_t lastupdate;
 static uint32_t lastflicker;
-int32_t iOdom;
-int8_t dir=1;
+volatile int32_t iOdom;
+volatile int8_t dir=1;
 uint8_t sRxBuffer[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int vbat;
-int itotal;
-int fvbat;
-int fitotal;
+volatile int vbat;
+volatile int itotal;
+volatile int fvbat;
+volatile int fitotal;
 uint8_t hallposprev=1;
-int speed=0;
-int pwm=0;
-int realspeed=0;
-int frealspeed=0;
-uint8_t  wState;
+volatile int speed=0;
+volatile int pwm=0;
+volatile int realspeed=0;
+volatile int frealspeed=0;
+volatile uint8_t  wState;
 static uint8_t flicker=0;
 uint8_t uarten=1;
 uint8_t halltimen=1;

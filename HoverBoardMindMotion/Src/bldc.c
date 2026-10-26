@@ -11,8 +11,8 @@
 #include "math.h"
 #include "../Inc/hallhandle.h"
 
-uint16_t abspwm;
-uint32_t lastcommutate;
+volatile uint16_t abspwm;
+volatile uint32_t lastcommutate;
 uint32_t lasttestrotate;
 int testrotatedir=1;
 uint8_t hallpos(uint8_t dir);
