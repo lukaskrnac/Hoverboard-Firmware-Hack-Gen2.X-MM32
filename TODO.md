@@ -47,11 +47,17 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Block commutation needs 18.5 % duty before the wheel turns (sine: 1 %); it freewheels and only
       coasts down. Check the switching pattern (one PWM high side + the complementary output of the
       low side) against the gate driver's input polarity; complementary switching would also brake.
-- [ ] Remove dead code: `PID()`, `PID2PWM()`, `PIDrst()`, `PID_Init()` (no mode uses them since
-      COM_SPEED/SINE_SPEED use `SpeedCtrl()`), the unreachable FOC modes 4–6 and their PI blocks.
+- [ ] FOC modes 4–6 are unreachable (the config frame accepts 0–3) but still compiled into the ADC
+      ISR with their modules (FOC_Math, clarke, park, PID.c): finish them (the board measures two
+      phase currents) or remove them.
+- [ ] Host unit tests for the pure logic (CRC and frame layout against the web console's test
+      vectors, SpeedCtrl() against the measured plant) and a CI build. Needs the logic split from
+      the HAL-dependent code first.
+- [ ] Naming is mixed (camelCase, snake_case, Hungarian `iSpeed`/`bConfigRx`, vendor `u8`/`s32`
+      next to stdint; config macros like `DRIVEMODE` are lvalues of `pinstorage[]`): clean up file by
+      file when a file gets real work, not in one sweep.
 - [ ] `UART_GPIO_Init()`: the last matching table entry wins (PB7 is both UART1 RX and UART2 TX):
       select the UART from the TX/RX pair instead of relying on table order.
-- [ ] Watchdog is compiled out (`//#define WATCHDOG` in `pinout.h`).
 - [ ] RemoteUartBus: state bit 128 (shut off) and `slaveNew` are not implemented; there is no read
       command for the configuration (the console cannot show the board's drive mode). A position mode
       (GD32 drive mode 3, odometer target) would be the useful new mode.
@@ -78,6 +84,12 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 | 05cc4f6 | hall measurement on real edges only; commutation on direction change; timer overflow |
 | fc734f3 | COM_SPEED: PI + feed forward + reference model (was a double integrator) |
 | f0547ed | sine: calibrated hall angle estimator, interpolation per real ISR period; SINE_SPEED on the same controller |
+| f3ee9ca a960618 | faults/unused vectors switch the gates off; watchdog on (~0.5 s) with bounded init; flasher stops DMA (UART RX DMA wrote into the programming buffer) |
+| 3521dd6 | power button shutdown through the gate owner; all waits feed the watchdog |
+| fcdbff9 | drive mode change while running: gates off + ISR masked; bumpless speed controller restart |
+| a756f4a | tools restore registers, RAM, DMA after a halt (resume after `mm32config set` faulted or ran with garbage) |
+| e9dcff6 656b0c3 | -Wextra etc. for our code, prototypes, include guards, scoped pack; dead code removed, file-local symbols static |
+| a6a38bf 6473849 6bb2952 775ecd2 | -nostartfiles, Makefile dependency, UTF-8 sources, whitespace/includes, .editorconfig |
 
 Verification for every change: flashed to the bench board and checked with RemoteUartBus telemetry
 (bus replies, speed steps, CPU load by IPSR sampling); refactors also by comparing `objdump -d -r` of

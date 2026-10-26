@@ -33,6 +33,16 @@ last 2 KB of flash (written by PinFinder or the RemoteUartBus config command) is
 firmware is started without a reset so a self-holding board stays powered. A locked (read
 protected) chip must be unlocked with a full chip erase first, see the installation guide.
 
+### Watchdog and fault handling
+- The independent watchdog runs with a ~0.5 s timeout. A watchdog reset (like any reset) releases
+  the power latch, so a hung board switches itself off.
+- A fault or unexpected interrupt switches the bridge off (TIM1 MOE) before the watchdog resets.
+- Debugging: a breakpoint or halt longer than 0.5 s resets the chip. Set bit 8 (IWDG_STOP) of
+  DBGMCU_CR (0x40013404) from the debugger first. On this MM32 the bit freezes the watchdog for as
+  long as debug is enabled (until power off), not only while halted. `tools/mm32flash.py` and
+  `tools/mm32config.py` handle this themselves. To build without the watchdog, remove
+  `#define WATCHDOG` in `Inc/pinout.h`.
+
 ## Control methods
 The boards are controlled over the RemoteUartBus protocol, see
 [PROTOCOL.md](https://gitlab.com/ailife8881/remoteuartbus-online/-/blob/main/PROTOCOL.md). The
