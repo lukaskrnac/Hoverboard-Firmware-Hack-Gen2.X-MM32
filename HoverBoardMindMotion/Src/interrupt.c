@@ -25,6 +25,7 @@ int iphaseb;
 uint32_t iphaseaoffset=0;
 uint32_t iphaseboffset=0;
 uint16_t vrefint;    //last internal 1.2V reference conversion
+volatile uint32_t adcticks;    //adc interrupts since boot (one per pwm period)
 volatile uint8_t realdir=0;
 
 int16_t	TestAngle = 0;
@@ -53,6 +54,7 @@ void ADC1_COMP_IRQHandler(void){
 		TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
   }
 	if(RESET != ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
+		adcticks++;
 		if(poweron<127){//cancel out adc offset
 			itotaloffset+=analogRead(ITOTALPIN);
 			iphaseaoffset+=analogRead(IPHASEAPIN);
@@ -123,8 +125,12 @@ void ADC1_COMP_IRQHandler(void){
 					}
 					//IPARK
 					if(DRIVEMODE==SINE_VOLT||DRIVEMODE==SINE_SPEED){
+						//torque direction from the sign (the angle follows the rotor, not the command);
+						//negated so a positive command gives positive speed. +-32000: linear svpwm range
+						int32_t q = -pwm;
+						if(q>32000) q=32000; else if(q<-32000) q=-32000;
 						ipark1.Ds = 0;
-						ipark1.Qs = abspwm;
+						ipark1.Qs = q;
 					}else{
 						ipark1.Ds = CurID.qOut;
 						ipark1.Qs = CurIQ.qOut;	

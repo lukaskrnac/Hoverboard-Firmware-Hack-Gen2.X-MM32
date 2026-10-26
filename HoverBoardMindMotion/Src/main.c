@@ -79,7 +79,7 @@ s32 main(void){
 	//hall gpio init
 	HALL_Init();
 	//hall timer init
-	halltimen=HALLTIM_Init(65535, SystemCoreClock/1000000);//sysclock is 72mhz
+	halltimen=HALLTIM_Init(65535, SystemCoreClock/1000000-1);    //1 us ticks (the timer divides by psc+1)
 	//initialize 6 bldc pins
 	BLDC_init();
 	//initialize timer

@@ -11,7 +11,9 @@ void avgItotal();
 void avgvbat();
 uint32_t updateMotorRPM(uint32_t halltime);
 void PIDrst();
-int SpeedCtrl(int sp, int meas);
+typedef struct { int32_t kp, ki, kv, d0, tref; } SpeedPlant;    //see calculation.c
+void SpeedParams(uint8_t mode, SpeedPlant* p);
+int SpeedCtrl(int sp, int meas, const SpeedPlant* p);
 void SpeedCtrlReset(void);
 
 #endif

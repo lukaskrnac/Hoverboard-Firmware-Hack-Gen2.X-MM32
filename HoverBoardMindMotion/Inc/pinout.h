@@ -48,11 +48,15 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define BAT_FULL pinstorage[45]
 #define BAT_EMPTY pinstorage[46]
 #define SERIAL_TIMEOUT pinstorage[47]
-//COM_SPEED controller (calculation.c), 0 = built-in default
+//COM_SPEED / SINE_SPEED controllers (calculation.c), 0 = built-in default
 #define SPEED_KP pinstorage[48]    //0.1 permille duty per rpm error, default 50
 #define SPEED_KI pinstorage[49]    //0.1 permille duty per rpm*s, default 100
-#define SPEED_KV pinstorage[50]    //feed forward: 0.1 rpm per volt at 100% duty, default 389
+#define SPEED_KV pinstorage[50]    //feed forward: 0.1 rpm per volt at 100% duty, default 395
 #define SPEED_D0 pinstorage[51]    //feed forward: dead band in permille duty, default 185
+#define SINE_KP pinstorage[52]     //SINE_SPEED: 0.1 permille modulation per rpm error, default 5
+#define SINE_KI pinstorage[53]     //SINE_SPEED: 0.1 permille per rpm*s, default 85
+#define SINE_KV pinstorage[54]     //SINE_SPEED feed forward: 0.1 rpm per volt at 100% modulation, default 242
+#define SINE_D0 pinstorage[55]     //SINE_SPEED feed forward: dead band in permille, default 10
 
 
 #define MAGICNUM_POS 32

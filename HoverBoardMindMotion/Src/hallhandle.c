@@ -42,7 +42,8 @@ void HALLModuleInit(HALLType *u)
 
 
 
-		u->Angle = u->CWAngleTab[HALL1.RunHallValue] + CWShift;
+	u->MoveDir = 1;
+	u->Angle = (int16_t)u->CWAngleTab[u->PreRaw];    //middle of the current sector
 	
 	for(i=0;i<8;i++)
 	{
@@ -69,8 +70,15 @@ void HALLModuleCalc(HALLType *u){
 	
 	//measurement: only real hall edges. A change of the commanded direction also changes RunHallValue;
 	//counting that as an edge made a fake odometer step and a speed sample from a stale timer capture.
+	uint8_t edge = 0;
 	if(raw!=u->PreRaw && hall_to_pos[raw] && hall_to_pos[u->PreRaw]){
 		uint8_t d = (hall_to_pos[raw]+6-hall_to_pos[u->PreRaw])%6;    //1 or 5 for adjacent positions
+		edge = 1;
+		if(d==1){
+			u->MoveDir = 1;     //electrical angle rising: hall states 2,6,4,5,1,3
+		}else if(d==5){
+			u->MoveDir = -1;
+		}
 		TIM_TypeDef* tim = halltimen ? TIM2 : TIM3;
 		i++;
 		if(i >= 6)
@@ -110,11 +118,26 @@ void HALLModuleCalc(HALLType *u){
 		}
 	}
 	
-	//sine: re-anchor the electrical angle at a hall edge or a direction change. Unit of IncAngle is 62.5us.
-	if(!com&&u->PreHallValue != u->RunHallValue){
-		u->IncAngle = 4096000/u->HallTimeSum;
-		u->IncAngleMax = 10922;
-		u->Angle = u->CWAngleTab[u->RunHallValue] + CWShift;
+	//sine: rotor angle (65536 per electrical turn) from the hall sectors. Measured on the bench motor
+	//(d-axis vector swept over two turns): the hall states are centred on CWAngleTab, their boundaries
+	//at +-30 deg (5461), within 1.5 deg. At an edge the rotor is on the boundary just crossed; between
+	//edges the angle is interpolated at the measured speed, at most one sector. The old code put the
+	//angle on the sector centre at the edge (30 deg ahead) and interpolated as if this ran every 62.5 us
+	//instead of every pwm period (2*PWM_RES/72 MHz = 227.6 us), so the angle lagged and jumped.
+	if(!com){
+		if(edge){
+			int32_t s = u->MoveDir;
+			u->IncAngle = ((uint32_t)PWM_RES*16384/9)/u->HallTimeSum;    //per pwm period: 65536*2*PWM_RES/72/HallTimeSum
+			u->IncAngleMax = 10922;
+			//+1.5 periods: hall edge detection and the pwm update come that much late
+			u->Angle = (int16_t)(u->CWAngleTab[raw] - s*5461 + s*(u->IncAngle*3/2) + s*CWShift);
+		}else if(millis-lastcommutate>250){    //standing: middle of the sector
+			u->Angle = (int16_t)u->CWAngleTab[raw];
+			u->IncAngleMax = 0;
+		}else if(u->IncAngleMax >= u->IncAngle){
+			u->IncAngleMax -= u->IncAngle;
+			u->Angle += u->MoveDir*u->IncAngle;
+		}
 	}
 	//block commutation: evaluated every time, so a direction change or a mode switch takes effect at
 	//once instead of at the next hall edge
@@ -128,12 +151,5 @@ void HALLModuleCalc(HALLType *u){
 	}
 	u->PreHallValue = u->RunHallValue;
 	u->PreRaw = raw;
-
-	//Incremental value limit
-	if(((u->IncAngleMax - u->IncAngle)>=0)&&!(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED)){
-		u->IncAngleMax = u->IncAngleMax - u->IncAngle;
-		u->Angle = u->Angle + u->CMDDIR * u->IncAngle;
-	}
-
 }
 

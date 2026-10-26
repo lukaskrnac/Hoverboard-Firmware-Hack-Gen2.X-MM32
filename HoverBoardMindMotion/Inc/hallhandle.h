@@ -13,6 +13,7 @@ typedef struct
   uint8_t PreHallValue;   
   uint8_t PreRaw;             //hall state at the last call, direction independent
 	int8_t	CMDDIR;
+	int8_t	MoveDir;            //measured: 1 electrical angle rising, -1 falling
 	int16_t	Angle;
 	int16_t IncAngle;
 	int16_t IncAngleMax;

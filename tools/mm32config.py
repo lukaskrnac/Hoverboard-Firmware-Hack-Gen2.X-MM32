@@ -44,8 +44,12 @@ FIELDS = {
     47: ("timeout", "num", "ms without a command until speed = 0"),
     48: ("speedkp", "num", "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"),
     49: ("speedki", "num", "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"),
-    50: ("speedkv", "num", "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 389"),
+    50: ("speedkv", "num", "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 395"),
     51: ("speedd0", "num", "COM_SPEED feed forward: dead band permille duty, 0 = default 185"),
+    52: ("sinekp", "num", "SINE_SPEED: 0.1 permille modulation per rpm, 0 = default 5"),
+    53: ("sineki", "num", "SINE_SPEED: 0.1 permille per rpm*s, 0 = default 85"),
+    54: ("sinekv", "num", "SINE_SPEED feed forward: 0.1 rpm/V at 100% modulation, 0 = default 242"),
+    55: ("sined0", "num", "SINE_SPEED feed forward: dead band permille, 0 = default 10"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}
 

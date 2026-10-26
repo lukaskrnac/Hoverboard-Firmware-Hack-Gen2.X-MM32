@@ -150,20 +150,17 @@ void speedupdate(){
 		}else{
 			if(DRIVEMODE==COM_VOLT){
 				pwm=speed*PWM_RES/1000;//1000~-1000 for all pwm resolution
-			}else if(DRIVEMODE==COM_SPEED){	
+			}else if(DRIVEMODE==SINE_VOLT){	
+				pwm= speed*40;// IQ=30000~-30000
+			}else if(DRIVEMODE==COM_SPEED||DRIVEMODE==SINE_SPEED){	//speed in rpm
 				if(speed==0){    //coast
 					pwm=0;
 					SpeedCtrlReset();
 				}else{
-					pwm=SpeedCtrl(speed,realspeed);    //speed in rpm
-				}
-			}else if(DRIVEMODE==SINE_VOLT){	
-				pwm= speed*40;// IQ=30000~-30000
-			}else if(DRIVEMODE==SINE_SPEED){	
-				pwm= PID2PWM((PID(speed,realspeed))/50);// command the required RPM
-				if(speed==0){
-					pwm=0;
-					PIDrst();
+					SpeedPlant p;
+					SpeedParams(DRIVEMODE, &p);
+					//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
+					pwm=SpeedCtrl(speed,realspeed,&p)*(DRIVEMODE==COM_SPEED ? (int32_t)PWM_RES : 32768)/1000;
 				}
 			}
 		}
