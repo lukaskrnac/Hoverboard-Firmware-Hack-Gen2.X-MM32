@@ -7,6 +7,7 @@
 
 /*------------------- Private variables ---------------*/
 HALLType HALL1;
+volatile int32_t fastspeed;
 static volatile int16_t CWShift = 0;    //extra sine angle advance in the direction of motion (65536 = 360 deg el), tuning over SWD
 /*------------------ Private functions ----------------*/
 void HALLModuleInit(HALLType *u);
@@ -146,6 +147,18 @@ void HALLModuleCalc(HALLType *u){
 
 	if(millis-lastcommutate>250){//zero out speed
 		realspeed=0;
+	}
+	//speed from the last hall interval. realspeed averages six, which lags by ~3 intervals (100 ms at
+	//20 rpm): too slow for a current driven speed loop (FOC), which, unlike the voltage modes, gets no
+	//damping from the back emf. The hall sectors are equal within 1.5 deg on the bench motor. Between
+	//edges it decays with the time since the last edge once that is longer than the last interval;
+	//below ~10 rpm (65 ms timer overflow) it is 0.
+	{
+		TIM_TypeDef* tim = halltimen ? TIM2 : TIM3;
+		uint32_t el = (tim->SR&TIM_SR_UI) ? 65535 : tim->CNT;
+		uint32_t iv = u->HallTime[i]>el ? u->HallTime[i] : el;
+		int32_t f = iv>=65535 ? 0 : (int32_t)(SPEEDX/6/iv);
+		fastspeed = realdir ? f : -f;
 	}
 	u->PreHallValue = u->RunHallValue;
 	u->PreRaw = raw;

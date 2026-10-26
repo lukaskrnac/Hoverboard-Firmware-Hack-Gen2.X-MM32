@@ -57,6 +57,15 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define SINE_KI pinstorage[53]     //SINE_SPEED: 0.1 permille per rpm*s, default 85
 #define SINE_KV pinstorage[54]     //SINE_SPEED feed forward: 0.1 rpm per volt at 100% modulation, default 242
 #define SINE_D0 pinstorage[55]     //SINE_SPEED feed forward: dead band in permille, default 10
+//FOC (foc.c), 0 = built-in default. The phase current pins are IPHASEAPIN/IPHASEBPIN.
+#define IPHASE_GAIN pinstorage[56] //0.1 mA per adc count, default 515 (MM32SPIN05PFOP op-amps)
+#define IPHASE_CFG pinstorage[57]  //bits 0-1: phases on the two pins 0 = A,B  1 = B,C  2 = A,C;
+                                   //bit 2: adc rises with current into the motor (default: falls)
+#define FOC_IMAX pinstorage[58]    //phase current limit, 0.1 A, default 100; trip at twice that
+#define CUR_KP pinstorage[59]      //current loop, mV per A, default 400 (rings at 800, oscillates at 1600)
+#define CUR_KI pinstorage[60]      //current loop, V per A*s, default 300 (zero at R/L: 0.3 Ohm, 0.46 mH)
+#define FOC_SPD_KP pinstorage[61]  //FOC_SPEED, mA per rpm, default 30
+#define FOC_SPD_KI pinstorage[62]  //FOC_SPEED, mA per rpm*s, default 100 (kp 50 limit-cycles at the stop)
 
 
 //config layout version: 0 = before the drive mode encoding commutation*4 + control (SINE_VOLT was 2,

@@ -204,10 +204,10 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 				u1->CompC = taon;
 				break;
 
-			default:
-				u1->CompA = 0;
-				u1->CompB = 0;
-				u1->CompC = 0;
+			default:    //zero vector (alpha = beta = 0): 50 %, not 0. In PWM2 mode a compare of 0 keeps
+				u1->CompA = u1->N_halfPeriod/2;    //all high sides on: no low side time for the current
+				u1->CompB = u1->N_halfPeriod/2;    //sense and the bootstrap capacitors
+				u1->CompC = u1->N_halfPeriod/2;
 				break;
 		}
 	}

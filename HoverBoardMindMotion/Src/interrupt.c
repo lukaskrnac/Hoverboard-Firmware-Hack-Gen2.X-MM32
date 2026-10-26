@@ -11,19 +11,12 @@
 #include "calculation.h"
 
 #include "ipark.h"
-#include "park.h"
-#include "clarke.h"
-#include "PID.h"
-#include "FOC_Math.h"
 #include "pwm_gen.h"
 #include "hallhandle.h"
+#include "foc.h"
 
 static uint32_t itotaloffset=0;
 volatile uint8_t poweron=0;
-static int iphasea;
-static int iphaseb;
-static uint32_t iphaseaoffset=0;
-static uint32_t iphaseboffset=0;
 static uint16_t vrefint;    //last internal 1.2V reference conversion
 static volatile uint32_t adcticks;    //adc interrupts since boot (one per pwm period)
 volatile uint8_t realdir=0;
@@ -56,13 +49,9 @@ void ADC1_COMP_IRQHandler(void){
 		adcticks++;
 		if(poweron<127){//cancel out adc offset
 			itotaloffset+=analogRead(ITOTALPIN);
-			iphaseaoffset+=analogRead(IPHASEAPIN);
-			iphaseboffset+=analogRead(IPHASEBPIN);
 			poweron++;
 		}else if(poweron==127){//divide by 128
 			itotaloffset = itotaloffset>>7;
-			iphaseaoffset = iphaseaoffset>>7;
-			iphaseboffset = iphaseboffset>>7;
 			if(AWDG){    //hardware current limit, only if the current sense pin has an adc channel
 				for(uint8_t i=0;i<ADCCOUNT;i++){
 					if(adcs[i].io==ITOTALPIN){
@@ -84,67 +73,35 @@ void ADC1_COMP_IRQHandler(void){
 				vbat = (int32_t)((uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
 				itotal = (int32_t)ITOTAL_DIVIDER*((int32_t)analogRead(ITOTALPIN)-(int32_t)itotaloffset)*120/vrefint;
 			}
-			iphasea = (int32_t)iphaseaoffset-(int32_t)analogRead(IPHASEAPIN);
-			iphaseb = (int32_t)iphaseboffset-(int32_t)analogRead(IPHASEBPIN);
+			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC;
+			if(foc){
+				FocMeasure();    //phase currents; itotal from them (the shunt reads ~0 at this sample time)
+			}
 			avgvbat();
 			avgItotal();
 			//SOFT_ILIMIT in A against the 64 sample average (~15 ms): one adc count of a direct shunt is
 			//~0.3 A and the raw value spikes on switching noise. Fast faults are the adc watchdog's job (AWDG).
 			uint8_t overcurrent = SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100;
-			gatesOutput(!(gatesoff||overcurrent));    //the only place the gates are switched while running
-			{
-				HALL1.CMDDIR = -dir;
-				HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
-
-				if(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK){
-					if(DRIVEMODE==FOC_VOLT||DRIVEMODE==FOC_SPEED||DRIVEMODE==FOC_TORQUE){
-						//CLARK
-						clarke1.As = iphasea;
-						clarke1.Bs = iphaseb;
-						CLARKE_MACRO1(&clarke1);
-						//PARK
-						park1.Alpha = clarke1.Alpha;
-						park1.Beta = clarke1.Beta;
-						park1.Theta = HALL1.Angle;
-						PARK_MACRO1(&park1);
-						//filter
-						IDData.NewData = park1.Ds;
-						MovingAvgCal(&IDData);
-
-						IQData.NewData = park1.Qs;
-						MovingAvgCal(&IQData);
-						//PID
-						CurID.qInRef = 0;
-						CurID.qInMeas = IDData.Out;
-						CalcPI(&CurID);
-
-						CurIQ.qInRef = Speed.qOut;
-						CurIQ.qInMeas = IQData.Out;
-						CalcPI(&CurIQ);
-					}
-					//IPARK
-					if(DRIVEMODE==SINE_VOLT||DRIVEMODE==SINE_SPEED){
-						//torque direction from the sign (the angle follows the rotor, not the command);
-						//negated so a positive command gives positive speed. +-32000: linear svpwm range
-						int32_t q = -pwm;
-						if(q>32000) q=32000; else if(q<-32000) q=-32000;
-						ipark1.Ds = 0;
-						ipark1.Qs = q;
-					}else{
-						ipark1.Ds = CurID.qOut;
-						ipark1.Qs = CurIQ.qOut;
-					}
-					ipark1.Theta = HALL1.Angle;
-					IPARK_MACRO1(&ipark1);
-					//SVPWM
-					//pwm_gen.Mode = FIVEMODE;
-					pwm_gen.Mode = SEVENMODE;
-					pwm_gen.Alpha = ipark1.Alpha;
-					pwm_gen.Beta  = ipark1.Beta;
-					PWM_GEN_calc(&pwm_gen);
-					//Update duty cycle
-					Update_PWM(&pwm_gen);
-				}
+			//the only place the gates are switched while running
+			gatesOutput(!(gatesoff||coastreq||overcurrent||(foc&&FocHoldOff())));
+			HALL1.CMDDIR = -dir;
+			HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
+			if(COMMUTATION(DRIVEMODE)==COMMUT_SINE){
+				//torque direction from the sign (the angle follows the rotor, not the command);
+				//negated so a positive command gives positive speed. +-32000: linear svpwm range
+				int32_t q = -pwm;
+				if(q>32000) q=32000; else if(q<-32000) q=-32000;
+				ipark1.Ds = 0;
+				ipark1.Qs = q;
+				ipark1.Theta = HALL1.Angle;
+				IPARK_MACRO1(&ipark1);
+				pwm_gen.Mode = SEVENMODE;
+				pwm_gen.Alpha = ipark1.Alpha;
+				pwm_gen.Beta  = ipark1.Beta;
+				PWM_GEN_calc(&pwm_gen);
+				Update_PWM(&pwm_gen);
+			}else if(foc){
+				FocControl();
 			}
 		}
 		ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);

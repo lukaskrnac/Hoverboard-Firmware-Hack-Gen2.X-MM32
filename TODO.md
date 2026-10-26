@@ -26,9 +26,24 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       so the battery-voltage menu prints blank values: print in mV with integers instead.
       Its power-latch detection gives wrong results when the MCU is powered from the debugger.
 - [ ] **Current sense calibration.** `itotaldivider` 250 assumes a 4 mΩ shunt (PA7, direct). Compare
-      the telemetry current with the bench supply under load and correct it. The zero offset is the
-      mean of 128 samples at boot, biased by switching spikes, and the ADC clips at 0 (no negative
-      current): use a median / exclude spikes.
+      the telemetry current with the bench supply under load and correct it (webcam on /dev/video0
+      reads the PSU; the user brakes the wheel by hand). One ADC count is ~0.3 A. The zero offset is
+      the mean of 128 samples at boot, biased by switching spikes, and the ADC clips at 0 (no negative
+      current): use a median / exclude spikes. In sine mode the shunt is sampled while all low sides
+      conduct and carries ~0 there: it needs another sample time (FOC computes the bus current from
+      the phase currents and duties instead).
+- [ ] **Remaining modes and options** (agreed 2026-10-27): torque for block/sine (bus current based),
+      position for all (command 0 holds), FOC field weakening (negative d current, config switch)
+      and sine field weakening (phase advance). Command 0: pwm coasts, speed brakes, position holds;
+      SINE_VOLT/COM_VOLT still brake/freewheel at 0 as before.
+- [ ] Web console: drive mode numbers changed (sine 2/3 -> 4/5, FOC 8-10); its config frame still
+      sends the old numbers, which are now ignored (2/3) or mean block torque/position.
+- [ ] FOC: I_d/I_q noise ~±0.3 A at standstill (±5 counts on the op-amp outputs) and ~±1 A at
+      500 rpm; the median filter delays the current by one period. Check the angle estimate at speed
+      (park angle lead), and filter id/iq for telemetry.
+- [ ] COM_SPEED started while the wheel drifts backwards at a few rpm: the bumpless restart begins at
+      the feed forward of the measured speed including the dead band (-18.5 % duty) and overshot to
+      169 rpm once on a 60 rpm step. Start from 0 below ~20 rpm.
 - [ ] **Low-battery cut-off** is disabled on the bench (`batempty` 19.0 V). Set real limits for a
       battery (e.g. 42.0 / 32.0 V for 10S) with the web console or `mm32config.py`.
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
@@ -38,7 +53,8 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 
 - [ ] Speed measurement averages the last 6 hall intervals: it lags during the first electrical turn
       of a fast acceleration (SINE_SPEED steps overshoot up to ~10 %), and one bad sample (178 rpm at
-      150) was seen during an acceleration. Consider the last interval when the speed changes fast.
+      150) was seen during an acceleration. FOC_SPEED uses `fastspeed` (last interval); the other
+      speed modes could too.
 - [ ] After a COM_SPEED -> SINE_SPEED switch at speed, one hall sector takes 10-28 ms instead of
       4.4 ms (150 rpm) and the next ones come faster: the speed reading dips for one electrical turn
       (to 120, once 68 rpm) although the ADC ISR keeps running. Probably the stator current transient
@@ -47,9 +63,6 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Block commutation needs 18.5 % duty before the wheel turns (sine: 1 %); it freewheels and only
       coasts down. Check the switching pattern (one PWM high side + the complementary output of the
       low side) against the gate driver's input polarity; complementary switching would also brake.
-- [ ] FOC modes 4–6 are unreachable (the config frame accepts 0–3) but still compiled into the ADC
-      ISR with their modules (FOC_Math, clarke, park, PID.c): finish them (the board measures two
-      phase currents) or remove them.
 - [ ] Host unit tests for the pure logic (CRC and frame layout against the web console's test
       vectors, SpeedCtrl() against the measured plant) and a CI build. Needs the logic split from
       the HAL-dependent code first.
@@ -63,8 +76,8 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       (GD32 drive mode 3, odometer target) would be the useful new mode.
 - [ ] MM32SPIN06 untested with the GCC build; MM32SPIN25 not ported (needs the MM32SPIN2x pack
       headers, see `HoverBoardMindMotion/Device/MM32SPIN2x/Source/README.md`).
-- [ ] Unused board hardware on the bench board: charger detect PB10, E-stop PB0, back-EMF comparators
-      PA0–PA6, I2C PD0/PD1, WS2812 headers.
+- [ ] Unused board hardware on the bench board: charger detect PB10, E-stop PB0, I2C PD0/PD1, WS2812
+      headers. (PA0–PA6 are not comparators: the PFOP's op-amps, phase B/C current, see README.)
 
 ## Done (this branch)
 

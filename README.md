@@ -59,6 +59,29 @@ you can also use a ESP32 to control the hacked hoverboard
 you can find example control methods in this repo
 
 https://github.com/reed-dan/hoverboard_hack_esp32_manualspeed
+
+### Drive modes
+`drivemode` (config field 44, or the config frame's iDriveMode) = commutation × 4 + control.
+Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
+
+| | pwm (0) | speed (1), rpm | torque (2), 0.01 A | position (3) |
+|---|---|---|---|---|
+| block (0) | 0 COM_VOLT | 1 COM_SPEED | – | – |
+| sine (1) | 4 SINE_VOLT | 5 SINE_SPEED | – | – |
+| FOC (2) | 8 FOC_VOLT | 9 FOC_SPEED | 10 FOC_TORQUE | – |
+
+Configs saved before the version field (word 63) used 2/3 for SINE_VOLT/SINE_SPEED; they are
+migrated at boot. FOC needs the two phase current pins (`iphasea`/`iphaseb`, `iphasecfg` selects the
+phases and polarity). In FOC, command 0 coasts (gates off) in pwm mode, gives zero current in torque
+mode and holds 0 rpm (brakes) in speed mode.
+
+### Phase currents on the MM32SPIN05PFOP
+The PFOP variant has two internal op-amps that MindMotion does not document for the SPIN05. They work
+without any register setup. On the bench board they amplify the low-side current of phases B and C:
+outputs PA2/PA6, inputs PA0/PA1 and PA4/PA5, about 19.4 ADC counts per A and an offset of ~1520
+counts. The outputs are only valid while the low sides conduct, and they saturate when the gates are
+off. Config for that board: `iphasea=PA2 iphaseb=PA6 iphasecfg=1`.
+
 ## Working features
 
 The firmware is already 90% functional, basic motor control should all work, but more testing is needed
@@ -73,15 +96,15 @@ https://youtu.be/hCaIlEKzI3A
 * voltage and total current
 * software and hardware over current protection
 * sine wave mode to drive the motor with more torque and higher effiency
+* FOC with two measured phase currents: torque, speed and current-limited voltage control
 ## Autodetect&configuration
 
 https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/wikis/home/%7BHow-to-use-PinFinder-firmware%7D
 
 ## todo
 * optimizations
-* constant torque
-* phase current
-* foc
+* position control, torque control for block and sine
+* field weakening
 ## Hardware
 any board equippted with MM32SPIN0X or MM32SPIN2X microcontroller should be supported
 

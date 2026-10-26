@@ -10,10 +10,12 @@
 #include "hal_conf.h"
 #include <math.h>
 #include "hallhandle.h"
+#include "foc.h"
 
 static volatile uint16_t abspwm;
 volatile uint32_t lastcommutate;
 volatile uint8_t gatesoff=0;
+volatile uint8_t coastreq=0;
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
@@ -139,9 +141,29 @@ void speedupdate(void){
 			lowbatcount=0;
 		}
 		gatesoff = lowbatperm || (wState & STATE_DISABLE);
+		uint8_t coast = 0;
+		if(speed==0){
+			FocClearTrip();
+		}
 		if(gatesoff){
 			pwm=0;
 			SpeedCtrlReset();
+			FocSpeedReset();
+		}else if(COMMUTATION(DRIVEMODE)==COMMUT_FOC){
+			//command 0: pwm coasts (gates off), torque 0 current, speed holds 0 rpm (brakes)
+			switch(CONTROL(DRIVEMODE)){
+				case CTRL_PWM:
+					coast = speed==0;
+					FocSetVoltage(speed);
+					break;
+				case CTRL_TORQUE:
+					FocSetCurrent((int32_t)speed*10);    //0.01 A
+					break;
+				default:
+					FocSetCurrent(FocSpeedCtrl(speed, fastspeed));
+					break;
+			}
+			pwm = speed;
 		}else{
 			if(DRIVEMODE==COM_VOLT){
 				pwm=speed*PWM_RES/1000;//1000~-1000 for all pwm resolution
@@ -159,6 +181,7 @@ void speedupdate(void){
 				}
 			}
 		}
+		coastreq = coast;
 		if(pwm>0){
 		dir=1;
 		}else{
@@ -191,6 +214,9 @@ void gatesOutput(uint8_t on){
 static void TIMOCInit(void);
 
 uint8_t DriveModeSupported(uint8_t mode){
+	if(COMMUTATION(mode)==COMMUT_FOC){
+		return (mode==FOC_VOLT||mode==FOC_SPEED||mode==FOC_TORQUE)&&FocAvailable();
+	}
 	return mode==COM_VOLT||mode==COM_SPEED||mode==SINE_VOLT||mode==SINE_SPEED;
 }
 
@@ -207,6 +233,7 @@ void SetDriveMode(uint8_t mode){
 	TIM1->CCR3 = 0;
 	DRIVEMODE = mode;
 	SpeedCtrlReset();
+	FocInit();
 	TIMOCInit();
 	NVIC_EnableIRQ(ADC_COMP_IRQn);
 }

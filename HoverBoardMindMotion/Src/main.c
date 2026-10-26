@@ -16,11 +16,9 @@
 #include "hardware.h"
 #include "calculation.h"
 
-#include "ipark.h"
-#include "FOC_Math.h"
 #include "pwm_gen.h"
-#include "PID.h"
 #include "hallhandle.h"
+#include "foc.h"
 
 volatile uint8_t step=1;//very importatnt to set to 1 or it will not work
 volatile uint32_t millis;
@@ -152,12 +150,8 @@ s32 main(void){
 	UART_SendString("hello World\n\r");    //debug uart
 
 	PWM_GEN_init(&pwm_gen);
-	InitNormalization(300,4000,4000,&RP);
 	HALLModuleInit(&HALL1);
-	InitPI();
-	MovingAvgInit(&IDData);
-	MovingAvgInit(&IQData);
-	MovingAvgInit(&SpeedFdk);
+	FocInit();
   while(1) {
 		uint8_t state = wState;
 		digitalWrite(LEDUPIN, (state&STATE_LED_UP)!=0);    //unconfigured pins are ignored
