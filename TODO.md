@@ -32,18 +32,15 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       current): use a median / exclude spikes. In sine mode the shunt is sampled while all low sides
       conduct and carries ~0 there: it needs another sample time (FOC computes the bus current from
       the phase currents and duties instead).
-- [ ] **Remaining modes and options** (agreed 2026-10-27): torque for block/sine (bus current based),
-      position for all (command 0 holds), FOC field weakening (negative d current, config switch)
-      and sine field weakening (phase advance). Command 0: pwm coasts, speed brakes, position holds;
-      SINE_VOLT/COM_VOLT still brake/freewheel at 0 as before.
-- [ ] Web console: drive mode numbers changed (sine 2/3 -> 4/5, FOC 8-10); its config frame still
-      sends the old numbers, which are now ignored (2/3) or mean block torque/position.
+- [ ] Web console: drive mode numbers changed (sine 2/3 -> 4/5, now 0-11); its config frame still
+      sends the old numbers, which now mean block torque/position (2/3).
+- [ ] Position: FOC settles 1-2 steps off (the speed set point near the target is below what the
+      halls can measure); the target is int16 (the command field). Sine takes 1.6-2.2 s per move.
+- [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
+      same command; block torque depends on the shunt calibration.
 - [ ] FOC: I_d/I_q noise ~±0.3 A at standstill (±5 counts on the op-amp outputs) and ~±1 A at
       500 rpm; the median filter delays the current by one period. Check the angle estimate at speed
       (park angle lead), and filter id/iq for telemetry.
-- [ ] COM_SPEED started while the wheel drifts backwards at a few rpm: the bumpless restart begins at
-      the feed forward of the measured speed including the dead band (-18.5 % duty) and overshot to
-      169 rpm once on a 60 rpm step. Start from 0 below ~20 rpm.
 - [ ] **Low-battery cut-off** is disabled on the bench (`batempty` 19.0 V). Set real limits for a
       battery (e.g. 42.0 / 32.0 V for 10S) with the web console or `mm32config.py`.
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to

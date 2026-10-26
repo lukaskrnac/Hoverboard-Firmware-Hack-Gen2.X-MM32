@@ -64,16 +64,31 @@ https://github.com/reed-dan/hoverboard_hack_esp32_manualspeed
 `drivemode` (config field 44, or the config frame's iDriveMode) = commutation × 4 + control.
 Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
 
-| | pwm (0) | speed (1), rpm | torque (2), 0.01 A | position (3) |
+| | pwm (0), permille | speed (1), rpm | torque (2), 0.01 A | position (3), hall steps |
 |---|---|---|---|---|
-| block (0) | 0 COM_VOLT | 1 COM_SPEED | – | – |
-| sine (1) | 4 SINE_VOLT | 5 SINE_SPEED | – | – |
-| FOC (2) | 8 FOC_VOLT | 9 FOC_SPEED | 10 FOC_TORQUE | – |
+| block (0) | 0 COM_VOLT | 1 COM_SPEED | 2 COM_TORQUE | 3 COM_POSITION |
+| sine (1) | 4 SINE_VOLT | 5 SINE_SPEED | 6 SINE_TORQUE | 7 SINE_POSITION |
+| FOC (2) | 8 FOC_VOLT | 9 FOC_SPEED | 10 FOC_TORQUE | 11 FOC_POSITION |
+
+- **Command 0:** pwm modes coast (gates off); speed modes brake and hold (block: low-side short
+  brake, sine: ramp down then zero vector, FOC: speed loop); torque modes give zero current (FOC)
+  or coast (block, sine). Position modes take the command as the target odometer (like the GD32's
+  iOdom input) and hold it. When the remote goes silent they hold where they are.
+- **Torque:**
+  - FOC: measured phase current.
+  - Block: a current loop on the bus shunt, which carries the phase current at the sample time in
+    block mode.
+  - Sine: no current sensing; the voltage is computed from `motorr` and the back EMF.
+- **Field weakening** is off by default.
+  - FOC: `fwimax`, a negative d current up to that value.
+  - Sine: `fwadvance`, phase advance in degrees. Sine field weakening has no current control and is
+    expensive; see `Inc/pinout.h`.
+- **Overvoltage:** the board coasts while the bus is 3 V above `batfull`, so braking doesn't pump a
+  bench supply.
 
 Configs saved before the version field (word 63) used 2/3 for SINE_VOLT/SINE_SPEED; they are
 migrated at boot. FOC needs the two phase current pins (`iphasea`/`iphaseb`, `iphasecfg` selects the
-phases and polarity). In FOC, command 0 coasts (gates off) in pwm mode, gives zero current in torque
-mode and holds 0 rpm (brakes) in speed mode.
+phases and polarity).
 
 ### Phase currents on the MM32SPIN05PFOP
 The PFOP variant has two internal op-amps that MindMotion does not document for the SPIN05. They work
@@ -96,15 +111,14 @@ https://youtu.be/hCaIlEKzI3A
 * voltage and total current
 * software and hardware over current protection
 * sine wave mode to drive the motor with more torque and higher effiency
-* FOC with two measured phase currents: torque, speed and current-limited voltage control
+* FOC with two measured phase currents; pwm, speed, torque and position control for block, sine and FOC; field weakening
 ## Autodetect&configuration
 
 https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/wikis/home/%7BHow-to-use-PinFinder-firmware%7D
 
 ## todo
 * optimizations
-* position control, torque control for block and sine
-* field weakening
+* bus current calibration
 ## Hardware
 any board equippted with MM32SPIN0X or MM32SPIN2X microcontroller should be supported
 
