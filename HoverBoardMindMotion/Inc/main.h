@@ -8,7 +8,6 @@ extern volatile uint8_t step;            //6 step commutation position 1..6
 extern volatile uint32_t millis;         //ms since boot, SysTick
 extern volatile int32_t iOdom;           //hall steps, signed
 extern volatile int8_t dir;              //commanded direction 1 / -1
-extern uint8_t sRxBuffer[10];   //uart rx dma buffer
 extern volatile int vbat;                //battery voltage 0.01V
 extern volatile int itotal;              //bus current 0.01A
 extern volatile int fvbat;               //filtered vbat

@@ -47,7 +47,7 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define VBAT_DIVIDER pinstorage[33]
 #define ITOTAL_DIVIDER pinstorage[34]    //itotal = divider * adc voltage: 1/shunt ohm for a direct shunt (250 = 4 mOhm; bench
                                          //board 419, measured against the op-amp phase current)
-#define BAUD pinstorage[36]
+#define BAUD pinstorage[36]    //uart baud / 100 (config version 2; 1152 = 115200)
 #define PWM_RES pinstorage[37]
 #define SLAVE_ID pinstorage[38]
 #define WINDINGS pinstorage[39]
@@ -81,7 +81,7 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 //config layout version: 0 = before the drive mode encoding commutation*4 + control (SINE_VOLT was 2,
 //SINE_SPEED 3); main.c migrates older layouts after loading
 #define CFG_VERSION pinstorage[63]
-#define CFG_VERSION_CURRENT 1
+#define CFG_VERSION_CURRENT 2    //2: BAUD in units of 100 baud
 
 static inline int32_t cfgOrDefault(uint16_t v, int32_t def){ return (v==0||v==0xFFFF) ? def : v; }
 

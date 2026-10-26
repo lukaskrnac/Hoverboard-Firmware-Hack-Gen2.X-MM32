@@ -28,7 +28,6 @@
 #include "calculation.h"
 
 
-static volatile uint8_t bAnswerMaster = 0;
 static int16_t iReceivePos = -1;    //-1: waiting for the start byte
 
 
@@ -67,7 +66,7 @@ typedef struct {			// "#pragma pack(1)" needed to get correct sizeof()
    uint16_t checksum;
 } SerialServer2HoverConfig;
 
-static uint8_t aReceiveBuffer[255];	//sizeof(SerialServer2Hover)
+static uint8_t aReceiveBuffer[16];    //largest v1 frame: 15 bytes
 
 #define START_FRAME         0xABCD       // [-] Start frme definition for reliable serial communication
 typedef struct{				// "#pragma pack(1)" needed to get correct sizeof()
@@ -90,7 +89,7 @@ _Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 
 
 
 
-static volatile uint32_t iTimeLastRx = 0;
+static uint32_t iTimeLastRx = 0;
 
 
 static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
@@ -119,11 +118,7 @@ static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
 
 
 
-// a config frame is only copied in the rx interrupt and applied here in the main loop: it
-// reinitialises TIM1 and the controllers and writes flash, which stalls the cpu (and the commutation interrupt)
 static void AnswerMaster(void);
-static SerialServer2HoverConfig oConfigRx;
-static volatile uint8_t bConfigRx = 0;
 static uint8_t bConfigSave = 0;
 
 static void ApplyConfig(const SerialServer2HoverConfig* pData){
@@ -150,24 +145,10 @@ void RemoteUpdate(void){
 	if (millis - iTimeLastRx > SERIAL_TIMEOUT){
 		speed = 0;
 	}
-	if (bConfigRx)
-	{
-		SerialServer2HoverConfig oConfig;
-		__disable_irq();    //a new frame could arrive while copying
-		oConfig = oConfigRx;
-		bConfigRx = 0;
-		__enable_irq();
-		ApplyConfig(&oConfig);
-	}
 	if (bConfigSave && speed == 0 && realspeed == 0)    //save only with the wheel stopped
 	{
 		EEPROM_Write((u8*)pinstorage, 2 * 64);
 		bConfigSave = 0;
-	}
-	if (bAnswerMaster)
-	{
-		AnswerMaster();
-		bAnswerMaster = 0;
 	}
 }
 
@@ -193,7 +174,7 @@ static void AnswerMaster(void){
 	oData.checksum = 	CalcCRC((uint8_t*) &oData, sizeof(oData) - 2);	// (first bytes except crc)
 
 
-	UART_Send_Group((uint8_t*) &oData, sizeof(oData));
+	SerialSend((uint8_t*) &oData, sizeof(oData));
 
 
 }
@@ -202,13 +183,8 @@ static void AnswerMaster(void){
 static uint8_t iRxDataType;
 static uint8_t iRxDataSize;
 
-// Update USART steer input
-// static int16_t iReceivePos = -1;		// if >= 0 incoming bytes are recorded until message size reached
-void serialit(void){
-
-
-	uint8_t cRead = sRxBuffer[0];
-	//DEBUG_LedSet((steerCounter%20) < 10,0)	//
+//v1 frames ('/' start), one byte at a time from the rx ring (main loop)
+static void feedV1(uint8_t cRead){
 
 	if (iReceivePos < 0)		// data reading not yet begun
 	{
@@ -266,15 +242,21 @@ void serialit(void){
 				}
 				case 2:
 				{
-					memcpy(&oConfigRx, aReceiveBuffer, sizeof(oConfigRx));    //applied by RemoteUpdate()
-					bConfigRx = 1;
+					SerialServer2HoverConfig oConfig;
+					memcpy(&oConfig, aReceiveBuffer, sizeof(oConfig));
+					ApplyConfig(&oConfig);
 					break;
 				}
 			}
-
-			//if (speed > 300) speed = 300;	else if (speed < -300) speed = -300;		// for testing this function
-			bAnswerMaster = 1;
-			iTimeLastRx = millis;  	// Reset the pwm timout to avoid stopping motors
+			AnswerMaster();
 		}
+	}
+}
+
+//drains the rx ring: called from the main loop every pass
+void RemotePoll(void){
+	int c;
+	while((c = SerialGetByte())>=0){
+		feedV1((uint8_t)c);
 	}
 }

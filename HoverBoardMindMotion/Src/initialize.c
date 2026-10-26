@@ -254,38 +254,6 @@ uint8_t UART_GPIO_Init(void){
 	return uart;
 }
 
-void DMA_NVIC_Config(DMA_Channel_TypeDef* dam_chx, u32 cpar, u32 cmar, u16 cndtr){
-	DMA_InitTypeDef DMA_InitStructure;
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-	DMA_DeInit(dam_chx);
-	DMA_StructInit(&DMA_InitStructure);
-	//DMA transfer peripheral address
-	DMA_InitStructure.DMA_PeripheralBaseAddr = cpar;
-	//DMA transfer memory address
-	DMA_InitStructure.DMA_MemoryBaseAddr = cmar;
-	//DMA transfer direction from peripheral to memory
-	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
-	//DMA cache size
-	DMA_InitStructure.DMA_BufferSize = cndtr;
-	//After receiving the data, the peripheral address is forbidden to move
-	//backward
-	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-	//After receiving the data, the memory address is shifted backward
-	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-	//Define the peripheral data width to 8 bits
-	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
-	DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-	DMA_InitStructure.DMA_Priority = DMA_Priority_Low;
-	//M2M mode is disabled
-	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
-	DMA_Init(dam_chx, &DMA_InitStructure);
-	// Enable UARTy_DMA1_Channel Transfer complete interrupt
-	DMA_ITConfig(dam_chx, DMA_IT_TC, ENABLE);
-	// UARTy_DMA1_Channel enable
-	DMA_Cmd(dam_chx, ENABLE);
-}
-
 void adc_Init(void){
 	ADC_InitTypeDef  ADC_InitStructure;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);

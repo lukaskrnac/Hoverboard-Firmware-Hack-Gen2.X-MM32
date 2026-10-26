@@ -15,6 +15,6 @@
 
 void RemoteUpdate(void);
 uint8_t RemoteTimedOut(void);    //no command frame within SERIAL_TIMEOUT
-void serialit(void);    //uart rx dma interrupt, one byte in sRxBuffer[0]
+void RemotePoll(void);    //main loop: parse received bytes, answer
 
 #endif

@@ -26,7 +26,6 @@ static uint32_t lastupdate;
 static uint32_t lastflicker;
 volatile int32_t iOdom;
 volatile int8_t dir=1;
-uint8_t sRxBuffer[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 volatile int vbat;
 volatile int itotal;
 volatile int fvbat;
@@ -87,6 +86,10 @@ s32 main(void){
 		else if(DRIVEMODE==3) DRIVEMODE=SINE_SPEED;
 		CFG_VERSION=1;
 	}
+	if(CFG_VERSION<2){    //baud was stored in baud, now in 100 baud (115200 did not fit the 16 bit word)
+		BAUD = BAUD>=1200 ? BAUD/100 : 1152;
+		CFG_VERSION=2;
+	}
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
 
 	//initialize normal gpio
@@ -111,16 +114,8 @@ s32 main(void){
 	#endif
 	//serial1.begin(19200);
 	uarten=UART_GPIO_Init();
-	UARTX_Init((uint32_t)BAUD,uarten);
-	//uart interrupt
-	//uart dma
-	if(uarten==1){
-		DMA_NVIC_Config(DMA1_Channel3, (u32)&UART1->RDR, (u32)sRxBuffer, 1);
-		NVIC_Configure(DMA1_Channel2_3_IRQn, 1);
-	}else{
-		DMA_NVIC_Config(DMA1_Channel5, (u32)&UART2->RDR, (u32)sRxBuffer, 1);
-		NVIC_Configure(DMA1_Channel4_5_IRQn, 1);
-	}
+	UARTX_Init((uint32_t)BAUD*100,uarten);    //BAUD in units of 100 (config version 2)
+	SerialInit();    //rx ring and tx by DMA, parsed in the main loop (RemotePoll)
 	//latch on power
 	if(LATCHPIN<PINCOUNT){    //have latch
 		DelayFed(100);    //some board the micro controller can reset in time and turn back on
@@ -153,6 +148,7 @@ s32 main(void){
 	HALLModuleInit(&HALL1);
 	FocInit();
   while(1) {
+		RemotePoll();    //received frames and replies, as soon as they arrive
 		uint8_t state = wState;
 		digitalWrite(LEDUPIN, (state&STATE_LED_UP)!=0);    //unconfigured pins are ignored
 		digitalWrite(LEDDPIN, (state&STATE_LED_DOWN)!=0);

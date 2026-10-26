@@ -27,19 +27,6 @@ void TIM1_BRK_UP_TRG_COM_IRQHandler(void){
   TIM_ClearITPendingBit(TIM1, TIM_IT_COM);
 }
 
-void DMA1_Channel2_3_IRQHandler(void){
-  if(DMA_GetITStatus(DMA1_IT_TC3)) {
-    DMA_ClearITPendingBit(DMA1_IT_GL3);
-    serialit();
-  }
-}
-
-void DMA1_Channel4_5_IRQHandler(void){
-  if(DMA_GetITStatus(DMA1_IT_TC5)) {
-    DMA_ClearITPendingBit(DMA1_IT_GL5);
-    serialit();
-  }
-}
 void ADC1_COMP_IRQHandler(void){
 	if(ADC_GetFlagStatus(ADC1, ADC_IT_AWD) != RESET) {
     ADC_ClearFlag(ADC1, ADC_IT_AWD);
