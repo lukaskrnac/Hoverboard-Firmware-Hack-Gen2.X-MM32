@@ -157,8 +157,8 @@ void speedupdate(void){
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage
 		uint8_t overvolt = BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL+3000;
-		if(speed==0){
-			FocClearTrip();
+		if((speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)||gatesoff){
+			FocClearTrip();    //zero command, or disarmed (the only way in position mode: its command is a target)
 		}
 		//position: the command is the target odometer (hall steps, like the Gen2.x-GD32 iOdom input);
 		//without commands the wheel holds where it is instead of going back to target 0

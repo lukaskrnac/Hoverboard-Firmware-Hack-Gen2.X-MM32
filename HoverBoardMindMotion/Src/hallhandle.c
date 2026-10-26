@@ -81,6 +81,7 @@ void HALLModuleCalc(HALLType *u){
 			u->MoveDir = -1;
 		}
 		TIM_TypeDef* tim = halltimen ? TIM2 : TIM3;
+		uint8_t reversal = (d==1) != (realdir==0);    //against the previous edge's direction
 		i++;
 		if(i >= 6)
 		{
@@ -96,6 +97,12 @@ void HALLModuleCalc(HALLType *u){
 			tim->SR = ~TIM_SR_UI;      //ms timing instead (it was a fixed 250 ms: below ~10 rpm the speed
 			uint32_t ms = millis-edgeMs;    //read 0 or far too low)
 			u->HallTime[i] = ms<250 ? ms*1000 : 250000;
+		}
+		if(reversal){
+			//a direction change is no speed sample: a rotor resting on a hall boundary (position hold)
+			//flickers the bit, the short intervals read as up to 89 rpm in alternating directions and the
+			//FOC speed loop answered with 6 A kicks. Start the averaging over from standstill.
+			for(j=0;j<6;j++) u->HallTime[j] = 250000;
 		}
 		edgeMs = millis;
 
