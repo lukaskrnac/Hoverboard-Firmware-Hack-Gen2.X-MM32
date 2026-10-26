@@ -16,6 +16,8 @@ static volatile uint16_t abspwm;
 volatile uint32_t lastcommutate;
 volatile uint8_t gatesoff=0;
 volatile uint8_t coastreq=0;
+volatile uint8_t blockbrake=0;    //block commutation: low side short brake active, the hall isr does not commutate
+static uint16_t brakeduty;        //permille of the period the low sides are on while braking
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
@@ -141,7 +143,10 @@ void speedupdate(void){
 			lowbatcount=0;
 		}
 		gatesoff = lowbatperm || (wState & STATE_DISABLE);
-		uint8_t coast = 0;
+		uint8_t coast = 0, brake = 0;
+		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
+		//bench supply: coast while the bus is 3 V above the full battery voltage
+		uint8_t overvolt = BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL+3000;
 		if(speed==0){
 			FocClearTrip();
 		}
@@ -165,22 +170,44 @@ void speedupdate(void){
 			}
 			pwm = speed;
 		}else{
-			if(DRIVEMODE==COM_VOLT){
-				pwm=speed*PWM_RES/1000;//1000~-1000 for all pwm resolution
-			}else if(DRIVEMODE==SINE_VOLT){
-				pwm= speed*40;// IQ=30000~-30000
-			}else if(DRIVEMODE==COM_SPEED||DRIVEMODE==SINE_SPEED){	//speed in rpm
-				if(speed==0){    //coast
-					pwm=0;
-					SpeedCtrlReset();
-				}else{
-					SpeedPlant p;
-					SpeedParams(DRIVEMODE, &p);
-					//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
-					pwm=SpeedCtrl(speed,realspeed,&p)*(DRIVEMODE==COM_SPEED ? (int32_t)PWM_RES : 32768)/1000;
-				}
+			uint8_t blk = COMMUTATION(DRIVEMODE)==COMMUT_BLOCK;
+			switch(CONTROL(DRIVEMODE)){
+				case CTRL_PWM:    //command 0 coasts
+					coast = speed==0;
+					pwm = blk ? speed*PWM_RES/1000 : speed*40;    //duty counts / Q15 modulation (+-32000 linear)
+					break;
+				case CTRL_SPEED:    //rpm; command 0 brakes and holds
+					if(speed==0){
+						//block: short the motor with the low sides (it cannot brake through its normal
+						//switching). Sine: the modulation ramps to 0 at the speed loop's slew rate (3 per
+						//mille/ms; the motor regenerates as it falls below the back emf), then the zero
+						//vector shorts the motor and holds. Running the speed loop at 0 rpm hunted +-20 rpm.
+						if(blk){
+							pwm = 0;
+							brake = 1;
+						}else{
+							int32_t st = 32768*6/1000;    //this runs every ~2 ms
+							pwm = pwm>st ? pwm-st : (pwm<-st ? pwm+st : 0);
+						}
+						SpeedCtrlReset();
+					}else{
+						SpeedPlant p;
+						SpeedParams(DRIVEMODE, &p);
+						//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
+						pwm = SpeedCtrl(speed,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
+					}
+					break;
+				default:
+					pwm = 0;
+					coast = 1;
+					break;
 			}
 		}
+		if(overvolt){
+			coast = 1;
+			brake = 0;
+		}
+		BlockBrake(brake);
 		coastreq = coast;
 		if(pwm>0){
 		dir=1;
@@ -189,10 +216,48 @@ void speedupdate(void){
 		}
 		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
 		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-			TIM1->CCR1=abspwm;
-			TIM1->CCR2=abspwm;
-			TIM1->CCR3=abspwm;
+			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_RES*(1000-brakeduty)/1000) : abspwm;
+			TIM1->CCR1=ccr;
+			TIM1->CCR2=ccr;
+			TIM1->CCR3=ccr;
 		}
+	}
+}
+
+//Block commutation short brake: high sides off, the three low sides switched together (PWM1: the
+//complementary output is on while CNT >= CCR), so the motor's phases are shorted for brakeduty of the
+//period. The duty ramps up over ~0.3 s (the brake torque is proportional to speed: a sudden full short
+//at speed is a current spike) and stays at 100 % while standing. The hall isr does not commutate
+//while blockbrake is set; ending the brake forces a commutation.
+void BlockBrake(uint8_t on){
+	if(!on||COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK){
+		if(blockbrake){
+			NVIC_DisableIRQ(ADC_COMP_IRQn);
+			blockbrake = 0;
+			brakeduty = 0;
+			step = 0;    //the hall isr commutates at its next run
+			if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK) commutate();
+			NVIC_EnableIRQ(ADC_COMP_IRQn);
+		}
+		return;
+	}
+	if(!blockbrake){
+		NVIC_DisableIRQ(ADC_COMP_IRQn);
+		blockbrake = 1;
+		brakeduty = 0;
+		TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_RES;
+		for(uint8_t ch=0;ch<3;ch++){
+			uint16_t c = ch==0 ? TIM_Channel_1 : (ch==1 ? TIM_Channel_2 : TIM_Channel_3);
+			TIM_SelectOCxM(TIM1, c, TIM_OCMode_PWM1);
+			TIM_CCxCmd(TIM1, c, TIM_CCx_Disable);
+			TIM_CCxNCmd(TIM1, c, TIM_CCxN_Enable);
+		}
+		TIM_GenerateEvent(TIM1, TIM_EventSource_COM);
+		NVIC_EnableIRQ(ADC_COMP_IRQn);
+	}
+	if(brakeduty<1000){
+		brakeduty += 6;    //called every ~2 ms
+		if(brakeduty>1000) brakeduty = 1000;
 	}
 }
 
@@ -232,6 +297,7 @@ void SetDriveMode(uint8_t mode){
 	TIM1->CCR2 = 0;
 	TIM1->CCR3 = 0;
 	DRIVEMODE = mode;
+	blockbrake = 0;    //TIMOCInit() sets the outputs up from scratch
 	SpeedCtrlReset();
 	FocInit();
 	TIMOCInit();

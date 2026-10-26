@@ -140,7 +140,7 @@ void HALLModuleCalc(HALLType *u){
 	}
 	//block commutation: evaluated every time, so a direction change or a mode switch takes effect at
 	//once instead of at the next hall edge
-	if(com&&hall_to_pos[u->RunHallValue]!=step){
+	if(com&&!blockbrake&&hall_to_pos[u->RunHallValue]!=step){
 		step=hall_to_pos[u->RunHallValue];
 		commutate();
 	}

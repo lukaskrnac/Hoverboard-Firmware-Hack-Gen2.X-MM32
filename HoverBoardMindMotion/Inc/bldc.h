@@ -8,6 +8,8 @@ uint8_t hallpos(uint8_t forward);    //1: raw hall state, else complemented (7-r
 void speedupdate(void);
 void SetDriveMode(uint8_t mode);    //safe while running, see bldc.c
 void gatesOutput(uint8_t on);
+void BlockBrake(uint8_t on);    //block commutation short brake (speedupdate)
+extern volatile uint8_t blockbrake;
 
 extern volatile uint8_t gatesoff;    //1: gates must stay off (disarmed by the remote, low battery), applied by the adc isr
 extern volatile uint8_t coastreq;    //1: gates off for now, the drive mode's behaviour at command 0 (coast)

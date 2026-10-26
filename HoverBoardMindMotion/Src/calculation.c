@@ -68,6 +68,7 @@ void SpeedCtrlReset(void){
 }
 
 static int32_t FeedForward(int32_t rpm, const SpeedPlant* p, int32_t v){    //permille<<8, |rpm| <= 1000
+	if(rpm==0) return 0;    //no dead band push at a 0 rpm set point (braking to standstill)
 	int32_t a = rpm < 0 ? -rpm : rpm;
 	int32_t ff = (p->d0<<8) + a*256000/(p->kv*v/1000);     //1000/(kv/10 * v/100) per rpm
 	return rpm < 0 ? -ff : ff;
@@ -83,8 +84,10 @@ int SpeedCtrl(int sp, int meas, const SpeedPlant* p){    //sp, meas in rpm; retu
 	if(meas > 1000) meas = 1000; else if(meas < -1000) meas = -1000;
 	if(!spdRun){    //(re)start bumpless from the speed the wheel has (coasting, drive mode change):
 		spdRef = meas<<8;    //reference and output from the measured speed. Starting the output at 0
-		spdU = meas ? FeedForward(meas, p, v) : 0;    //braked a turning wheel in sine mode (to 75 from
-		spdRun = 1;    //150 rpm) while it slewed up
+		//braked a turning wheel in sine mode (to 75 from 150 rpm) while it slewed up. Below 20 rpm from 0:
+		//the dead band part of the feed forward against the motion overshot a step from a slow drift
+		spdU = (meas>20||meas<-20) ? FeedForward(meas, p, v) : 0;
+		spdRun = 1;
 	}
 	di = ((sp<<8)-spdRef)*dt/p->tref;
 	spdRef = di ? spdRef+di : sp<<8;    //snap once the step rounds to 0
