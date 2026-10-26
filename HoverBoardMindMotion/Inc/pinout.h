@@ -36,14 +36,14 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define OCPREFPIN pinstorage[24]
 
 #define VBAT_DIVIDER pinstorage[33]
-#define ITOTAL_DIVIDER pinstorage[34]
+#define ITOTAL_DIVIDER pinstorage[34]    //itotal = divider * adc voltage: 1/shunt ohm for a direct shunt (250 = 4 mOhm)
 #define BAUD pinstorage[36]
 #define PWM_RES pinstorage[37]
 #define SLAVE_ID pinstorage[38]
 #define WINDINGS pinstorage[39]
 #define INVERT_LOWSIDE pinstorage[40]
-#define SOFT_ILIMIT pinstorage[41]
-#define AWDG pinstorage[42]
+#define SOFT_ILIMIT pinstorage[41]    //A, averaged bus current that switches the gates off, 0 = off
+#define AWDG pinstorage[42]    //adc counts above the zero offset, hardware (adc watchdog) gate trip, 0 = off
 #define DRIVEMODE pinstorage[44]
 #define BAT_FULL pinstorage[45]
 #define BAT_EMPTY pinstorage[46]

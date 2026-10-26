@@ -87,7 +87,9 @@ void ADC1_COMP_IRQHandler(void){
 			iphaseb = (int32_t)iphaseboffset-(int32_t)analogRead(IPHASEBPIN);
 			avgvbat();
 			avgItotal();
-			if(itotal>SOFT_ILIMIT){
+			//SOFT_ILIMIT in A against the 64 sample average (~15 ms): one adc count of a direct shunt is
+			//~0.3 A and the raw value spikes on switching noise. Fast faults are the adc watchdog's job (AWDG).
+			if(SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100){
 				TIM_CtrlPWMOutputs(TIM1, DISABLE);
 			}else{
 				TIM_CtrlPWMOutputs(TIM1, ENABLE);
