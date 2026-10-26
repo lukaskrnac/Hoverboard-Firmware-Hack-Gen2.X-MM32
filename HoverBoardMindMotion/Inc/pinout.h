@@ -11,9 +11,9 @@
 #ifndef PINOUT_H
 #define PINOUT_H
 
-#include "../Inc/hardware.h"
+#include "hardware.h"
 extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EEPROM (main.c)
-	
+
 
 #define HALLAPIN pinstorage[0]
 #define HALLBPIN pinstorage[1]

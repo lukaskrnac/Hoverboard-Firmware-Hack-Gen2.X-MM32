@@ -1,9 +1,9 @@
 /*-------------------- Includes -----------------------*/
-#include "../Inc/hallhandle.h"
-#include "../Inc/main.h"
-#include "../Inc/interrupt.h"
-#include "../Inc/bldc.h"
-#include "../Inc/mcu.h"
+#include "hallhandle.h"
+#include "main.h"
+#include "interrupt.h"
+#include "bldc.h"
+#include "mcu.h"
 
 /*------------------- Private variables ---------------*/
 HALLType HALL1;
@@ -22,7 +22,7 @@ void HALLModuleCalc(HALLType *u);
 void HALLModuleInit(HALLType *u)
 {
 	uint8_t i;
-	
+
 	u->RunHallValue = hallpos(dir);
 	u->PreHallValue = u->RunHallValue;
 	u->PreRaw = hallpos(1);
@@ -32,7 +32,7 @@ void HALLModuleInit(HALLType *u)
 	u->SpeedTemp = 0;
 	u->Time100msCNT = 0;
 	u->HallTimeSum = 60000;
-	
+
 	u->CWAngleTab[5] = 32767;
 	u->CWAngleTab[1] = 43688;
 	u->CWAngleTab[3] = 54610;
@@ -44,7 +44,7 @@ void HALLModuleInit(HALLType *u)
 
 	u->MoveDir = 1;
 	u->Angle = (int16_t)u->CWAngleTab[u->PreRaw];    //middle of the current sector
-	
+
 	for(i=0;i<8;i++)
 	{
 		u->HallTime[i] = 10000;
@@ -66,7 +66,7 @@ void HALLModuleCalc(HALLType *u){
 
 	//RunHallValue is the hall state as seen by the commutation: complemented (7-raw) for the other direction
 	u->RunHallValue = u->CMDDIR==1 ? raw : 7-raw;
-	
+
 	//measurement: only real hall edges. A change of the commanded direction also changes RunHallValue;
 	//counting that as an edge made a fake odometer step and a speed sample from a stale timer capture.
 	uint8_t edge = 0;
@@ -94,28 +94,28 @@ void HALLModuleCalc(HALLType *u){
 			tim->SR = ~TIM_SR_UI;
 			u->HallTime[i] = 250000;
 		}
-				
+
 		//Calculate rotor electrical angle speed and mechanical speed
 		u->HallTimeSum = 0;
 		for(j=0;j<6;j++)
 		{
 			u->HallTimeSum += u->HallTime[j];
 		}
-		
+
 		u->SpeedTemp = SPEEDX/u->HallTimeSum;
 		if(realdir){
 			realspeed = u->SpeedTemp;
 		}else{
 			realspeed = -u->SpeedTemp;
 		}
-		lastcommutate = millis;	
+		lastcommutate = millis;
 		if (realdir == 1){
 			iOdom++;
 		}else{
 			iOdom--;
 		}
 	}
-	
+
 	//sine: rotor angle (65536 per electrical turn) from the hall sectors. Measured on the bench motor
 	//(d-axis vector swept over two turns): the hall states are centred on CWAngleTab, their boundaries
 	//at +-30 deg (5461), within 1.5 deg. At an edge the rotor is on the boundary just crossed; between
@@ -143,11 +143,10 @@ void HALLModuleCalc(HALLType *u){
 		step=hall_to_pos[u->RunHallValue];
 		commutate();
 	}
-	
+
 	if(millis-lastcommutate>250){//zero out speed
 		realspeed=0;
 	}
 	u->PreHallValue = u->RunHallValue;
 	u->PreRaw = raw;
 }
-

@@ -30,13 +30,13 @@ typedef struct
 	int16_t Min;		//最小限制值
 	int16_t Inc;		//加速步距
 	int16_t Dec;		//加速步距
-}LoopCMP_T; 
+}LoopCMP_T;
 
 typedef struct
 {
 	uint16_t In;             //输入值
 	uint16_t MaxIn;          //最大值有效值
-	uint16_t MinIn;          //最小值有效值		
+	uint16_t MinIn;          //最小值有效值
 	uint16_t MaxOut;         //对应允许最大输出值
 	uint16_t Out;            //输出值
 	uint8_t  OutEn;          //输出使能标志

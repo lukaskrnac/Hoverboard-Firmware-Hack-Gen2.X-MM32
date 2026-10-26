@@ -1,0 +1,29 @@
+# https://editorconfig.org - conventions of this repo
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{c,h}]
+indent_style = tab
+tab_width = 4
+
+[Makefile]
+indent_style = tab
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+# vendor code (MindMotion HAL, CMSIS, device headers): keep as delivered
+[HoverBoardMindMotion/{Library,Device}/**]
+charset = unset
+indent_style = unset
+trim_trailing_whitespace = false
+insert_final_newline = unset

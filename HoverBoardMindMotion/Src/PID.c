@@ -1,5 +1,5 @@
 /*-------------------- Includes -----------------------*/
-#include "../Inc/PID.h"
+#include "PID.h"
 
 /*------------------- Private variables ---------------*/
 tPIParm CurID;		//ID环
@@ -21,7 +21,7 @@ void InitPI(void)
 	CurID.qdSum = 0;
 	CurID.qInMeas = 0;
 	CurID.qOut = 0;
-	
+
 	CurIQ.qKp = 2048;
 	CurIQ.qKi = 50;
 	CurIQ.qOutMax = 30000;
@@ -29,10 +29,10 @@ void InitPI(void)
 	CurIQ.qdSum = 0;
 	CurIQ.qInMeas = 0;
 	CurIQ.qOut = 0;
-	
+
 	Speed.qOutMax = 30000;
 	Speed.qOutMin = -30000;
-	Speed.qKp = 8000;		
+	Speed.qKp = 8000;
 	Speed.qKi = 50;
 	Speed.qdSum = 0;
 	Speed.qInMeas = 0;
@@ -50,17 +50,17 @@ void CalcPI(tPIParm *pParm)
 	signed int   Error;
 	signed long  Up;
 	signed long  Ui;
-	
+
 	//Calc Error
 	Error = pParm->qInRef - pParm->qInMeas;
-	
+
 	//Calc proportional
 	Up = (pParm-> qKp * Error)>>15;
-	
+
 	//Calc integral
 	pParm->qdSum = pParm->qdSum + pParm->qKi* Error;
-	
-	//Limit integral 
+
+	//Limit integral
 	if(pParm->qdSum >= (pParm->qOutMax<<15))		//CurIQ.qOutMax<<15
 	{
 		pParm->qdSum = (pParm->qOutMax<<15);
@@ -71,12 +71,12 @@ void CalcPI(tPIParm *pParm)
 	}
 	else
 	{}
-	
+
 	Ui = pParm->qdSum>>15;
-	
-	//Out = Up + Ui 
+
+	//Out = Up + Ui
 	pParm->qOut = Up + Ui;
-		
+
 	//Out Limit
 	if(pParm->qOut > pParm->qOutMax)
 	{
@@ -88,7 +88,6 @@ void CalcPI(tPIParm *pParm)
 	}
 	else
 	{
-		
+
 	}
 }
-

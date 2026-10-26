@@ -1,7 +1,7 @@
 #include "hal_uart.h"
-#include "../Inc//pinout.h"
-#include "../Inc/uart.h"
-#include "../Inc/main.h"
+#include "pinout.h"
+#include "uart.h"
+#include "main.h"
 
 
 static void UART_Send_Byte(u8 dat){
@@ -18,26 +18,3 @@ void UART_SendString(char* str){
     while(*str)
         UART_Send_Byte((u8)(*str++));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

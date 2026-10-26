@@ -1,26 +1,26 @@
-#include "../Inc/mcu.h"
-#include "../Inc/main.h"
-#include "../Inc/interrupt.h"
+#include "mcu.h"
+#include "main.h"
+#include "interrupt.h"
 #include "hal_gpio.h"
 #include "hal_rcc.h"
-#include "hal_adc.h"           
+#include "hal_adc.h"
 #include "hal_tim.h"
 #include "hal_iwdg.h"
-#include "../Inc/delay.h"
-#include "../Inc/pinout.h"  
-#include "../Inc/initialize.h"
-#include "../Inc/uart.h"
-#include "../Inc/bldc.h"
-#include "../Inc/remoteUartBus.h"
-#include "../Inc/sim_eeprom.h"
-#include "../Inc/hardware.h"
-#include "../Inc/calculation.h"
+#include "delay.h"
+#include "pinout.h"
+#include "initialize.h"
+#include "uart.h"
+#include "bldc.h"
+#include "remoteUartBus.h"
+#include "sim_eeprom.h"
+#include "hardware.h"
+#include "calculation.h"
 
-#include "../Inc/ipark.h"
-#include "../Inc/FOC_Math.h"
-#include "../Inc/pwm_gen.h"
-#include "../Inc/PID.h"
-#include "../Inc/hallhandle.h"
+#include "ipark.h"
+#include "FOC_Math.h"
+#include "pwm_gen.h"
+#include "PID.h"
+#include "hallhandle.h"
 
 volatile uint8_t step=1;//very importatnt to set to 1 or it will not work
 volatile uint32_t millis;
@@ -73,17 +73,17 @@ s32 main(void){
 				if(i!=10&&i!=11){
 					pinMode(i, INPUT_PULLUP);
 				}
-			}	
+			}
 			DELAY_Ms(1000);
 			for(uint8_t i=0;i<33;i++){
 				if(i!=10&&i!=11){
 					pinMode(i, INPUT_PULLDOWN);
 				}
-			}	
+			}
 			DELAY_Ms(1000);
 		}
 	}
-	
+
 	//initialize normal gpio
 	io_init();
 	//hall gpio init
@@ -131,7 +131,7 @@ s32 main(void){
 				__NOP();
 			}
 			IWDG_ReloadCounter();
-		}	
+		}
 	}
 	if(BUZZERPIN<PINCOUNT){
 		for(int i=0;i<5;i++){    //power on melody
@@ -143,7 +143,7 @@ s32 main(void){
 	}
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);    //Software start conversion
 	UART_SendString("hello World\n\r");    //debug uart
-	
+
 	PWM_GEN_init(&pwm_gen);
 	InitNormalization(300,4000,4000,&RP);
 	HALLModuleInit(&HALL1);
@@ -178,7 +178,7 @@ s32 main(void){
 				}else if(vbat*10>bat_50){
 					digitalWrite(LEDRPIN,0);
 					digitalWrite(LEDGPIN,0);
-					digitalWrite(LEDBPIN,1);	
+					digitalWrite(LEDBPIN,1);
 				}else if(vbat*10>bat_20){
 					digitalWrite(LEDRPIN,1);
 					digitalWrite(LEDGPIN,0);
@@ -240,6 +240,5 @@ s32 main(void){
 			}
 		}
 		IWDG_ReloadCounter();    //feed the watchdog
-  }//main loop	
+  }//main loop
 }
-

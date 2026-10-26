@@ -1,8 +1,8 @@
-#include "../Inc/mcu.h"
-#include "../Inc/main.h"
-#include "../Inc/calculation.h"   
-#include "../Inc/pinout.h"   
-#include "../Inc/bldc.h"   
+#include "mcu.h"
+#include "main.h"
+#include "calculation.h"
+#include "pinout.h"
+#include "bldc.h"
 
 //running averages of the adc isr: 32 (vbat) and 64 (itotal) samples, one per pwm period
 static uint8_t vindex;
@@ -13,20 +13,20 @@ static int adatasum;
 static int aavgarr[64];
 
 void avgvbat(void){
-	
+
 	if(vindex >= 32){
     vindex = 0;
-  } 
+  }
   vdatasum = vdatasum + vbat - vavgarr[vindex];
   vavgarr[vindex] = vbat;
   fvbat = (int)(vdatasum>>5);
   vindex++;
 }
 void avgItotal(void){
-	
+
 	if(aindex >= 64){
     aindex = 0;
-  } 
+  }
   adatasum = adatasum + itotal - aavgarr[aindex];
   aavgarr[aindex] = itotal;
   fitotal = (int)(adatasum>>6);

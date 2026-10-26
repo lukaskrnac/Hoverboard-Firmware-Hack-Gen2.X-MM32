@@ -1,11 +1,11 @@
 /*-------------------- Includes -----------------------*/
-#include "../Inc/mcu.h"
-#include "../Inc/pwm_gen.h"
-#include "../Inc/pinout.h"
+#include "mcu.h"
+#include "pwm_gen.h"
+#include "pinout.h"
 
 /*------------------- Private variables ---------------*/
 PWM_GEN_T pwm_gen;
-	
+
 /*------------------ Private functions ----------------*/
 void PWM_GEN_init(PWM_GEN_T *u1);
 void PWM_GEN_calc(PWM_GEN_T *u1);
@@ -14,7 +14,7 @@ void Update_PWM(PWM_GEN_T *u1);
 /*************************************
 	Function Name：PWM_GEN_init
 	Description：It initializes SVPWM structure
-	Input：*u1 --- Structure PWM_GEN_T 
+	Input：*u1 --- Structure PWM_GEN_T
 	Output：none
 **************************************/
 void PWM_GEN_init(PWM_GEN_T *u1)
@@ -31,22 +31,22 @@ void PWM_GEN_init(PWM_GEN_T *u1)
 
 /*************************************
 	Function Name：PWM_GEN_calc
-	Description：Computes duty cycle values 
-	Input：*u1 --- Structure PWM_GEN_T 
+	Description：Computes duty cycle values
+	Input：*u1 --- Structure PWM_GEN_T
 	Output：none
 **************************************/
 void PWM_GEN_calc(PWM_GEN_T *u1)
 {
 	int32_t	tempA = 0;
 	int32_t tempB = 0;
-	
+
 	int32_t Vref1 = 0;
 	int32_t Vref2 = 0;
 	int32_t Vref3 = 0;
 	int32_t X = 0;
 	int32_t Y = 0;
 	int32_t Z = 0;
-	
+
 	uint8_t sector = 0;
 
 	int32_t t1on = 0;
@@ -54,14 +54,14 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 	int32_t taon = 0;
 	int32_t tbon = 0;
 	int32_t tcon = 0;
-	
+
 	tempA = (28378*(s32)u1->Alpha)>>15;//Valpha*sqrt(3)/2
 	tempB = (u1->Beta)>>1;//Vbeta/2
-	
+
 	Vref1 = u1->Beta;
-	Vref2 = tempA - tempB;		//Valpha*sqrt(3)/2 - Vbeta/2 
-	Vref3 = -tempA - tempB;		//-Valpha*sqrt(3)/2 - Vbeta/2   
-	
+	Vref2 = tempA - tempB;		//Valpha*sqrt(3)/2 - Vbeta/2
+	Vref3 = -tempA - tempB;		//-Valpha*sqrt(3)/2 - Vbeta/2
+
 	// Sector calculation
 	sector = 0;
 	if(Vref1>=0)
@@ -76,12 +76,12 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 	{
 		sector = sector + 4;
 	}
-	
-	// Duty cycles computation 
+
+	// Duty cycles computation
 	X = u1->Beta;					//Vbeta
 	Y = tempB + tempA;		//Vbeta/2 + Valpha*sqrt(3)/2
 	Z = tempB - tempA;		//Vbeta/2 - Valpha*sqrt(3)/2
-	
+
 	//Compute the duration of two basis vector
 	switch(sector)
 	{
@@ -89,27 +89,27 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 			t1on = Z;
 			t2on = Y;
 			break;
-		
+
 		case 2:
 			t1on = Y;
 			t2on = -X;
 			break;
-		
+
 		case 3:
 			t1on = -Z;
 			t2on = X;
 			break;
-		
+
 		case 4:
 			t1on = -X;
 			t2on = Z;
 			break;
-		
+
 		case 5:
 			t1on = X;
 			t2on = -Y;
 			break;
-		
+
 		case 6:
 			t1on = -Y;
 			t2on = -Z;
@@ -120,7 +120,7 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 	taon = (32768-t1on-t2on)>>1;		//(1-t1-t2)/2,Q15格式
 	tbon = taon + t1on;							//taon+t1
 	tcon = tbon + t2on;							//tbon+t2
-		
+
 
 	//Compute the duty cycle
 	taon = (taon * u1->N_halfPeriod)>>15;
@@ -135,7 +135,7 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 	}
 	else
 	{ }
-		
+
 	tbon = (tbon * u1->N_halfPeriod)>>15;
 
 	if(tbon >= u1->N_halfPeriod)
@@ -147,7 +147,7 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 		tbon = 0;
 	}
 	else
-	{ }	
+	{ }
 
 	tcon = (tcon * u1->N_halfPeriod)>>15;
 
@@ -162,7 +162,7 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 	else
 	{ }
 
-		
+
 	//Prepare load compare values
 	if(u1->Mode == SEVENMODE)
 	{
@@ -173,37 +173,37 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 				u1->CompB = taon;
 				u1->CompC = tcon;
 				break;
-			
+
 			case 2:
 				u1->CompA = taon;
 				u1->CompB = tcon;
 				u1->CompC = tbon;
 				break;
-			
+
 			case 3:
 				u1->CompA = taon;
 				u1->CompB = tbon;
 				u1->CompC = tcon;
 				break;
-			
+
 			case 4:
 				u1->CompA = tcon;
 				u1->CompB = tbon;
 				u1->CompC = taon;
 				break;
-			
+
 			case 5:
 				u1->CompA = tcon;
 				u1->CompB = taon;
 				u1->CompC = tbon;
 				break;
-			
+
 			case 6:
 				u1->CompA = tbon;
 				u1->CompB = tcon;
 				u1->CompC = taon;
 				break;
-			
+
 			default:
 				u1->CompA = 0;
 				u1->CompB = 0;
@@ -220,37 +220,37 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 				u1->CompB = 0;
 				u1->CompC = tcon-taon;
 				break;
-			
+
 			case 2:
 				u1->CompA = 0;
 				u1->CompB = tcon-taon;
 				u1->CompC = tbon-taon;
 				break;
-			
+
 			case 3:
 				u1->CompA = 0;
 				u1->CompB = tbon-taon;
 				u1->CompC = tcon-taon;
 				break;
-			
+
 			case 4:
 				u1->CompA = tcon-taon;
 				u1->CompB = tbon-taon;
 				u1->CompC = 0;
 				break;
-			
+
 			case 5:
 				u1->CompA = tcon-taon;
 				u1->CompB = 0;
 				u1->CompC = tbon-taon;
 				break;
-			
+
 			case 6:
 				u1->CompA = tbon-taon;
 				u1->CompB = tcon-taon;
 				u1->CompC = 0;
 				break;
-			
+
 			default:
 				u1->CompA = 0;
 				u1->CompB = 0;
@@ -264,7 +264,7 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 		u1->CompB = 0;
 		u1->CompC = 0;
 	}
-	
+
 	u1->Sector = sector;
 }
 

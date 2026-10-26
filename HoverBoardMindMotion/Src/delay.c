@@ -1,6 +1,6 @@
 
-#include "../Inc/delay.h"
-#include "../Inc/main.h"
+#include "delay.h"
+#include "main.h"
 #include "hal_rcc.h"
 
 static __IO u32 sTimingDelay;

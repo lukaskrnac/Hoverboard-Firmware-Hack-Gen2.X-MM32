@@ -1,4 +1,4 @@
-#include "../Inc/hardware.h"
+#include "hardware.h"
 
 static GPIO_InitTypeDef GPIO_InitStruct;
 
@@ -222,7 +222,7 @@ void pinMode(uint8_t io,uint8_t state){
 			GPIO_InitStruct.GPIO_Pin = pins[io].pin;
 			GPIO_Init(GPIOD, &GPIO_InitStruct);
 		break;
-		
+
 	}
 }
 
@@ -330,5 +330,3 @@ uint16_t analogRead(uint8_t io){
 			return 0;
 	}
 }
-
-

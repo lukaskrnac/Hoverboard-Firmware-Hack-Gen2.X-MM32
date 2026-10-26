@@ -9,8 +9,8 @@
 
 // Files includes
 #include "hal_conf.h"
-#include "../Inc/sim_eeprom.h"
-#include "../Inc/pinout.h" 
+#include "sim_eeprom.h"
+#include "pinout.h"
 
 #define M8(adr)  (*((vu8  *) (adr)))
 #define M16(adr) (*((vu16 *) (adr)))

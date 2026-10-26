@@ -1,22 +1,22 @@
 #include "hal_tim.h"
 #include "hal_conf.h"
 #include "hal_adc.h"
-#include "stdio.h"
-#include "../Inc/pinout.h"
-#include "../Inc/interrupt.h"
-#include "../Inc/main.h"
-#include "../Inc/hardware.h"
-#include "../Inc/bldc.h"
-#include "../Inc/remoteUartBus.h"
-#include "../Inc/calculation.h"
+#include <stdio.h>
+#include "pinout.h"
+#include "interrupt.h"
+#include "main.h"
+#include "hardware.h"
+#include "bldc.h"
+#include "remoteUartBus.h"
+#include "calculation.h"
 
-#include "../Inc/ipark.h"
-#include "../Inc/park.h"
-#include "../Inc/clarke.h"
-#include "../Inc/PID.h"
-#include "../Inc/FOC_Math.h"
-#include "../Inc/pwm_gen.h"
-#include "../Inc/hallhandle.h"
+#include "ipark.h"
+#include "park.h"
+#include "clarke.h"
+#include "PID.h"
+#include "FOC_Math.h"
+#include "pwm_gen.h"
+#include "hallhandle.h"
 
 static uint32_t itotaloffset=0;
 volatile uint8_t poweron=0;
@@ -39,14 +39,14 @@ void DMA1_Channel2_3_IRQHandler(void){
     DMA_ClearITPendingBit(DMA1_IT_GL3);
     serialit();
   }
-}	
+}
 
 void DMA1_Channel4_5_IRQHandler(void){
   if(DMA_GetITStatus(DMA1_IT_TC5)) {
     DMA_ClearITPendingBit(DMA1_IT_GL5);
     serialit();
   }
-}	
+}
 void ADC1_COMP_IRQHandler(void){
 	if(ADC_GetFlagStatus(ADC1, ADC_IT_AWD) != RESET) {
     ADC_ClearFlag(ADC1, ADC_IT_AWD);
@@ -95,7 +95,7 @@ void ADC1_COMP_IRQHandler(void){
 			{
 				HALL1.CMDDIR = -dir;
 				HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
-				
+
 				if(!(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED)){
 					if(DRIVEMODE==FOC_VOLT||DRIVEMODE==FOC_SPEED||DRIVEMODE==FOC_TORQUE){
 						//CLARK
@@ -106,18 +106,18 @@ void ADC1_COMP_IRQHandler(void){
 						park1.Alpha = clarke1.Alpha;
 						park1.Beta = clarke1.Beta;
 						park1.Theta = HALL1.Angle;
-						PARK_MACRO1(&park1);	
+						PARK_MACRO1(&park1);
 						//filter
 						IDData.NewData = park1.Ds;
 						MovingAvgCal(&IDData);
-						
+
 						IQData.NewData = park1.Qs;
-						MovingAvgCal(&IQData);		
+						MovingAvgCal(&IQData);
 						//PID
 						CurID.qInRef = 0;
 						CurID.qInMeas = IDData.Out;
 						CalcPI(&CurID);
-						
+
 						CurIQ.qInRef = Speed.qOut;
 						CurIQ.qInMeas = IQData.Out;
 						CalcPI(&CurIQ);
@@ -132,9 +132,9 @@ void ADC1_COMP_IRQHandler(void){
 						ipark1.Qs = q;
 					}else{
 						ipark1.Ds = CurID.qOut;
-						ipark1.Qs = CurIQ.qOut;	
+						ipark1.Qs = CurIQ.qOut;
 					}
-					ipark1.Theta = HALL1.Angle;    
+					ipark1.Theta = HALL1.Angle;
 					IPARK_MACRO1(&ipark1);
 					//SVPWM
 					//pwm_gen.Mode = FIVEMODE;
@@ -149,12 +149,4 @@ void ADC1_COMP_IRQHandler(void){
 		}
 		ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
 	}
-}	
-
-
-
-
-
-
-
-	
+}

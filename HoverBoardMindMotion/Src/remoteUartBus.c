@@ -13,19 +13,19 @@
 #include "HAL_device.h"                 // Device header
 #else
 #include "mm32_device.h"                // Device header
-#endif         
-#include "math.h" 
-#include "../Inc/pinout.h"
-#include "../Inc/main.h"
-#include "../Inc/bldc.h"
-#include "../Inc/uart.h"
-#include "stdio.h"
-#include "string.h"
-#include "../Inc/remoteUartBus.h"
+#endif
+#include <math.h>
+#include "pinout.h"
+#include "main.h"
+#include "bldc.h"
+#include "uart.h"
+#include <stdio.h>
+#include <string.h>
+#include "remoteUartBus.h"
 #include "hal_crc.h"
 
-#include "../Inc/sim_eeprom.h"
-#include "../Inc/calculation.h"
+#include "sim_eeprom.h"
+#include "calculation.h"
 
 
 static volatile uint8_t bAnswerMaster = 0;
@@ -94,7 +94,7 @@ static volatile uint32_t iTimeLastRx = 0;
 
 
 static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
-	
+
   uint16_t  crc;
   uint8_t i;
   crc = 0;
@@ -145,7 +145,7 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 }
 
 void RemoteUpdate(void){
-	
+
 	if (millis - iTimeLastRx > SERIAL_TIMEOUT){
 		speed = 0;
 	}
@@ -173,7 +173,7 @@ void RemoteUpdate(void){
 
 
 static void AnswerMaster(void){
-	
+
 	// Ask for steer input
 	SerialHover2Server oData;
 	oData.cStart = START_FRAME;
@@ -185,9 +185,9 @@ static void AnswerMaster(void){
 
 	oData.checksum = 	CalcCRC((uint8_t*) &oData, sizeof(oData) - 2);	// (first bytes except crc)
 
-	
+
 	UART_Send_Group((uint8_t*) &oData, sizeof(oData));
-	
+
 
 }
 
@@ -201,18 +201,18 @@ void serialit(void){
 
 
 	uint8_t cRead = sRxBuffer[0];
-	//DEBUG_LedSet((steerCounter%20) < 10,0)	// 	
-	
+	//DEBUG_LedSet((steerCounter%20) < 10,0)	//
+
 	if (iReceivePos < 0)		// data reading not yet begun
 	{
 		if (cRead == '/')	// Start character is captured, start record
 			iReceivePos = 0;
-		else	
+		else
 			return;
 	}
-	
+
 	aReceiveBuffer[iReceivePos++] = cRead;
-	
+
 	if (iReceivePos == 1)	// '/' read
 			return;
 
@@ -228,11 +228,11 @@ void serialit(void){
 		}
 		return;
 	}
-	
+
 	if (iReceivePos < iRxDataSize)
 		return;
-		
-		
+
+
 	uint16_t iCRC = (aReceiveBuffer[iReceivePos-1] << 8) | aReceiveBuffer[iReceivePos-2];
 	iReceivePos = -1;
 	if (iCRC == CalcCRC(aReceiveBuffer, iRxDataSize - 2))	//  first bytes except crc
@@ -240,7 +240,7 @@ void serialit(void){
 		if (aReceiveBuffer[2] == SLAVE_ID)
 		{
 			iTimeLastRx = millis;
-			
+
 			switch (iRxDataType)
 			{
 				case 0:
@@ -250,25 +250,24 @@ void serialit(void){
 					wState = pData->wState;
 					break;
 				}
-				case 1: 
+				case 1:
 				{
 					SerialServer2HoverMaster* pData = (SerialServer2HoverMaster*) aReceiveBuffer;
 					speed = pData->iSpeed;
 					wState = pData->wState;
 					break;
 				}
-				case 2: 
+				case 2:
 				{
 					memcpy(&oConfigRx, aReceiveBuffer, sizeof(oConfigRx));    //applied by RemoteUpdate()
 					bConfigRx = 1;
 					break;
 				}
 			}
-			
+
 			//if (speed > 300) speed = 300;	else if (speed < -300) speed = -300;		// for testing this function
 			bAnswerMaster = 1;
 			iTimeLastRx = millis;  	// Reset the pwm timout to avoid stopping motors
 		}
 	}
 }
-

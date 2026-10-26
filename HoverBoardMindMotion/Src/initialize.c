@@ -1,13 +1,13 @@
 //initialize all pheberals
-#include "../Inc/pinout.h"
+#include "pinout.h"
 #include "hal_gpio.h"
 #include "hal_rcc.h"
 #include "hal_comp.h"
 #include "hal_tim.h"
-#include "../Inc/initialize.h"
+#include "initialize.h"
 #include "hal_conf.h"
-#include "../Inc/hardware.h"
-#include "../Inc/main.h"
+#include "hardware.h"
+#include "main.h"
 #ifdef TARGET_MM32SPIN25
 #include "spin25-redefine.h"
 #include "HAL_device.h"
@@ -64,7 +64,7 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
 	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStruct;
 	TIM_ICInitTypeDef  TIM_ICInitStruct;
 
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);      
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 	TIM_TimeBaseStructInit(&TIM_TimeBaseStruct);
 	TIM_TimeBaseStruct.TIM_Period = arr;
@@ -82,15 +82,15 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
 	TIM_ICInitStruct.TIM_ICSelection = TIM_ICSelection_TRC;
 	TIM_ICInitStruct.TIM_ICPrescaler = TIM_ICPSC_DIV1;
 	TIM_ICInitStruct.TIM_ICFilter = 0x0;
-	TIM_ICInit(tim2 ? TIM2 : TIM3, &TIM_ICInitStruct); 
+	TIM_ICInit(tim2 ? TIM2 : TIM3, &TIM_ICInitStruct);
 	TIM_ITConfig(tim2 ? TIM2 : TIM3, TIM_IT_CC1, ENABLE);
-	
+
 	TIM_SelectHallSensor(tim2 ? TIM2 : TIM3,ENABLE);
 	TIM_UpdateRequestConfig(tim2 ? TIM2 : TIM3,TIM_UpdateSource_Regular);
 	TIM_SelectInputTrigger(tim2 ? TIM2 : TIM3, TIM_TS_TI1F_ED);
 	TIM_SelectSlaveMode(tim2 ? TIM2 : TIM3, TIM_SlaveMode_Reset);
 	TIM_SelectMasterSlaveMode(tim2 ? TIM2 : TIM3, TIM_MasterSlaveMode_Enable);
-	
+
 	TIM_Cmd(tim2 ? TIM2 : TIM3, ENABLE);
 	//NVIC_Configure(tim2 ? TIM2_IRQn : TIM3_IRQn, 1);
 	return tim2;
@@ -109,10 +109,10 @@ void BLDC_init(void){
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource14, GPIO_AF_2);
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_2);
 	GPIO_StructInit(&GPIO_InitStructure);
-	
+
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	
+
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
@@ -186,14 +186,14 @@ void TIM1_init(u16 arr, u16 psc){
 			GPIO_Init(HARD_ILIMIT_PORT, &GPIO_InitStruct);
 			GPIO_InitStruct.GPIO_Pin = HARD_ILIMIT_COMP_REF_PIN;
 			GPIO_Init(HARD_ILIMIT_COMP_REF_PORT, &GPIO_InitStruct);
-			
+
 			COMP_InitTypeDef COMP_InitStructure;
-			COMP_DeInit(COMP1); 
+			COMP_DeInit(COMP1);
 			COMP_InitStructure.COMP_InvertingInput 		= HARD_ILIMIT_COMP_INVERTING;
 			COMP_InitStructure.COMP_NonInvertingInput = HARD_ILIMIT_COMP_NONINVERTING;
 			COMP_InitStructure.COMP_Output    				= COMP_Output_TIM1BKIN;
 			COMP_InitStructure.COMP_OutputPol 				= COMP_OutputPol_NonInverted;
-			COMP_InitStructure.COMP_Hysteresis  			= COMP_Hysteresis_High; 
+			COMP_InitStructure.COMP_Hysteresis  			= COMP_Hysteresis_High;
 			COMP_InitStructure.COMP_Mode        			= COMP_Mode_HighSpeed;
 			COMP_InitStructure.COMP_Filter      			= COMP_Filter_4_Period;
 			COMP_Init(COMP1, &COMP_InitStructure);
@@ -206,7 +206,7 @@ void TIM1_init(u16 arr, u16 psc){
 					pinModeAF(OCPPIN, ocps[i].af);
 				}
 			}
-		}	
+		}
 	}
 	TIM_Cmd(TIM1, ENABLE);
 }
@@ -287,8 +287,8 @@ void DMA_NVIC_Config(DMA_Channel_TypeDef* dam_chx, u32 cpar, u32 cmar, u16 cndtr
 }
 
 void adc_Init(void){
-	ADC_InitTypeDef  ADC_InitStructure;    
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); 
+	ADC_InitTypeDef  ADC_InitStructure;
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 	ADC_InitStructure.ADC_PRESCALE = ADC_PCLK2_PRESCALE_6;							//for 72MHz
 	ADC_InitStructure.ADC_Mode = ADC_Mode_Single_Period;
 	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;

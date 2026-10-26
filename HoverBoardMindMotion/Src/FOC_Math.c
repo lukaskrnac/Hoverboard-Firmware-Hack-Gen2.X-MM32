@@ -1,6 +1,6 @@
 /*-------------------- Includes -----------------------*/
-#include "../Inc/mcu.h"
-#include "../Inc/FOC_Math.h"
+#include "mcu.h"
+#include "FOC_Math.h"
 
 /*--------------------Private macro ------------------*/
 #define SIN_COS_TABLE {\
@@ -73,34 +73,34 @@ Trig_Components MCM_Trig_Functions(int16_t hAngle)
 {
   int32_t shindex;
   uint16_t uhindex;
-  
+
   Trig_Components Local_Components;
-  
-  /* 10 bit index computation  */  
-  shindex =((int32_t)32768 + (int32_t)hAngle); 
+
+  /* 10 bit index computation  */
+  shindex =((int32_t)32768 + (int32_t)hAngle);
   uhindex = (uint16_t)shindex;
-  uhindex /= (uint16_t)64;      
-  
-  switch ((uint16_t)(uhindex) & SIN_MASK) 
+  uhindex /= (uint16_t)64;
+
+  switch ((uint16_t)(uhindex) & SIN_MASK)
   {
 		case U0_90:
 			Local_Components.hSin = hSin_Cos_Table[(uint8_t)(uhindex)];
 			Local_Components.hCos = hSin_Cos_Table[(uint8_t)(0xFFu-(uint8_t)(uhindex))];
 			break;
-		
-		case U90_180:  
+
+		case U90_180:
 			 Local_Components.hSin = hSin_Cos_Table[(uint8_t)(0xFFu-(uint8_t)(uhindex))];
 			 Local_Components.hCos = -hSin_Cos_Table[(uint8_t)(uhindex)];
 			break;
-		
+
 		case U180_270:
 			 Local_Components.hSin = -hSin_Cos_Table[(uint8_t)(uhindex)];
 			 Local_Components.hCos = -hSin_Cos_Table[(uint8_t)(0xFFu-(uint8_t)(uhindex))];
 			break;
-		
+
 		case U270_360:
 			 Local_Components.hSin =  -hSin_Cos_Table[(uint8_t)(0xFFu-(uint8_t)(uhindex))];
-			 Local_Components.hCos =  hSin_Cos_Table[(uint8_t)(uhindex)]; 
+			 Local_Components.hCos =  hSin_Cos_Table[(uint8_t)(uhindex)];
 			break;
 		default:
 			break;
@@ -130,13 +130,13 @@ int32_t MCM_Sqrt(int32_t wInput)
     {
       wtemproot = (int32_t)8192;
     }
-    
+
     do
     {
       wtemprootnew = (wtemproot + wInput/wtemproot)/(int32_t)2;
 	//		divtemp = Division(wInput,wtemproot);
 		//	wtemprootnew = (wtemproot + divtemp)>>1;
-			
+
       if (wtemprootnew == wtemproot)
       {
         biter = 6u;
@@ -153,8 +153,8 @@ int32_t MCM_Sqrt(int32_t wInput)
   {
     wtemprootnew = (int32_t)0;
   }
-  
-  return (wtemprootnew); 
+
+  return (wtemprootnew);
 }
 
 
@@ -172,9 +172,9 @@ int16_t arctan2(int16_t y1,int16_t x1)
 	int32_t x;
 	int32_t result;
 	int32_t sw;
-	
+
 	sw = 0;
-	
+
 	if(y1<0)
 	{
 		ay = -y1;
@@ -183,7 +183,7 @@ int16_t arctan2(int16_t y1,int16_t x1)
 	{
 		ay = y1;
 	}
-	
+
 	if(x1<0)
 	{
 		ax = -x1;
@@ -192,7 +192,7 @@ int16_t arctan2(int16_t y1,int16_t x1)
 	{
 		ax = x1;
 	}
-	
+
 	if(ay>ax)
 	{
 		a = ay;
@@ -200,7 +200,7 @@ int16_t arctan2(int16_t y1,int16_t x1)
 		ax = a;
 		sw = 1;
 	}
-	
+
 	if(ax == 0)
 	{
 		return 0;
@@ -209,7 +209,7 @@ int16_t arctan2(int16_t y1,int16_t x1)
 	{
 		x = ((ay<<15)/ax);
 	//	x = Division(ay<<15,ax);
-		
+
 		if(x == 0x8000)
 		{
 			result = 0x2000;
@@ -220,18 +220,18 @@ int16_t arctan2(int16_t y1,int16_t x1)
 			a = (-(0x4306<<14) + a*x)>>16;
 			a = ((0x364<<12) + a*x)>>15;
 			a = ((0x5179<<14) + a*x)>>15;
-			
+
 			result = (a*x)>>15;
 		}
-		
+
 		if(sw == 1)
 		{
 			result = 0x4000 - result;
 		}
-		
+
 		if(x1>=0)
 		{
-			if(y1<0)	
+			if(y1<0)
 			{
 				result = -result;
 			}
@@ -247,11 +247,11 @@ int16_t arctan2(int16_t y1,int16_t x1)
 				result = -(0x8000 - result);
 			}
 		}
-		
+
 		return result;
 	}
 }
-	
+
 /*************************************
 	Function Name：MovingAvgInit
 	Description：Initialize the loop array
@@ -261,7 +261,7 @@ int16_t arctan2(int16_t y1,int16_t x1)
 void MovingAvgInit(MovingAvgData *Data)
 {
 	uint8_t i;
-	
+
 	for(i=0;i<32;i++)
 	{
 		Data->DataARR[i] = 0;
@@ -284,7 +284,7 @@ void MovingAvgCal(MovingAvgData *Data)
 	{
 		Data->Index = 0;
 	}
-	
+
 	Data->DataSum = Data->DataSum + Data->NewData - Data->DataARR[Data->Index];
 	Data->DataARR[Data->Index] = Data->NewData;
 	Data->Out = (int)(Data->DataSum>>5);
@@ -325,7 +325,7 @@ void LoopCmp_Cal(LoopCMP_T *u1)
 	}
 	else
 	{}
-	
+
 	//Output limitation
 	if(u1->Act > u1->Max)
 	{
@@ -342,7 +342,7 @@ void LoopCmp_Cal(LoopCMP_T *u1)
 /****************************************************************
 	Function Name：InitNormalization
 	Description：Initialize *u, Vsp_out = u->Out = u->Kslope*(u->In - u->MinIn);
-	Input： 
+	Input：
 		Lowdata --- Minimum threshold
 		highdata --- Max threshold
 		maxout --- Max output
@@ -374,7 +374,7 @@ void CalcNormalization(u16 value,NormalizationType *u)
 	{
 		u->State |= 1;
 		u->Out = 0;
-		
+
 		if(u->State == 3)
 		{
 			u->State &= 1;
@@ -385,10 +385,10 @@ void CalcNormalization(u16 value,NormalizationType *u)
 	{
 		u->State |= 2;
 		u->Out = u->Kslope*(u->In - u->MinIn);		//Normalized
-		
+
 		if(u->Out > u->MaxOut)
 		{
-			u->Out = u->MaxOut;	
+			u->Out = u->MaxOut;
 		}
 		if(u->State == 3)
 		{
