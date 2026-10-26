@@ -1,3 +1,6 @@
+#ifndef IPARK_H
+#define IPARK_H
+
 #ifdef TARGET_MM32SPIN25
 #include "HAL_device.h"                 // Device header
 #else
@@ -32,4 +35,4 @@ extern IPARK_T ipark1;
 //------------------------------------------------------------------------------
 void IPARK_MACRO1(volatile IPARK_T *v);
 //------------------------------------------------------------------------------
-
+#endif

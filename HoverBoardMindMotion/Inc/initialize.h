@@ -3,9 +3,9 @@
 
 #include "mcu.h"
 
-void io_init();
+void io_init(void);
 void TIM1_init(u16 arr, u16 psc);
-void BLDC_init();
+void BLDC_init(void);
 void NVIC_Configure(u8 ch, u8 pri);
 void UARTX_Init(u32 baudrate,uint8_t uart);
 void DMA_NVIC_Config(DMA_Channel_TypeDef* dam_chx, u32 cpar, u32 cmar, u16 cndtr);
@@ -13,6 +13,6 @@ void adc_Init(void);
 uint8_t HALLTIM_Init(u32 arr, u16 psc);
 void HALL_Init(void);
 void Iwdg_Init(u16 IWDG_Prescaler, u16 Reload);
-uint8_t UART_GPIO_Init();
+uint8_t UART_GPIO_Init(void);
 
 #endif

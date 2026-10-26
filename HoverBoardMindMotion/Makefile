@@ -18,12 +18,16 @@ SRC := $(wildcard Src/*.c) \
        Device/MM32SPIN0x/Source/system_mm32spin05.c \
        Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
 
-INC := -IInc -ILibrary/MM32SPIN05/HAL_Lib/Inc -IDevice/MM32SPIN0x/Include -IDevice/CMSIS/Include
+# vendor and CMSIS headers as system headers: their warnings are not ours to fix
+INC := -IInc -isystem Library/MM32SPIN05/HAL_Lib/Inc -isystem Device/MM32SPIN0x/Include -isystem Device/CMSIS/Include
 
 ARCH    := -mcpu=cortex-m0 -mthumb
 # -fno-strict-aliasing: the vendor HAL type-puns peripheral pointers (*(u32*)&gpio)
 CFLAGS  := $(ARCH) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common \
            -fno-strict-aliasing -Wall $(INC)
+# stricter for our own code (Src/, startup); the vendor HAL sources keep -Wall
+WARN    := -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wundef
+$(BUILD)/Src/%.o $(BUILD)/Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.o: CFLAGS += $(WARN)
 LDFLAGS := $(ARCH) -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs -Wl,--gc-sections \
            -Wl,-Map=$(TARGET).map -Wl,--print-memory-usage
 

@@ -1,3 +1,6 @@
+#ifndef CLARKE_H
+#define CLARKE_H
+
 #ifdef TARGET_MM32SPIN25
 #include "HAL_device.h"                 // Device header
 #else
@@ -28,3 +31,4 @@ extern CLARKE_T clarke1;
 extern CLARKE_T Emf_AB;	
 										
 extern void CLARKE_MACRO1(CLARKE_T *u1);
+#endif

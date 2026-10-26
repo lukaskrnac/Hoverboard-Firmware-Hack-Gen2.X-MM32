@@ -23,7 +23,7 @@ uint8_t aindex;
 int adatasum;
 int aavgarr[64];
 
-void PID_Init(){
+void PID_Init(void){
 	switch(DRIVEMODE){
 		case COM_SPEED:
 			Kp=50;
@@ -42,7 +42,7 @@ void PID_Init(){
 	}
 
 }
-void PIDrst(){
+void PIDrst(void){
 	lasterr=qdSum=prevpwm=0;
 }
 
@@ -80,7 +80,7 @@ int PID(int setpoint,int real){
 	
 }
 
-void avgspeed(){
+void avgspeed(void){
 	
 	if(sindex >= 32){
     sindex = 0;
@@ -90,7 +90,7 @@ void avgspeed(){
   frealspeed = (int)(datasum>>5);
   sindex++;
 }
-void avgvbat(){
+void avgvbat(void){
 	
 	if(vindex >= 32){
     vindex = 0;
@@ -100,7 +100,7 @@ void avgvbat(){
   fvbat = (int)(vdatasum>>5);
   vindex++;
 }
-void avgItotal(){
+void avgItotal(void){
 	
 	if(aindex >= 64){
     aindex = 0;

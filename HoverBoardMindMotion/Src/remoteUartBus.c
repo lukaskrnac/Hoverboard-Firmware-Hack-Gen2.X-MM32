@@ -28,14 +28,12 @@
 #include "../Inc/calculation.h"
 
 
-#pragma pack(1)
-
-
 volatile uint8_t bAnswerMaster = 0;
 static int16_t iReceivePos = -1;    //-1: waiting for the start byte
 
 
 
+#pragma pack(push, 1)    //wire format
 typedef struct {			// �#pragma pack(1)� needed to get correct sizeof()
    uint8_t cStart;			//  = '/';
    //uint16_t cStart;		//  = #define START_FRAME         0xABCD
@@ -81,6 +79,7 @@ typedef struct{				// �#pragma pack(1)� needed to get correct sizeof()
    int32_t iOdom;		// hall steps
    uint16_t checksum;
 } SerialHover2Server;
+#pragma pack(pop)
 
 // wire format sizes (see the GD32 project's remoteUartBus.c), checked so a compiler change cannot alter them
 _Static_assert(sizeof(SerialServer2Hover) == 8, "SerialServer2Hover must be 8 bytes");
@@ -94,7 +93,7 @@ _Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 
 volatile uint32_t iTimeLastRx = 0;
 
 
-uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
+static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
 	
   uint16_t  crc;
   uint8_t i;

@@ -1,3 +1,6 @@
+#ifndef PARK_H
+#define PARK_H
+
 #ifdef TARGET_MM32SPIN25
 #include "HAL_device.h"                 // Device header
 #else
@@ -30,3 +33,4 @@ Default initalizer for the PARK object.
 extern PARK_T park1;
 extern void PARK_MACRO1(PARK_T *u1);
 //------------------------------------------------------------------------------
+#endif

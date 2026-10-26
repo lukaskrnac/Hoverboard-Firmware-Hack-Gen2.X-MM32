@@ -15,7 +15,7 @@
 
 
 //normal io
-void io_init(){
+void io_init(void){
 	//enable gpio clock
 	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA, ENABLE);
 	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOB, ENABLE);
@@ -47,7 +47,7 @@ void io_init(){
 	}
 }
 
-void HALL_Init(){
+void HALL_Init(void){
 	pinMode(HALLAPIN, INPUT);
 	pinMode(HALLBPIN, INPUT);
 	pinMode(HALLCPIN, INPUT);
@@ -98,7 +98,7 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
 
 
 //6 bldc pin
-void BLDC_init(){
+void BLDC_init(void){
 	GPIO_InitTypeDef GPIO_InitStructure;
 	//high side
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_2);
@@ -237,7 +237,7 @@ void UARTX_Init(u32 baudrate,uint8_t uart){
 	UART_DMACmd(uart==1 ? UART1 : UART2, UART_DMAReq_EN, ENABLE);
 }
 
-uint8_t UART_GPIO_Init(){
+uint8_t UART_GPIO_Init(void){
 	uint8_t uart=1;
 	for(uint8_t i=0;i<UARTCOUNT;i++){
 		if(uarts[i].io==TXPIN||uarts[i].io==RXPIN){

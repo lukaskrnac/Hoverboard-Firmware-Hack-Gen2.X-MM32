@@ -6,6 +6,7 @@
 extern uint32_t _sidata, _sdata, _edata, _sbss, _ebss, _estack;
 extern void SystemInit(void);
 extern int main(void);
+void Reset_Handler(void);
 
 // Fault, unexpected interrupt or main() returned: switch the bridge off before hanging. The pwm timer
 // keeps running with its last compare values (in sine mode a static voltage vector, i.e. DC current
@@ -29,7 +30,7 @@ void Reset_Handler(void)
     Trap();
 }
 
-void Default_Handler(void)
+static void Default_Handler(void)
 {
     Trap();
 }

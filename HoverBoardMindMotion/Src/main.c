@@ -56,10 +56,10 @@ uint16_t pinstorage[64]={0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
 //instead of switching it off)
 static void DelayFed(uint32_t ms){
 	while(ms){
-		uint32_t step = ms > 50 ? 50 : ms;
-		DELAY_Ms(step);
+		uint32_t chunk = ms > 50 ? 50 : ms;
+		DELAY_Ms(chunk);
 		IWDG_ReloadCounter();
-		ms -= step;
+		ms -= chunk;
 	}
 }
 

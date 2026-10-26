@@ -94,6 +94,7 @@
 
 void DELAY_Init(void);
 void DELAY_Ms(__IO u32 count);
+void SysTick_Handler(void);    //1 ms tick: delays and millis
 //void DELAY_Us(__IO u32 count);
 
 /// @}

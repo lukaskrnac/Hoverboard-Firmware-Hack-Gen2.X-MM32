@@ -3,10 +3,10 @@
 
 #include "mcu.h"
 
-void commutate();
-uint8_t hallpos(uint8_t dir);
-void speedupdate();
-void TIMOCInit();
+void commutate(void);
+uint8_t hallpos(uint8_t forward);    //1: raw hall state, else complemented (7-raw)
+void speedupdate(void);
+void TIMOCInit(void);
 void SetDriveMode(uint8_t mode);    //safe while running, see bldc.c
 void gatesOutput(uint8_t on);
 

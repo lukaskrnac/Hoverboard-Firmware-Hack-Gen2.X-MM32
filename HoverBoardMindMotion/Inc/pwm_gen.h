@@ -1,3 +1,6 @@
+#ifndef PWM_GEN_H
+#define PWM_GEN_H
+
 /*-------------------- Includes -----------------------*/
 #ifdef TARGET_MM32SPIN25
 #include "HAL_device.h"                 // Device header
@@ -27,3 +30,4 @@ extern void PWM_GEN_init(PWM_GEN_T *u1);
 extern void PWM_GEN_calc(PWM_GEN_T *u1);
 extern void Update_PWM(PWM_GEN_T *u1);
 extern void SVPWM(void);
+#endif

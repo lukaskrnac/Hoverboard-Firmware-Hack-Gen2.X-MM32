@@ -16,7 +16,6 @@ volatile uint32_t lastcommutate;
 volatile uint8_t gatesoff=0;
 uint32_t lasttestrotate;
 int testrotatedir=1;
-uint8_t hallpos(uint8_t dir);
 bool lastdir=0;
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
@@ -35,7 +34,7 @@ const uint8_t hall_to_pos[8] =
 };
 
 
-uint8_t hallpos(uint8_t dir){
+uint8_t hallpos(uint8_t forward){
 	uint8_t HallA;
 	uint8_t HallB;
 	uint8_t HallC;
@@ -45,7 +44,7 @@ uint8_t hallpos(uint8_t dir){
 	HallB = digitalRead(HALLBPIN);
 	HallC = digitalRead(HALLCPIN);
 	
-	if(dir == 1)
+	if(forward == 1)
 	{
 		HallValue = HallC*4 + HallB*2 + HallA;
 	}
@@ -129,7 +128,7 @@ void commutate(){//U,V,W(A,B,C)
 
 
 
-void speedupdate(){
+void speedupdate(void){
 	if(poweron>127){
 		RemoteUpdate();	
 		//speed=200;
@@ -212,7 +211,7 @@ void SetDriveMode(uint8_t mode){
 	NVIC_EnableIRQ(ADC_COMP_IRQn);
 }
 
-void TIMOCInit(){
+void TIMOCInit(void){
 	if(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED){
 		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
 		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);

@@ -96,7 +96,7 @@ static u8 FLASH_SIM_FindEmpty(u32 ptr, u16 len)
 ///         This parameter can only be even.
 /// @retval the pointer of the starting address.
 ////////////////////////////////////////////////////////////////////////////////
-u32 FLASH_SIM_WriteLocate(u32 pageAddress, u16 len)
+static u32 FLASH_SIM_WriteLocate(u32 pageAddress, u16 len)
 {
     u16 i;
     u32 ptr = pageAddress;
@@ -235,7 +235,7 @@ s32 FLASH_SIM_EEPROM_Test(void)
     return 0;
 }
 
-uint8_t restorecfg(){
+uint8_t restorecfg(void){
 	uint16_t tmp[64];
 	EEPROM_Read((u8*)tmp, 2 * 64);
 	if(tmp[MAGICNUM_POS]==MAGIC_NUMBER){    //verify config is valid
