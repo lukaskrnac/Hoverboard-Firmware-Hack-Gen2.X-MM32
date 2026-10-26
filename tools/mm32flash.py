@@ -81,21 +81,24 @@ class Mm32:
                 self.t.halt()
                 raise RuntimeError("RAM routine did not finish")
 
-    def program(self, image):
+    def program_at(self, addr, data):
+        """Program erased flash at addr (halfword aligned, len(data) even and <= CHUNK); core halted."""
         self.t.write_memory_block8(STUB_AT, list(PROGRAM_STUB))
+        self.t.write_memory_block8(BUF_AT, list(data))
+        self.unlock()
+        self.w(FLASH_REG + 0x10, 0x1)                       # PG
+        self.run((("r0", addr), ("r1", BUF_AT), ("r2", len(data) // 2),
+                  ("r3", FLASH_REG), ("sp", STACK_AT), ("pc", STUB_AT),
+                  ("xpsr", 0x01000000), ("primask", 1)))
+        if self.t.read_core_register("r2") != 0:
+            raise RuntimeError("programming stopped at 0x%08x" % addr)
+        self.w(FLASH_REG + 0x10, 0x80)                      # LOCK
+
+    def program(self, image):
         for off in range(0, len(image), CHUNK):
             chunk = image[off:off + CHUNK]
-            if chunk == b"\xff" * len(chunk):
-                continue
-            self.t.write_memory_block8(BUF_AT, list(chunk))
-            self.unlock()
-            self.w(FLASH_REG + 0x10, 0x1)                   # PG
-            self.run((("r0", FLASH_BASE + off), ("r1", BUF_AT), ("r2", len(chunk) // 2),
-                      ("r3", FLASH_REG), ("sp", STACK_AT), ("pc", STUB_AT),
-                      ("xpsr", 0x01000000), ("primask", 1)))
-            if self.t.read_core_register("r2") != 0:
-                raise RuntimeError("programming stopped at +0x%x" % off)
-            self.w(FLASH_REG + 0x10, 0x80)
+            if chunk != b"\xff" * len(chunk):
+                self.program_at(FLASH_BASE + off, chunk)
 
     def soft_start(self):
         for off in (0x0C, 0x10):                            # APB2RSTR, APB1RSTR
