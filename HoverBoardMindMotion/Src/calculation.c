@@ -16,7 +16,7 @@ int qdSum = 0;
 int lasterr=0;
 int prevpwm=0;
 
-uint8_t index;
+uint8_t sindex;
 int datasum;
 int avgarr[32];
 extern int realspeed;
@@ -91,13 +91,13 @@ int PID(int setpoint,int real){
 
 void avgspeed(){
 	
-	if(index >= 32){
-    index = 0;
+	if(sindex >= 32){
+    sindex = 0;
   } 
-  datasum = datasum + realspeed - avgarr[index];
-  avgarr[index] = realspeed;
+  datasum = datasum + realspeed - avgarr[sindex];
+  avgarr[sindex] = realspeed;
   frealspeed = (int)(datasum>>5);
-  index++;
+  sindex++;
 }
 void avgvbat(){
 	

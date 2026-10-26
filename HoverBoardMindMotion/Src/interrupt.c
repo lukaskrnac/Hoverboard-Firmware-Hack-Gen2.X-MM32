@@ -36,7 +36,7 @@ int iphaseb;
 uint32_t iphaseaoffset=0;
 uint32_t iphaseboffset=0;
 extern MM32ADC adcs[10];
-float vcc;
+uint16_t vrefint;    //last internal 1.2V reference conversion
 uint8_t realdir=0;
 extern uint8_t hall_to_pos[8];
 extern uint16_t abspwm;
@@ -76,26 +76,29 @@ void ADC1_COMP_IRQHandler(void){
 			itotaloffset = itotaloffset>>7;
 			iphaseaoffset = iphaseaoffset>>7;
 			iphaseboffset = iphaseboffset>>7;
-			if(AWDG){
-				ADC_AnalogWatchdogCmd(ADC1, ENABLE);
-				ADC_AnalogWatchdogThresholdsConfig(ADC1, (uint16_t)(AWDG+itotaloffset), 0);
+			if(AWDG){    //hardware current limit, only if the current sense pin has an adc channel
 				for(uint8_t i=0;i<ADCCOUNT;i++){
 					if(adcs[i].io==ITOTALPIN){
+						ADC_AnalogWatchdogCmd(ADC1, ENABLE);
+						ADC_AnalogWatchdogThresholdsConfig(ADC1, (uint16_t)(AWDG+itotaloffset), 0);
 						ADC_AnalogWatchdogSingleChannelConfig(ADC1, adcs[i].channel);
+						ADC_ITConfig(ADC1, ADC_IT_AWD, ENABLE);
 						break;
 					}
 				}
-				ADC_ITConfig(ADC1, ADC_IT_AWD, ENABLE);
 			}
 			poweron++;
 		}else{
-			uint16_t tmp = ADC1->ADDR15;
-			vcc=(double)4915.2/tmp;
-			vbat = (double)VBAT_DIVIDER*analogRead(VBATPIN)*vcc*100/4096;//read adc register
-			tmp = analogRead(ITOTALPIN);//prevent overflow on negative value
-			itotal = (double)ITOTAL_DIVIDER*(tmp-itotaloffset)*vcc*100/4096;
-			iphasea = iphaseaoffset-analogRead(IPHASEAPIN);
-			iphaseb = iphaseboffset-analogRead(IPHASEBPIN);
+			//integer math only: this runs every pwm period, with soft-float double math the isr took 45% cpu (gcc).
+			//VDD = 1.2V*4096/vrefint, so DIVIDER*adc*VDD*100/4096 (unit 0.01) = DIVIDER*adc*120/vrefint.
+			//32 bit is enough for dividers below 4369.
+			vrefint = ADC1->ADDR15;
+			if(vrefint){
+				vbat = (int32_t)((uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
+				itotal = (int32_t)ITOTAL_DIVIDER*((int32_t)analogRead(ITOTALPIN)-(int32_t)itotaloffset)*120/vrefint;
+			}
+			iphasea = (int32_t)iphaseaoffset-(int32_t)analogRead(IPHASEAPIN);
+			iphaseb = (int32_t)iphaseboffset-(int32_t)analogRead(IPHASEBPIN);
 			avgvbat();
 			avgItotal();
 			if(itotal>SOFT_ILIMIT){

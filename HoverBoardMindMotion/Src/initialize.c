@@ -52,7 +52,7 @@ void HALL_Init(){
 }
 
 uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
-	uint8_t tim2;
+	uint8_t tim2=1;    //no hall pin on a timer input: speed sensing will not work, but keep it deterministic
 	for(uint8_t i=0;i<TIMCOUNT;i++){
 		if(halltims[i].io==HALLAPIN||halltims[i].io==HALLBPIN||halltims[i].io==HALLCPIN){
 			pinModeAF(halltims[i].io,halltims[i].af);

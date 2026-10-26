@@ -180,7 +180,7 @@ void speedupdate(){
 		}else{
 		dir=-1;
 		}
-		abspwm=fabs((double)pwm);    // 4095~-4095
+		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
 		if(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED){
 			TIM1->CCR1=abspwm;
 			TIM1->CCR2=abspwm;

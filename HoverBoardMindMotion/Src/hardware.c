@@ -281,12 +281,15 @@ void digitalWrite(uint8_t io, uint8_t state){
 
 
 uint16_t analogRead(uint8_t io){
-	uint8_t adcch;
+	uint8_t adcch=ADCCOUNT;
 	for(uint8_t i=0;i<ADCCOUNT;i++){
 		if(adcs[i].io==io){
 			adcch=i;
 			break;
 		}
+	}
+	if(adcch==ADCCOUNT){    //pin not configured or has no adc channel
+		return 0;
 	}
 	switch (adcs[adcch].channel){
 		case ADC_Channel_0:

@@ -154,13 +154,12 @@ s32 main(void){
 	PID_Init();
   while(1) {
 		if(LEDRPIN<PINCOUNT&&LEDGPIN<PINCOUNT&&LEDBPIN<PINCOUNT){
-			uint16_t bat_0 = BAT_EMPTY;
-			uint16_t bat_10 = BAT_EMPTY+((float)(BAT_FULL-BAT_EMPTY)/100*10);
-			uint16_t bat_20 = BAT_EMPTY+((float)(BAT_FULL-BAT_EMPTY)/100*20);
-			uint16_t bat_50 = BAT_EMPTY+((float)(BAT_FULL-BAT_EMPTY)/100*50);
-			uint16_t bat_60 = BAT_EMPTY+((float)(BAT_FULL-BAT_EMPTY)/100*60);
-			uint16_t bat_70 = BAT_EMPTY+((float)(BAT_FULL-BAT_EMPTY)/100*70);
-			uint16_t bat_100 = BAT_FULL;
+			int32_t bat_range = (int32_t)BAT_FULL-BAT_EMPTY;
+			int32_t bat_10 = BAT_EMPTY+bat_range*10/100;
+			int32_t bat_20 = BAT_EMPTY+bat_range*20/100;
+			int32_t bat_50 = BAT_EMPTY+bat_range*50/100;
+			int32_t bat_60 = BAT_EMPTY+bat_range*60/100;
+			int32_t bat_70 = BAT_EMPTY+bat_range*70/100;
 			if(BAT_FULL>20000&&BAT_FULL<65000&&BAT_EMPTY>20000&&BAT_EMPTY<65000&&BAT_FULL>BAT_EMPTY){
 				if(vbat*10>bat_70){
 					digitalWrite(LEDRPIN,0);
