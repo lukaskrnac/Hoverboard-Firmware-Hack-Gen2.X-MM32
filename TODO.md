@@ -39,6 +39,11 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Speed measurement averages the last 6 hall intervals: it lags during the first electrical turn
       of a fast acceleration (SINE_SPEED steps overshoot up to ~10 %), and one bad sample (178 rpm at
       150) was seen during an acceleration. Consider the last interval when the speed changes fast.
+- [ ] After a COM_SPEED -> SINE_SPEED switch at speed, one hall sector takes 10-28 ms instead of
+      4.4 ms (150 rpm) and the next ones come faster: the speed reading dips for one electrical turn
+      (to 120, once 68 rpm) although the ADC ISR keeps running. Probably the stator current transient
+      at the switch moving the hall switching points (armature reaction); check with a phase current
+      probe, or ramp the sine modulation in over a few ms.
 - [ ] Block commutation needs 18.5 % duty before the wheel turns (sine: 1 %); it freewheels and only
       coasts down. Check the switching pattern (one PWM high side + the complementary output of the
       low side) against the gate driver's input polarity; complementary switching would also brake.

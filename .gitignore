@@ -2,3 +2,5 @@ HoverBoardGigaDevice/Objects/*
 HoverBoardGigaDevice/BinariesToFlash/hoverboard*
 /HoverBoardMindMotion/Objects
 /HoverBoardMindMotion/build
+__pycache__/
+*.pyc
