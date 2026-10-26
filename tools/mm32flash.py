@@ -52,7 +52,7 @@ class Mm32:
 
     def halt(self):
         """Halt the core with the independent watchdog frozen and the DMA stopped.
-        The firmware runs the watchdog at ~200 ms; it cannot be stopped once started and its reset
+        The firmware runs the watchdog at ~500 ms; it cannot be stopped once started and its reset
         powers latched boards off. On this MM32 DBGMCU IWDG_STOP freezes it whenever debug is
         enabled, not only while halted, so soft_start() clears the bit again.
         A halt does not stop the firmware's UART RX DMA, which wrote received bus bytes into the

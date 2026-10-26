@@ -51,6 +51,18 @@ uint16_t pinstorage[64]={0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
+//every wait after the watchdog started: in steps well below its timeout (a 2 x 150 ms melody note
+//between two feeds was enough for a watchdog reset; with the button still held that rebooted the board
+//instead of switching it off)
+static void DelayFed(uint32_t ms){
+	while(ms){
+		uint32_t step = ms > 50 ? 50 : ms;
+		DELAY_Ms(step);
+		IWDG_ReloadCounter();
+		ms -= step;
+	}
+}
+
 s32 main(void){
 	DELAY_Init();
 	if(!restorecfg()&&EEPROMEN){    //if data in eeprom is not valid, do not boot up
@@ -92,7 +104,7 @@ s32 main(void){
 	//adc interrupt
 	NVIC_Configure(ADC_COMP_IRQn, 0);
 	#ifdef WATCHDOG
-	Iwdg_Init(IWDG_Prescaler_32, 0xff);    //LSI 40 kHz / 32 / 256 = ~200 ms; every blocking wait below feeds it
+	Iwdg_Init(IWDG_Prescaler_32, 625);    //LSI 40 kHz / 32 / 625 = 500 ms (LSI tolerance: >= ~330 ms); waits below use DelayFed()
 	#endif
 	//serial1.begin(19200);
 	uarten=UART_GPIO_Init();
@@ -108,14 +120,14 @@ s32 main(void){
 	}
 	//latch on power
 	if(LATCHPIN<PINCOUNT){    //have latch
-		DELAY_Ms(100);    //some board the micro controller can reset in time and turn back on
+		DelayFed(100);    //some board the micro controller can reset in time and turn back on
 		digitalWrite(LATCHPIN, 1);
 		while(digitalRead(BUTTONPIN)&&BUTTONPIN<PINCOUNT){    //wait while release button
 			if(BUZZERPIN<PINCOUNT){    //have buzzer
 				digitalWrite(BUZZERPIN, 1);
-				DELAY_Ms(2);
+				DelayFed(2);
 				digitalWrite(BUZZERPIN, 0);
-				DELAY_Ms(2);
+				DelayFed(2);
 			}else{
 				__NOP();
 				__NOP();
@@ -126,10 +138,9 @@ s32 main(void){
 	if(BUZZERPIN<PINCOUNT){
 		for(int i=0;i<5;i++){    //power on melody
 			digitalWrite(BUZZERPIN, 1);
-			DELAY_Ms(50);
+			DelayFed(50);
 			digitalWrite(BUZZERPIN, 0);
-			DELAY_Ms(50);
-			IWDG_ReloadCounter();
+			DelayFed(50);
 		}
 	}
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);    //Software start conversion
@@ -207,16 +218,18 @@ s32 main(void){
 		}
 		if(LATCHPIN<PINCOUNT&&BUTTONPIN<PINCOUNT){
 			if(digitalRead(BUTTONPIN)){    //button press for shutdown
-				TIM1->CCR1=0;    //shut down motor
-				TIM1->CCR2=0;
-				TIM1->CCR3=0;
+				//gates off for good: speedupdate() is not called again, so gatesoff stays set and the adc
+				//isr keeps them off. Zeroing CCR1-3 did not stop the motor: the isr rewrites them in sine
+				//mode, and the gates stayed armed. Switched here too in case the isr is the part that hangs.
+				gatesoff = 1;
+				pwm = 0;
+				gatesOutput(0);
 				if(BUZZERPIN<PINCOUNT){
 					for(int i=0;i<3;i++){    //power off melody
 						digitalWrite(BUZZERPIN, 1);
-						DELAY_Ms(150);
+						DelayFed(150);
 						digitalWrite(BUZZERPIN, 0);
-						DELAY_Ms(150);
-						IWDG_ReloadCounter();
+						DelayFed(150);
 					}
 				}
 				while(digitalRead(BUTTONPIN)) {    //wait for release
@@ -224,7 +237,9 @@ s32 main(void){
 					IWDG_ReloadCounter();
 				}
 				digitalWrite(LATCHPIN, 0);    //last line to ever be executed
-				while(1);//incase the hardware failed...
+				while(1){    //still powered (latch failed, debugger supply): stay off. A watchdog reset
+					IWDG_ReloadCounter();    //would boot and set the latch again
+				}
 			}
 		}
 		IWDG_ReloadCounter();    //feed the watchdog
