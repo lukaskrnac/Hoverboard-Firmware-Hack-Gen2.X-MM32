@@ -32,7 +32,7 @@
 
 
 volatile uint8_t bAnswerMaster = 0;
-static int16_t iReceivePos = 0;	
+static int16_t iReceivePos = -1;    //-1: waiting for the start byte
 
 
 
@@ -120,10 +120,51 @@ uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
 
 
 
+// a config frame is only copied in the rx interrupt and applied here in the main loop: it
+// reinitialises TIM1/PID and writes flash, which stalls the cpu (and the commutation interrupt)
+static SerialServer2HoverConfig oConfigRx;
+static volatile uint8_t bConfigRx = 0;
+static uint8_t bConfigSave = 0;
+
+static void ApplyConfig(const SerialServer2HoverConfig* pData){
+	if (	(pData->fBattFull > 0) && (pData->fBattFull < 60.0)	)
+	{
+		BAT_FULL = pData->fBattFull * 1000;
+	}
+	if (	(pData->fBattEmpty > 0) && (pData->fBattEmpty < 60.0)	)
+	{
+		BAT_EMPTY = pData->fBattEmpty * 1000;
+	}
+	if (pData->iDriveMode <= SINE_SPEED)
+	{
+		DRIVEMODE = pData->iDriveMode;
+		PIDrst();
+		PID_Init();
+		TIMOCInit();
+	}
+	if (pData->iSlaveNew >= 0 && 0)    //disabled!
+		SLAVE_ID = pData->iSlaveNew;
+	bConfigSave = 1;
+}
+
 void RemoteUpdate(void){
 	
 	if (millis - iTimeLastRx > SERIAL_TIMEOUT){
 		speed = 0;
+	}
+	if (bConfigRx)
+	{
+		SerialServer2HoverConfig oConfig;
+		__disable_irq();    //a new frame could arrive while copying
+		oConfig = oConfigRx;
+		bConfigRx = 0;
+		__enable_irq();
+		ApplyConfig(&oConfig);
+	}
+	if (bConfigSave && speed == 0 && realspeed == 0)    //save only with the wheel stopped
+	{
+		EEPROM_Write((u8*)pinstorage, 2 * 64);
+		bConfigSave = 0;
 	}
 	if (bAnswerMaster)
 	{
@@ -188,6 +229,7 @@ void serialit(void){
 			case 0: iRxDataSize = sizeof(SerialServer2Hover);	break;
 			case 1: iRxDataSize = sizeof(SerialServer2HoverMaster);	break;
 			case 2: iRxDataSize = sizeof(SerialServer2HoverConfig);	break;
+			default: iReceivePos = -1;	break;    //unknown type: look for the next '/'
 		}
 		return;
 	}
@@ -222,26 +264,8 @@ void serialit(void){
 				}
 				case 2: 
 				{
-					SerialServer2HoverConfig* pData = (SerialServer2HoverConfig*) aReceiveBuffer;
-					if (	(pData->fBattFull > 0) && (pData->fBattFull < 60.0)	)
-					{
-						BAT_FULL = pData->fBattFull * 1000;
-					}
-					if (	(pData->fBattEmpty > 0) && (pData->fBattEmpty < 60.0)	)
-					{
-						BAT_EMPTY = pData->fBattEmpty * 1000;
-					}
-					if (pData->iDriveMode <= SINE_SPEED)
-					{
-						DRIVEMODE = pData->iDriveMode;
-						PIDrst();
-						PID_Init();
-						TIMOCInit();
-					}
-					if (pData->iSlaveNew >= 0 && 0)    //disabled!
-						SLAVE_ID = pData->iSlaveNew;
-			
-					EEPROM_Write((u8*)pinstorage, 2 * 64);    //if the detection failed, the pin is still saved
+					memcpy(&oConfigRx, aReceiveBuffer, sizeof(oConfigRx));    //applied by RemoteUpdate()
+					bConfigRx = 1;
 					break;
 				}
 			}
