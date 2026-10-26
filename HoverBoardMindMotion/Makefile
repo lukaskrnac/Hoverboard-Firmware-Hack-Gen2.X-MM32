@@ -37,11 +37,12 @@ DEP := $(OBJ:.o=.d)
 
 all: $(TARGET).bin $(TARGET).hex
 
-$(BUILD)/%.o: %.c
+# objects and the link depend on this Makefile: a flag change rebuilds everything
+$(BUILD)/%.o: %.c Makefile
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
-$(TARGET).elf: $(OBJ) $(LDSCRIPT)
+$(TARGET).elf: $(OBJ) $(LDSCRIPT) Makefile
 	$(CC) $(LDFLAGS) $(OBJ) -lm -o $@
 	$(SIZE) $@
 
