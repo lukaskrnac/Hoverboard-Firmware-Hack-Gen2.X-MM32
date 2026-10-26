@@ -181,7 +181,7 @@ void FocControl(void){
 	int32_t v = vbat>1000 ? vbat : 2400;    //0.01 V
 	int32_t vmax = MOD_MAX*v/5676;          //mV; phase amplitude Vbus/sqrt(3) at modulation 32768
 	int16_t th = HALL1.Angle;
-	int16_t thS = realspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*5/2)) : th;
+	int16_t thS = fastspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*5/2)) : th;
 	Trig_Components sc = MCM_Trig_Functions(thS);
 	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
 	int32_t id = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
@@ -203,7 +203,7 @@ void FocControl(void){
 	if(eq>20000) eq = 20000; else if(eq<-20000) eq = -20000;
 	int32_t kp = KP(), kiTs = KI()*TS_US;
 	int32_t kv = cfg(SINE_KV, 242);
-	int32_t vff = -realspeed*5774/kv;    //back emf amplitude, mV: rpm/(sqrt(3)*kv/10)
+	int32_t vff = -fastspeed*5774/kv;    //back emf amplitude, mV: rpm/(sqrt(3)*kv/10); the 6 interval realspeed lags
 
 	int32_t di = kiTs*ed/1000;
 	intD += di;
@@ -287,6 +287,11 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas){
 	}
 	int32_t d = ((sp<<8)-spRef)*dt/100;    //tref 100 ms
 	spRef = d ? spRef+d : sp<<8;
+	if(sp==0&&meas==0&&spRef==0){
+		//stopped at a 0 rpm set point: the integrator decays (100 ms). Left as it was it pushed ~0.3 A
+		//against static friction until the wheel broke loose, then swung +-50 rpm (the speed shows late)
+		spI -= spI*dt/100;
+	}
 	int32_t e = (spRef>>8)-meas;
 	int32_t kp = cfg(FOC_SPD_KP, 30), ki = cfg(FOC_SPD_KI, 100);    //mA per rpm, mA per rpm*s
 	int32_t di = ki*e*256/1000*dt;

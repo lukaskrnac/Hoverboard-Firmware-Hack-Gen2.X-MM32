@@ -8,6 +8,7 @@
 /*------------------- Private variables ---------------*/
 HALLType HALL1;
 volatile int32_t fastspeed;
+static uint32_t edgeMs;    //millis at the last hall edge: interval timing past the 65 ms of the us timer
 static volatile int16_t CWShift = 0;    //extra sine angle advance in the direction of motion (65536 = 360 deg el), tuning over SWD
 /*------------------ Private functions ----------------*/
 void HALLModuleInit(HALLType *u);
@@ -91,10 +92,12 @@ void HALLModuleCalc(HALLType *u){
 			realdir=1;
 		}
 		u->HallTime[i] = tim->CCR1;    //us since the previous edge (the timer is reset by every edge)
-		if(tim->SR&TIM_SR_UI){         //16 bit timer overflowed: more than 65 ms, the capture wrapped
-			tim->SR = ~TIM_SR_UI;
-			u->HallTime[i] = 250000;
+		if(tim->SR&TIM_SR_UI){         //16 bit timer overflowed: more than 65 ms, the capture wrapped;
+			tim->SR = ~TIM_SR_UI;      //ms timing instead (it was a fixed 250 ms: below ~10 rpm the speed
+			uint32_t ms = millis-edgeMs;    //read 0 or far too low)
+			u->HallTime[i] = ms<250 ? ms*1000 : 250000;
 		}
+		edgeMs = millis;
 
 		//Calculate rotor electrical angle speed and mechanical speed
 		u->HallTimeSum = 0;
@@ -152,12 +155,12 @@ void HALLModuleCalc(HALLType *u){
 	//20 rpm): too slow for a current driven speed loop (FOC), which, unlike the voltage modes, gets no
 	//damping from the back emf. The hall sectors are equal within 1.5 deg on the bench motor. Between
 	//edges it decays with the time since the last edge once that is longer than the last interval;
-	//below ~10 rpm (65 ms timer overflow) it is 0.
+	//0 after 250 ms without an edge (~3 rpm), like realspeed.
 	{
 		TIM_TypeDef* tim = halltimen ? TIM2 : TIM3;
-		uint32_t el = (tim->SR&TIM_SR_UI) ? 65535 : tim->CNT;
+		uint32_t el = (tim->SR&TIM_SR_UI) ? (millis-edgeMs)*1000 : tim->CNT;
 		uint32_t iv = u->HallTime[i]>el ? u->HallTime[i] : el;
-		int32_t f = iv>=65535 ? 0 : (int32_t)(SPEEDX/6/iv);
+		int32_t f = iv>=250000 ? 0 : (int32_t)(SPEEDX/6/iv);
 		fastspeed = realdir ? f : -f;
 	}
 	u->PreHallValue = u->RunHallValue;

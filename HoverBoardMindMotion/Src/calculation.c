@@ -106,3 +106,37 @@ int SpeedCtrl(int sp, int meas, const SpeedPlant* p){    //sp, meas in rpm; retu
 	spdU = u;
 	return u>>8;
 }
+
+//COM_TORQUE: current loop on the bus shunt. In block mode the adc samples at the pwm counter's zero,
+//inside the high side on time, so the shunt carries the phase current of the conducting pair there
+//(any duty > 0). Output in permille duty for the direction of the command: back emf feed forward plus
+//PI on the filtered current (fitotal, ~15 ms). Duty for 1 A ~ 2R/Vbus: 25 permille at 24 V.
+static int32_t trqI;    //permille << 8
+static uint32_t trqT;
+
+void TorqueCtrlReset(void){
+	trqI = 0;
+	trqT = millis;
+}
+
+int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm){    //mA (magnitude, imeas >= 0), rpm along the command
+	SpeedPlant p;
+	SpeedParams(COM_SPEED, &p);
+	int32_t v = vbat > 1000 ? vbat : 2400;
+	int32_t dt = millis - trqT;
+	trqT = millis;
+	if(dt > 20) dt = 20;
+	if(rpm > 1000) rpm = 1000; else if(rpm < -1000) rpm = -1000;
+	int32_t ff = (p.d0<<8)+rpm*256000/(p.kv*v/1000);    //permille<<8: FeedForward() of the speed along the command;
+	if(ff < 0) ff = 0;    //no current flows below the dead band (block needs 18.5 % at standstill)
+	int32_t e = iref - imeas;
+	int32_t di = 800*e/1000*256/1000*dt;    //ki 800 permille per A*s
+	int32_t u = ff + 5*e*256/1000 + trqI + di;    //kp 5 permille per A
+	if((u < SPD_UMAX || di < 0) && (u > 0 || di > 0)){
+		trqI += di;
+		if(trqI > SPD_UMAX) trqI = SPD_UMAX; else if(trqI < -SPD_UMAX) trqI = -SPD_UMAX;
+	}
+	u = ff + 5*e*256/1000 + trqI;
+	if(u > SPD_UMAX) u = SPD_UMAX; else if(u < 0) u = 0;    //no reverse duty: that would be plugging
+	return u>>8;
+}

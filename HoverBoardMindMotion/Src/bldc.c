@@ -190,9 +190,13 @@ void speedupdate(void){
 				case CTRL_POSITION:
 					FocSetCurrent(FocSpeedCtrl(posSpeed, fastspeed));
 					break;
-				default:
-					FocSetCurrent(FocSpeedCtrl(speed, fastspeed));
+				default:{
+					//below 10 rpm the last hall interval is > 65 ms old: the loop limit-cycled +-55 rpm
+					//around a 0 rpm set point on it. Read as 0 there, as before the ms interval timing.
+					int32_t m = fastspeed;
+					FocSetCurrent(FocSpeedCtrl(speed, (m<10&&m>-10) ? 0 : m));
 					break;
+				}
 			}
 			pwm = speed;
 		}else{
@@ -221,6 +225,26 @@ void speedupdate(void){
 						SpeedParams(DRIVEMODE, &p);
 						//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
 						pwm = SpeedCtrl(speed,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
+					}
+					break;
+				case CTRL_TORQUE:    //0.01 A; command 0 coasts
+					if(speed==0){
+						coast = 1;
+						pwm = 0;
+						TorqueCtrlReset();
+					}else if(blk){
+						//direction from the sign; the shunt current is a magnitude
+						int32_t sgn = speed>0 ? 1 : -1;
+						pwm = sgn*TorqueCtrlBlock((int32_t)speed*10*sgn, fitotal*10, fastspeed*sgn)*(int32_t)PWM_RES/1000;
+					}else{
+						//sine, no current sense: V = I*R + back emf (the sine kv), as modulation, plus the
+						//dead band of the sine plant (dead time, diodes: 1 % ~ 140 mV) in the command's direction
+						int32_t v = vbat>1000 ? vbat : 2400;
+						SpeedPlant p;
+						SpeedParams(SINE_SPEED, &p);
+						int32_t mv = (int32_t)speed*10*cfgOrDefault(MOTOR_R, 300)/1000+fastspeed*5774/p.kv;
+						pwm = mv*5676/v+(speed>0 ? 1 : -1)*p.d0*32768/1000;
+						if(pwm>32000) pwm = 32000; else if(pwm<-32000) pwm = -32000;
 					}
 					break;
 				case CTRL_POSITION:    //holds at the target like the speed modes at 0 (short brake / zero vector)
@@ -319,7 +343,7 @@ uint8_t DriveModeSupported(uint8_t mode){
 	if(COMMUTATION(mode)==COMMUT_FOC){
 		return mode<=FOC_POSITION&&FocAvailable();
 	}
-	return mode==COM_VOLT||mode==COM_SPEED||mode==COM_POSITION||mode==SINE_VOLT||mode==SINE_SPEED||mode==SINE_POSITION;
+	return mode<=SINE_POSITION;
 }
 
 void SetDriveMode(uint8_t mode){
