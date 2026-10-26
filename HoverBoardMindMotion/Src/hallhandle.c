@@ -14,10 +14,10 @@ void HALLModuleCalc(HALLType *u);
 
 
 /****************************************************************
-	Function Name£ºHALLModuleInit
-	Description£ºInitialize HALLModule Parameter
-	Input£ºnone
-	Output£ºnone
+	Function Nameï¿½ï¿½HALLModuleInit
+	Descriptionï¿½ï¿½Initialize HALLModule Parameter
+	Inputï¿½ï¿½none
+	Outputï¿½ï¿½none
 ****************************************************************/
 void HALLModuleInit(HALLType *u)
 {
@@ -50,10 +50,10 @@ void HALLModuleInit(HALLType *u)
 }
 
 /****************************************************************
-	Function Name£ºHALLModuleCalc
-	Description£ºUpdate the rotor electrical angle and motor speed
-	Input£ºHALL--Structure HALLType
-	Output£ºnone
+	Function Nameï¿½ï¿½HALLModuleCalc
+	Descriptionï¿½ï¿½Update the rotor electrical angle and motor speed
+	Inputï¿½ï¿½HALL--Structure HALLType
+	Outputï¿½ï¿½none
 ****************************************************************/
 uint32_t ChangeTime = 0;
 
@@ -73,9 +73,6 @@ void HALLModuleCalc(HALLType *u){
 			realdir=0;
 		}else{
 			realdir=1;
-		}
-		if(!realdir){
-			digitalWrite(LEDRPIN,1);
 		}
 		u->HallTime[i] = halltimen ? TIM2->CCR1 : TIM3->CCR1;	 
 		ChangeTime = u->HallTime[i];

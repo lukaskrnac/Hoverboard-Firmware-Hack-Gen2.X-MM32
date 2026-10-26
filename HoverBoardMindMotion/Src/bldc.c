@@ -13,6 +13,7 @@
 
 volatile uint16_t abspwm;
 volatile uint32_t lastcommutate;
+volatile uint8_t gatesoff=0;
 uint32_t lasttestrotate;
 int testrotatedir=1;
 uint8_t hallpos(uint8_t dir);
@@ -141,9 +142,10 @@ void speedupdate(){
 		}else{
 			lowbatcount=0;
 		}
-		if(lowbatperm){
+		gatesoff = lowbatperm || (wState & STATE_DISABLE);
+		if(gatesoff){
 			pwm=0;
-			TIM_CtrlPWMOutputs(TIM1, DISABLE);
+			PIDrst();    //no wind-up while the gates are off
 		}else{
 			if(DRIVEMODE==COM_VOLT){
 				pwm=speed*PWM_RES/1000;//1000~-1000 for all pwm resolution
@@ -174,6 +176,16 @@ void speedupdate(){
 			TIM1->CCR2=abspwm;
 			TIM1->CCR3=abspwm;
 		}
+	}
+}
+
+//TIM1 main output enable for all six gates. AOEN goes with MOEN: with automatic output enable set,
+//the timer sets MOEN again at the next update event and a software "off" lasts only one pwm period.
+void gatesOutput(uint8_t on){
+	if(on){
+		TIM1->BDTR |= TIM_BDTR_AOEN|TIM_BDTR_MOEN;
+	}else{
+		TIM1->BDTR &= ~(TIM_BDTR_AOEN|TIM_BDTR_MOEN);
 	}
 }
 

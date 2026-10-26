@@ -7,7 +7,9 @@ void commutate();
 uint8_t hallpos(uint8_t dir);
 void speedupdate();
 void TIMOCInit();
+void gatesOutput(uint8_t on);
 
+extern volatile uint8_t gatesoff;    //1: gates must stay off (disarmed by the remote, low battery), applied by the adc isr
 extern volatile uint16_t abspwm;
 extern volatile uint32_t lastcommutate;
 extern uint8_t lowbatcount;

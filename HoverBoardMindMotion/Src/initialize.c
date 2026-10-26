@@ -29,6 +29,12 @@ void io_init(){
 	if(LEDBPIN<PINCOUNT){
 		pinMode(LEDBPIN, OUTPUT);
 	}
+	if(LEDUPIN<PINCOUNT){
+		pinMode(LEDUPIN, OUTPUT);
+	}
+	if(LEDDPIN<PINCOUNT){
+		pinMode(LEDDPIN, OUTPUT);
+	}
 	if(LATCHPIN<PINCOUNT){
 		pinMode(LATCHPIN, OUTPUT);
 	}
@@ -236,7 +242,8 @@ uint8_t UART_GPIO_Init(){
 		if(uarts[i].io==TXPIN||uarts[i].io==RXPIN){
 			pinModeAF(uarts[i].io,uarts[i].af);
 			if(uarts[i].tx){
-				pinMode(uarts[i].io, OUTPUT_AF);
+				//open drain: several boards share one RemoteUartBus line, the master's rx must have a pull-up
+				pinMode(uarts[i].io, OUTPUT_AF_OD);
 			}else{
 				pinMode(uarts[i].io, INPUT);
 			}

@@ -31,6 +31,7 @@
 
 #define OUTPUT GPIO_Mode_Out_PP
 #define OUTPUT_AF GPIO_Mode_AF_PP
+#define OUTPUT_AF_OD GPIO_Mode_AF_OD
 #define OUTPUT_OD GPIO_Mode_Out_OD
 #define INPUT GPIO_Mode_FLOATING
 #define INPUT_PULLUP GPIO_Mode_IPU

@@ -196,6 +196,7 @@ const MM32TIMBK ocps[TIMBKCOUNT] = {
 
 
 void pinMode(uint8_t io,uint8_t state){
+	if(io>=PINCOUNT) return;    //pin not configured (65535)
 	switch (pins[io].port){
 		case IOA:
 			GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
@@ -226,6 +227,7 @@ void pinMode(uint8_t io,uint8_t state){
 }
 
 void pinModeAF(uint8_t io,uint8_t af){
+	if(io>=PINCOUNT) return;
 	switch (pins[io].port){
 		case IOA:
 			GPIO_PinAFConfig(GPIOA, pins[io].pinSrc, af);
@@ -244,6 +246,7 @@ void pinModeAF(uint8_t io,uint8_t af){
 
 
 uint8_t digitalRead(uint8_t io){
+	if(io>=PINCOUNT) return 0;
 	switch (pins[io].port){
 		case IOA:
 			return GPIO_ReadInputDataBit(GPIOA, pins[io].pin);
@@ -263,6 +266,7 @@ uint8_t digitalRead(uint8_t io){
 }
 
 void digitalWrite(uint8_t io, uint8_t state){
+	if(io>=PINCOUNT) return;
 	switch (pins[io].port){
 		case IOA:
 			GPIO_WriteBit(GPIOA, pins[io].pin, state);

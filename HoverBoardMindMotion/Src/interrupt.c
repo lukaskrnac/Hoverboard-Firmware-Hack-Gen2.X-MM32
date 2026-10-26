@@ -89,12 +89,11 @@ void ADC1_COMP_IRQHandler(void){
 			avgItotal();
 			//SOFT_ILIMIT in A against the 64 sample average (~15 ms): one adc count of a direct shunt is
 			//~0.3 A and the raw value spikes on switching noise. Fast faults are the adc watchdog's job (AWDG).
-			if(SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100){
-				TIM_CtrlPWMOutputs(TIM1, DISABLE);
-			}else{
-				TIM_CtrlPWMOutputs(TIM1, ENABLE);
+			uint8_t overcurrent = SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100;
+			gatesOutput(!(gatesoff||overcurrent));    //the only place the gates are switched while running
+			{
 				HALL1.CMDDIR = -dir;
-				HALLModuleCalc(&HALL1);
+				HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
 				
 				if(!(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED)){
 					if(DRIVEMODE==FOC_VOLT||DRIVEMODE==FOC_SPEED||DRIVEMODE==FOC_TORQUE){

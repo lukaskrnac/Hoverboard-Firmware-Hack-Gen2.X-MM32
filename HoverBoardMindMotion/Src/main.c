@@ -11,6 +11,7 @@
 #include "../Inc/initialize.h"
 #include "../Inc/uart.h"
 #include "../Inc/bldc.h"
+#include "../Inc/remoteUartBus.h"
 #include "../Inc/sim_eeprom.h"
 #include "../Inc/hardware.h"
 #include "../Inc/calculation.h"
@@ -37,7 +38,7 @@ volatile int speed=0;
 volatile int pwm=0;
 volatile int realspeed=0;
 volatile int frealspeed=0;
-volatile uint8_t  wState;
+volatile uint8_t  wState = STATE_LED_BATTLEVEL;    //battery LEDs until the remote sends a state
 static uint8_t flicker=0;
 uint8_t uarten=1;
 uint8_t halltimen=1;
@@ -142,7 +143,14 @@ s32 main(void){
 	MovingAvgInit(&SpeedFdk);
 	PID_Init();
   while(1) {
-		if(LEDRPIN<PINCOUNT&&LEDGPIN<PINCOUNT&&LEDBPIN<PINCOUNT){
+		uint8_t state = wState;
+		digitalWrite(LEDUPIN, (state&STATE_LED_UP)!=0);    //unconfigured pins are ignored
+		digitalWrite(LEDDPIN, (state&STATE_LED_DOWN)!=0);
+		if(!(state&STATE_LED_BATTLEVEL)){    //the remote sets the LEDs
+			digitalWrite(LEDGPIN, (state&STATE_LED_GREEN)!=0);
+			digitalWrite(LEDBPIN, (state&STATE_LED_ORANGE)!=0);
+			digitalWrite(LEDRPIN, (state&STATE_LED_RED)!=0);
+		}else if(LEDRPIN<PINCOUNT&&LEDGPIN<PINCOUNT&&LEDBPIN<PINCOUNT){
 			int32_t bat_range = (int32_t)BAT_FULL-BAT_EMPTY;
 			int32_t bat_10 = BAT_EMPTY+bat_range*10/100;
 			int32_t bat_20 = BAT_EMPTY+bat_range*20/100;
