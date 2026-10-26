@@ -180,7 +180,13 @@ static void AnswerMaster(void){
 	oData.cStart = START_FRAME;
 	oData.iSlave = SLAVE_ID;
 	oData.iVolt = (uint16_t) (fvbat);
-	oData.iAmp = (int16_t) 	(fitotal);
+	int32_t amp = fitotal;
+	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
+		//block mode samples the shunt inside the high side on time: phase current. Bus current = that
+		//times the duty (none while the low sides short brake)
+		amp = blockbrake ? 0 : amp*(int32_t)TIM1->CCR1/(int32_t)PWM_RES;
+	}
+	oData.iAmp = (int16_t)amp;
 	oData.iSpeed = (int16_t) (realspeed	*10);
 	oData.iOdom = (int32_t) iOdom;	//pwm	;
 

@@ -25,15 +25,9 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       those fixes works (`~/.cache/opencode-scratch/mm32-hover/pinfinder/`). It has no float printf,
       so the battery-voltage menu prints blank values: print in mV with integers instead.
       Its power-latch detection gives wrong results when the MCU is powered from the debugger.
-- [ ] **Current sense calibration.** `itotaldivider` 250 assumes a 4 mΩ shunt (PA7, direct). Compare
-      the telemetry current with the bench supply under load and correct it (webcam on /dev/video0
-      reads the PSU; the user brakes the wheel by hand). One ADC count is ~0.3 A. The zero offset is
-      the mean of 128 samples at boot, biased by switching spikes, and the ADC clips at 0 (no negative
-      current): use a median / exclude spikes. In sine mode the shunt is sampled while all low sides
-      conduct and carries ~0 there: it needs another sample time (FOC computes the bus current from
-      the phase currents and duties instead).
-- [ ] Web console: drive mode numbers changed (sine 2/3 -> 4/5, now 0-11); its config frame still
-      sends the old numbers, which now mean block torque/position (2/3).
+- [ ] Bus current in sine mode: the shunt is sampled at the zero vector (all low sides on) and reads
+      ~0. Boards with phase current pins could use FOC's estimate (sum of duty * phase current) once
+      the op-amp offsets are known; others need a second sample inside an active vector.
 - [ ] Position: FOC settles 1-2 steps off (the speed set point near the target is below what the
       halls can measure); the target is int16 (the command field). Sine takes 1.6-2.2 s per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the

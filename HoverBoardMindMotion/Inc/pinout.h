@@ -41,10 +41,12 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
                                    //control: 15 deg ran the bench wheel at 914 instead of 586 rpm but drew 3.1 A instead of
                                    //0.66 A from the supply (~12 A phase current) unloaded; FOC field weakening is controlled
 #define OCPPIN pinstorage[23]
+#define ITOTAL_ZERO pinstorage[25] //shunt zero below adc 0 (the adc clips it), 0.01 counts; 0/65535 = 0 (bench board: 145)
 #define OCPREFPIN pinstorage[24]
 
 #define VBAT_DIVIDER pinstorage[33]
-#define ITOTAL_DIVIDER pinstorage[34]    //itotal = divider * adc voltage: 1/shunt ohm for a direct shunt (250 = 4 mOhm)
+#define ITOTAL_DIVIDER pinstorage[34]    //itotal = divider * adc voltage: 1/shunt ohm for a direct shunt (250 = 4 mOhm; bench
+                                         //board 419, measured against the op-amp phase current)
 #define BAUD pinstorage[36]
 #define PWM_RES pinstorage[37]
 #define SLAVE_ID pinstorage[38]

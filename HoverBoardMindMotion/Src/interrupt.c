@@ -71,7 +71,11 @@ void ADC1_COMP_IRQHandler(void){
 			vrefint = ADC1->ADDR15;
 			if(vrefint){
 				vbat = (int32_t)((uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
-				itotal = (int32_t)ITOTAL_DIVIDER*((int32_t)analogRead(ITOTALPIN)-(int32_t)itotaloffset)*120/vrefint;
+				//a zero below adc 0 (ITOTAL_ZERO) reads 0 up to that current (0.76 A on the bench board), then
+				//the shifted value
+				int32_t raw = (int32_t)analogRead(ITOTALPIN)-(int32_t)itotaloffset;
+				int32_t zero = cfgOrDefault(ITOTAL_ZERO, 0);
+				itotal = raw>0 ? (int32_t)ITOTAL_DIVIDER*(raw*100+zero)*120/vrefint/100 : 0;
 			}
 			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC;
 			if(foc){
