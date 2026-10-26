@@ -158,8 +158,10 @@ void speedupdate(void){
 		}else{
 			lowbatcount=0;
 		}
-		//state bit 64 (v1 disarm) only counts while v1 frames command; CANSimple uses the axis state
-		gatesoff = lowbatperm || (cmdSource==1&&(wState & STATE_DISABLE)) || axisState==AXIS_IDLE;
+		//armed: v1 frames arm and disarm with state bit 64, CANSimple with the axis state (a v1 master
+		//cannot set that). A disarm by error (Estop) holds for both until Clear_Errors.
+		uint8_t idle = cmdSource==1 ? (wState & STATE_DISABLE)!=0 : axisState==AXIS_IDLE;
+		gatesoff = lowbatperm || axisDisarm || idle;
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage

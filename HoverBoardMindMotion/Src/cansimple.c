@@ -98,7 +98,8 @@ static uint8_t getMsg(uint8_t cmd, uint8_t* d){
 			return 8;
 		case CMD_HEARTBEAT:
 			wrU32(d, axisErrors|axisDisarm);
-			d[4] = axisState; d[5] = 0; d[6] = posDone; d[7] = 0;
+			d[4] = gatesoff ? AXIS_IDLE : AXIS_CLOSED_LOOP;    //the state in effect (v1 frames arm with bit 64)
+			d[5] = 0; d[6] = posDone; d[7] = 0;
 			return 8;
 		case CMD_GET_ERROR:
 			wrU32(d, axisErrors); wrU32(d+4, axisDisarm);
