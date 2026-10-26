@@ -28,7 +28,8 @@ CFLAGS  := $(ARCH) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-c
 # stricter for our own code (Src/, startup); the vendor HAL sources keep -Wall
 WARN    := -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wundef
 $(BUILD)/Src/%.o $(BUILD)/Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.o: CFLAGS += $(WARN)
-LDFLAGS := $(ARCH) -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs -Wl,--gc-sections \
+# -nostartfiles: startup_mm32spin0x_gcc.c is the startup; newlib's crt0 pulled in exit() and stdio
+LDFLAGS := $(ARCH) -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs -nostartfiles -Wl,--gc-sections \
            -Wl,-Map=$(TARGET).map -Wl,--print-memory-usage
 
 OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o))
