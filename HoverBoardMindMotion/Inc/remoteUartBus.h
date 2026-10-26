@@ -14,7 +14,10 @@
 #define STATE_SHUTOFF        128    //not implemented
 
 void RemoteUpdate(void);
-uint8_t RemoteTimedOut(void);    //no command frame within SERIAL_TIMEOUT
+uint8_t RemoteTimedOut(void);
+int32_t BusCurrent(void);         //0.01 A, filtered
+void RemoteFeedWatchdog(void);     //a command arrived (command timeout)
+void RemoteSaveConfig(void);       //store pinstorage once the wheel stands still    //no command frame within SERIAL_TIMEOUT
 void RemotePoll(void);    //main loop: parse received bytes, answer
 
 #endif

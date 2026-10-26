@@ -19,6 +19,12 @@ volatile uint8_t coastreq=0;
 volatile uint8_t blockbrake=0;    //block commutation: low side short brake active, the hall isr does not commutate
 static uint16_t brakeduty;        //permille of the period the low sides are on while braking
 static int32_t posHold;           //position mode: target kept while the remote is silent
+volatile int32_t posCmd;          //position target from the CANSimple protocol, hall steps (int32)
+volatile uint8_t cmdSource = 1;   //protocol of the last command frame: 1 v1 ('/'), 2 CANSimple
+volatile uint8_t axisState = AXIS_CLOSED_LOOP;    //ODrive AxisState: IDLE 1 = gates off, CLOSED_LOOP 8
+volatile uint32_t axisErrors;     //ODrive Error bits, the conditions active now (see bldc.h)
+volatile uint32_t axisDisarm;     //the error that switched the axis to IDLE, until Clear_Errors
+volatile uint8_t posDone;         //position mode: at the target
 static uint8_t posHeld;
 
 //position mode: hall step error -> speed set point (P, limited)
@@ -152,11 +158,14 @@ void speedupdate(void){
 		}else{
 			lowbatcount=0;
 		}
-		gatesoff = lowbatperm || (wState & STATE_DISABLE);
+		//state bit 64 (v1 disarm) only counts while v1 frames command; CANSimple uses the axis state
+		gatesoff = lowbatperm || (cmdSource==1&&(wState & STATE_DISABLE)) || axisState==AXIS_IDLE;
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage
 		uint8_t overvolt = BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL+3000;
+		axisErrors = (lowbatperm ? ERR_DC_BUS_UNDER_VOLTAGE : 0)|(overvolt ? ERR_DC_BUS_OVER_VOLTAGE : 0)|
+		             (overcurrent ? ERR_DC_BUS_OVER_CURRENT : 0)|(focTrip ? ERR_CURRENT_LIMIT_VIOLATION : 0);
 		if((speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)||gatesoff){
 			FocClearTrip();    //zero command, or disarmed (the only way in position mode: its command is a target)
 		}
@@ -167,10 +176,11 @@ void speedupdate(void){
 			if(RemoteTimedOut()){
 				if(!posHeld){ posHold = iOdom; posHeld = 1; }
 			}else{
-				posHold = speed;
+				posHold = cmdSource==2 ? posCmd : speed;
 				posHeld = 0;
 			}
 			posErr = posHold-iOdom;
+			posDone = posErr<=1&&posErr>=-1;
 			posSpeed = PositionSpeed(posErr);
 		}
 		if(gatesoff){

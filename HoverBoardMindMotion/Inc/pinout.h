@@ -40,6 +40,7 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define FW_ADVANCE pinstorage[22]  //sine field weakening: max phase advance, degrees electrical; default off. No current
                                    //control: 15 deg ran the bench wheel at 914 instead of 586 rpm but drew 3.1 A instead of
                                    //0.66 A from the supply (~12 A phase current) unloaded; FOC field weakening is controlled
+#define TORQUE_CONST pinstorage[26]  //Nm per A x 1000 (CANSimple torque units); 0/65535 = 8.27 / sine kv
 #define OCPPIN pinstorage[23]
 #define ITOTAL_ZERO pinstorage[25] //shunt zero below adc 0 (the adc clips it), 0.01 counts; 0/65535 = 0 (bench board: 145)
 #define OCPREFPIN pinstorage[24]

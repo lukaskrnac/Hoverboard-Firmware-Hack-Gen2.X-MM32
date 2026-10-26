@@ -20,6 +20,7 @@ void FocSetVoltage(int32_t permille);    //q voltage, permille of the usable max
 int32_t FocSpeedCtrl(int32_t sp, int32_t meas);    //rpm -> q current reference, mA
 void FocSpeedReset(void);
 void FocClearTrip(void);
+int32_t FocIqSetpoint(void);         //mA
 
 extern volatile int32_t focIdRef;     //d current reference, mA (field weakening, tests over SWD)
 extern volatile int16_t focId, focIq; //measured, mA

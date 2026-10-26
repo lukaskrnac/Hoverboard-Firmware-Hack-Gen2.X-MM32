@@ -26,6 +26,7 @@
 
 #include "sim_eeprom.h"
 #include "calculation.h"
+#include "cansimple.h"
 
 
 static int16_t iReceivePos = -1;    //-1: waiting for the start byte
@@ -136,6 +137,24 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 	bConfigSave = 1;
 }
 
+//bus current, 0.01 A (filtered). Block mode samples the shunt inside the high side on time: phase
+//current; the bus current is that times the duty (none while the low sides short brake)
+int32_t BusCurrent(void){
+	int32_t amp = fitotal;
+	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
+		amp = blockbrake ? 0 : amp*(int32_t)TIM1->CCR1/(int32_t)PWM_RES;
+	}
+	return amp;
+}
+
+void RemoteFeedWatchdog(void){
+	iTimeLastRx = millis;
+}
+
+void RemoteSaveConfig(void){    //written once the wheel stands still (RemoteUpdate)
+	bConfigSave = 1;
+}
+
 uint8_t RemoteTimedOut(void){
 	return millis - iTimeLastRx > SERIAL_TIMEOUT;
 }
@@ -161,13 +180,7 @@ static void AnswerMaster(void){
 	oData.cStart = START_FRAME;
 	oData.iSlave = SLAVE_ID;
 	oData.iVolt = (uint16_t) (fvbat);
-	int32_t amp = fitotal;
-	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-		//block mode samples the shunt inside the high side on time: phase current. Bus current = that
-		//times the duty (none while the low sides short brake)
-		amp = blockbrake ? 0 : amp*(int32_t)TIM1->CCR1/(int32_t)PWM_RES;
-	}
-	oData.iAmp = (int16_t)amp;
+	oData.iAmp = (int16_t)BusCurrent();
 	oData.iSpeed = (int16_t) (realspeed	*10);
 	oData.iOdom = (int32_t) iOdom;	//pwm	;
 
@@ -248,6 +261,7 @@ static void feedV1(uint8_t cRead){
 					break;
 				}
 			}
+			cmdSource = 1;
 			AnswerMaster();
 		}
 	}
@@ -257,6 +271,7 @@ static void feedV1(uint8_t cRead){
 void RemotePoll(void){
 	int c;
 	while((c = SerialGetByte())>=0){
-		feedV1((uint8_t)c);
+		//a v1 frame in progress keeps its bytes; otherwise CANSimple takes 0xA5 frames, v1 '/' frames
+		if(iReceivePos>=0||!CanSimpleFeed((uint8_t)c)) feedV1((uint8_t)c);
 	}
 }

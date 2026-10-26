@@ -81,6 +81,10 @@ static volatile u32* adcResultReg(uint16_t io){
 	return 0;
 }
 
+int32_t FocIqSetpoint(void){    //mA, motor frame (voltage mode: the limit in the command's direction)
+	return focVoltMode ? (focVCmd>0 ? IMAX() : (focVCmd<0 ? -IMAX() : 0)) : focIqRef;
+}
+
 uint8_t FocAvailable(void){
 	return adcResultReg(IPHASEAPIN)&&adcResultReg(IPHASEBPIN);
 }

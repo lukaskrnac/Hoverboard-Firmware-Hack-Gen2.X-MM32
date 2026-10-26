@@ -1,0 +1,480 @@
+{
+ "fw_version": "2.0.0",
+ "protocol": 2,
+ "endpoints": {
+  "config.halla": {
+   "id": 0,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall sensor A"
+  },
+  "config.hallb": {
+   "id": 1,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall sensor B"
+  },
+  "config.hallc": {
+   "id": 2,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall sensor C"
+  },
+  "config.ledr": {
+   "id": 3,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "red LED"
+  },
+  "config.ledg": {
+   "id": 4,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "green LED"
+  },
+  "config.ledb": {
+   "id": 5,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "blue / orange LED"
+  },
+  "config.ledu": {
+   "id": 6,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "upper LED"
+  },
+  "config.ledd": {
+   "id": 7,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "lower LED"
+  },
+  "config.buzzer": {
+   "id": 8,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "buzzer"
+  },
+  "config.button": {
+   "id": 9,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power button sense"
+  },
+  "config.latch": {
+   "id": 10,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power self-hold"
+  },
+  "config.charge": {
+   "id": 11,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "charger detect"
+  },
+  "config.vbat": {
+   "id": 12,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "battery voltage adc"
+  },
+  "config.itotal": {
+   "id": 13,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "bus current adc"
+  },
+  "config.tx": {
+   "id": 14,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart tx"
+  },
+  "config.rx": {
+   "id": 15,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart rx"
+  },
+  "config.iphasea": {
+   "id": 16,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current adc 1 (phase: iphasecfg)"
+  },
+  "config.iphaseb": {
+   "id": 17,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current adc 2 (phase: iphasecfg)"
+  },
+  "config.poskp": {
+   "id": 18,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position: 0.1 rpm per hall step of error; 0/65535 = default 20"
+  },
+  "config.posrpm": {
+   "id": 19,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position: max speed rpm; 0/65535 = default 100"
+  },
+  "config.motorr": {
+   "id": 20,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase resistance incl. mosfets, mOhm; 0/65535 = default 300"
+  },
+  "config.fwimax": {
+   "id": 21,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"
+  },
+  "config.fwadvance": {
+   "id": 22,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "sine field weakening: max phase advance, degrees electrical; 0/65535 = off"
+  },
+  "config.ocp": {
+   "id": 23,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TIM1 break input (hardware overcurrent)"
+  },
+  "config.ocpref": {
+   "id": 24,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "overcurrent comparator reference"
+  },
+  "config.itotalzero": {
+   "id": 25,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "shunt zero below adc 0 (the adc clips), 0.01 counts; 0/65535 = 0"
+  },
+  "config.torqueconst": {
+   "id": 26,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "torque constant mNm/A (CANSimple torque units); 0/65535 = 8270 / sine kv"
+  },
+  "config.magicnum": {
+   "id": 32,
+   "type": "uint16",
+   "access": "r",
+   "unit": "0xDCAB = valid"
+  },
+  "config.vbatdivider": {
+   "id": 33,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "vbat = divider * Vadc"
+  },
+  "config.itotaldivider": {
+   "id": 34,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "itotal = divider * Vadc (1/shunt ohm); bench board 419"
+  },
+  "config.baud": {
+   "id": 36,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200)"
+  },
+  "config.pwmres": {
+   "id": 37,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TIM1 period"
+  },
+  "config.slaveid": {
+   "id": 38,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "RemoteUartBus slave id"
+  },
+  "config.windings": {
+   "id": 39,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "motor poles"
+  },
+  "config.invlowside": {
+   "id": 40,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "1 = low side gate drive inverted"
+  },
+  "config.softocp": {
+   "id": 41,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "A, averaged bus current limit, 0 = off"
+  },
+  "config.hardocp": {
+   "id": 42,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "adc watchdog current limit, adc counts above zero"
+  },
+  "config.drivemode": {
+   "id": 44,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED, 3/7/11 COM/SINE/FOC_POSITION, 8 FOC_VOLT, 9 FOC_SPEED, 10 FOC_TORQUE (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"
+  },
+  "config.batfull": {
+   "id": 45,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "mV"
+  },
+  "config.batempty": {
+   "id": 46,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "mV, <= 20000 disables the low battery cut-off"
+  },
+  "config.timeout": {
+   "id": 47,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "ms without a command until speed = 0"
+  },
+  "config.speedkp": {
+   "id": 48,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"
+  },
+  "config.speedki": {
+   "id": 49,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"
+  },
+  "config.speedkv": {
+   "id": 50,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 395"
+  },
+  "config.speedd0": {
+   "id": 51,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED feed forward: dead band permille duty, 0 = default 185"
+  },
+  "config.sinekp": {
+   "id": 52,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED: 0.1 permille modulation per rpm, 0 = default 5"
+  },
+  "config.sineki": {
+   "id": 53,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED: 0.1 permille per rpm*s, 0 = default 85"
+  },
+  "config.sinekv": {
+   "id": 54,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED feed forward: 0.1 rpm/V at 100% modulation, 0 = default 242"
+  },
+  "config.sined0": {
+   "id": 55,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED feed forward: dead band permille, 0 = default 10"
+  },
+  "config.iphasegain": {
+   "id": 56,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC: 0.1 mA per adc count, 0 = default 515"
+  },
+  "config.iphasecfg": {
+   "id": 57,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC: phases on iphasea/b 0 = A,B 1 = B,C 2 = A,C; +4: adc rises with current into the motor"
+  },
+  "config.focimax": {
+   "id": 58,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC: phase current limit 0.1 A, 0 = default 100; trips at twice that"
+  },
+  "config.curkp": {
+   "id": 59,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC current loop: mV per A, 0 = default 400"
+  },
+  "config.curki": {
+   "id": 60,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC current loop: V per A*s, 0 = default 300"
+  },
+  "config.focspdkp": {
+   "id": 61,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC_SPEED: mA per rpm, 0 = default 30"
+  },
+  "config.focspdki": {
+   "id": 62,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC_SPEED: mA per rpm*s, 0 = default 100"
+  },
+  "config.cfgversion": {
+   "id": 63,
+   "type": "uint16",
+   "access": "r",
+   "unit": "config layout: 0 = old drive mode numbers (2/3 = sine), migrated at boot"
+  },
+  "vbus_voltage": {
+   "id": 256,
+   "type": "float",
+   "access": "r",
+   "unit": "V"
+  },
+  "ibus": {
+   "id": 257,
+   "type": "float",
+   "access": "r",
+   "unit": "A, bus current"
+  },
+  "pos_estimate": {
+   "id": 258,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns; writing sets the position (Set_Absolute_Position)"
+  },
+  "vel_estimate": {
+   "id": 259,
+   "type": "float",
+   "access": "r",
+   "unit": "turns/s"
+  },
+  "iq_measured": {
+   "id": 260,
+   "type": "float",
+   "access": "r",
+   "unit": "A (FOC; NaN otherwise)"
+  },
+  "iq_setpoint": {
+   "id": 261,
+   "type": "float",
+   "access": "r",
+   "unit": "A"
+  },
+  "axis_state": {
+   "id": 262,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 IDLE, 8 CLOSED_LOOP_CONTROL"
+  },
+  "active_errors": {
+   "id": 263,
+   "type": "uint32",
+   "access": "r",
+   "unit": "ODrive Error bits"
+  },
+  "disarm_reason": {
+   "id": 264,
+   "type": "uint32",
+   "access": "r",
+   "unit": "ODrive Error bits"
+  },
+  "odometer": {
+   "id": 265,
+   "type": "int32",
+   "access": "r",
+   "unit": "hall steps since boot"
+  },
+  "control_mode": {
+   "id": 266,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "0 VOLTAGE, 1 TORQUE, 2 VELOCITY, 3 POSITION"
+  },
+  "input_mode": {
+   "id": 267,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ"
+  },
+  "commutation": {
+   "id": 268,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "0 block, 1 sine, 2 FOC"
+  },
+  "input_pos": {
+   "id": 269,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns"
+  },
+  "input_vel": {
+   "id": 270,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s"
+  },
+  "input_torque": {
+   "id": 271,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm"
+  },
+  "input_voltage": {
+   "id": 272,
+   "type": "float",
+   "access": "rw",
+   "unit": "fraction of the maximum voltage, -1..1"
+  },
+  "torque_constant": {
+   "id": 273,
+   "type": "float",
+   "access": "r",
+   "unit": "Nm/A in use"
+  },
+  "id_setpoint": {
+   "id": 274,
+   "type": "int32",
+   "access": "rw",
+   "unit": "mA, FOC d current"
+  },
+  "fast_speed": {
+   "id": 275,
+   "type": "int32",
+   "access": "r",
+   "unit": "rpm, last hall interval"
+  },
+  "save_configuration": {
+   "id": 512,
+   "type": "function",
+   "access": "w",
+   "unit": "store the config words (when the wheel stands still)"
+  },
+  "clear_errors": {
+   "id": 513,
+   "type": "function",
+   "access": "w",
+   "unit": ""
+  }
+ }
+}

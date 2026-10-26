@@ -18,6 +18,22 @@ extern uint8_t lowbatcount;
 extern uint8_t lowbatperm;
 extern const uint8_t hall_to_pos[8];
 
+//CANSimple (ODrive) axis state and error bits, cansimple.c
+#define AXIS_IDLE 1
+#define AXIS_CLOSED_LOOP 8
+#define ERR_DC_BUS_OVER_VOLTAGE      0x100u
+#define ERR_DC_BUS_UNDER_VOLTAGE     0x200u
+#define ERR_DC_BUS_OVER_CURRENT      0x400u
+#define ERR_CURRENT_LIMIT_VIOLATION  0x1000u
+#define ERR_WATCHDOG_TIMER_EXPIRED   0x1000000u
+#define ERR_ESTOP_REQUESTED          0x2000000u
+extern volatile int32_t posCmd;
+extern volatile uint8_t cmdSource;
+extern volatile uint8_t axisState;
+extern volatile uint32_t axisErrors;
+extern volatile uint32_t axisDisarm;
+extern volatile uint8_t posDone;
+
 //drive mode = commutation*4 + control. Control 0..3 is the Gen2.x-GD32 iDrivingMode (pwm, speed, torque,
 //position): a remote written for that firmware gets block commutation with the same meaning.
 enum{ COMMUT_BLOCK=0, COMMUT_SINE=1, COMMUT_FOC=2 };

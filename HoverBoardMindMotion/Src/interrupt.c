@@ -20,6 +20,7 @@ volatile uint8_t poweron=0;
 static uint16_t vrefint;    //last internal 1.2V reference conversion
 static volatile uint32_t adcticks;    //adc interrupts since boot (one per pwm period)
 volatile uint8_t realdir=0;
+volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILIMIT)
 
 
 //commutation interrupt
@@ -72,7 +73,7 @@ void ADC1_COMP_IRQHandler(void){
 			avgItotal();
 			//SOFT_ILIMIT in A against the 64 sample average (~15 ms): one adc count of a direct shunt is
 			//~0.3 A and the raw value spikes on switching noise. Fast faults are the adc watchdog's job (AWDG).
-			uint8_t overcurrent = SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100;
+			overcurrent = SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100;
 			//the only place the gates are switched while running
 			gatesOutput(!(gatesoff||coastreq||overcurrent||(foc&&FocHoldOff())));
 			HALL1.CMDDIR = -dir;
