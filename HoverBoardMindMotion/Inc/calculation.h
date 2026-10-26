@@ -5,7 +5,7 @@
 
 void avgItotal(void);
 void avgvbat(void);
-typedef struct { int32_t kp, ki, kv, d0, tref; } SpeedPlant;    //see calculation.c
+typedef struct { int32_t kp, ki, kv, d0, tref, umax; } SpeedPlant;    //see calculation.c
 void SpeedParams(uint8_t mode, SpeedPlant* p);
 int SpeedCtrl(int sp, int meas, const SpeedPlant* p);
 void SpeedCtrlReset(void);

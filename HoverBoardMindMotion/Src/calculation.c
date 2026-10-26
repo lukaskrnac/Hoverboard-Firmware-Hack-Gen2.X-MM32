@@ -54,10 +54,13 @@ void SpeedParams(uint8_t mode, SpeedPlant* p){    //config fields, 0 = default
 		//default gains: lowest overshoot of a sweep (<= 9%), 8x below instability (40/340) on the bench wheel
 		p->kp = cfgOr(SINE_KP, 5); p->ki = cfgOr(SINE_KI, 85);
 		p->kv = cfgOr(SINE_KV, 242); p->d0 = cfgOr(SINE_D0, 10); p->tref = 100;
+		//above 100 % the sine path turns the excess into phase advance (field weakening), if enabled
+		p->umax = cfgOrDefault(FW_ADVANCE, 0) ? (1220<<8) : SPD_UMAX;
 	}else{
 		//default gains 2x below where steps from rest start to overshoot (100/200), 4x below instability
 		p->kp = cfgOr(SPEED_KP, 50); p->ki = cfgOr(SPEED_KI, 100);
 		p->kv = cfgOr(SPEED_KV, 395); p->d0 = cfgOr(SPEED_D0, 185); p->tref = 350;
+		p->umax = SPD_UMAX;
 	}
 }
 
@@ -95,12 +98,12 @@ int SpeedCtrl(int sp, int meas, const SpeedPlant* p){    //sp, meas in rpm; retu
 	ff = FeedForward(sp, p, v);
 	di = p->ki*e*256/10*dt/1000;
 	u = ff + p->kp*e*256/10 + spdI + di;
-	if((u < SPD_UMAX || di < 0) && (u > -SPD_UMAX || di > 0)){    //anti windup: no integration into saturation
+	if((u < p->umax || di < 0) && (u > -p->umax || di > 0)){    //anti windup: no integration into saturation
 		spdI += di;
 		if(spdI > SPD_IMAX) spdI = SPD_IMAX; else if(spdI < -SPD_IMAX) spdI = -SPD_IMAX;
 	}
 	u = ff + p->kp*e*256/10 + spdI;
-	if(u > SPD_UMAX) u = SPD_UMAX; else if(u < -SPD_UMAX) u = -SPD_UMAX;
+	if(u > p->umax) u = p->umax; else if(u < -p->umax) u = -p->umax;
 	if(u > spdU + SPD_SLEW*dt) u = spdU + SPD_SLEW*dt;
 	else if(u < spdU - SPD_SLEW*dt) u = spdU - SPD_SLEW*dt;
 	spdU = u;

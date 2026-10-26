@@ -47,6 +47,7 @@ static uint16_t ccrPrev[3];        //duties of the period the median sample was 
 volatile uint16_t focGlitches;     //samples the median rejected (> 100 counts from it), diagnostic
 static int32_t ia, ib, ic;         //mA, this period
 static int32_t intD, intQ;         //integrators, uV
+static int32_t fwId;               //field weakening d current, mA (<= 0)
 
 volatile int32_t focIdRef;
 volatile int16_t focId, focIq;
@@ -92,6 +93,7 @@ void FocInit(void){
 
 void FocReset(void){
 	intD = intQ = 0;
+	fwId = 0;
 	focIqRef = 0;
 	focVCmd = 0;
 	FocSpeedReset();
@@ -191,12 +193,14 @@ void FocControl(void){
 
 	//references in the electrical frame: + q turns the angle up = negative realspeed
 	int32_t imax = IMAX();
-	int32_t idRef = focIdRef, iqRef;
+	int32_t idRef = focIdRef+fwId, iqRef;
 	if(idRef>imax) idRef = imax; else if(idRef<-imax) idRef = -imax;
+	int32_t iqmax = fwId ? MCM_Sqrt(imax*imax-idRef*idRef) : imax;    //the total current stays within the limit
 	if(focVoltMode){
-		iqRef = focVCmd>0 ? -imax : imax;    //the voltage limit below sets the voltage; this the current limit
+		iqRef = focVCmd>0 ? -iqmax : iqmax;    //the voltage limit below sets the voltage; this the current limit
 	}else{
 		iqRef = -focIqRef;
+		if(iqRef>iqmax) iqRef = iqmax; else if(iqRef<-iqmax) iqRef = -iqmax;
 	}
 	int32_t ed = idRef-id, eq = iqRef-iq;
 	if(ed>20000) ed = 20000; else if(ed<-20000) ed = -20000;
@@ -222,6 +226,19 @@ void FocControl(void){
 	int32_t vq = kp*eq/1000+intQ/1000+vff;
 	if(vq>qhi){ if(di>0) intQ -= di; vq = qhi; }
 	else if(vq<qlo){ if(di<0) intQ -= di; vq = qlo; }
+
+	//field weakening: while q runs into the voltage circle (not a voltage command's own limit), the d
+	//current goes negative at 2 mA per period (3 A in ~0.35 s) down to FW_IMAX, and back while q has
+	//10 % of the circle left. The negative d current lowers the voltage the back emf needs on q.
+	int32_t fwmax = cfgOrDefault(FW_IMAX, 0)*100;
+	if(fwmax>imax*7/10) fwmax = imax*7/10;    //keep >= 70 % of the current limit for q (torque)
+	if(fwmax){
+		if((vq>=vqmax||vq<=-vqmax)&&fwId>-fwmax) fwId -= 2;
+		else if(vq<vqmax*9/10&&vq>-vqmax*9/10&&fwId<0) fwId += 2;
+		if(fwId<-fwmax) fwId = -fwmax;
+	}else{
+		fwId = 0;
+	}
 
 	if(focTraceN==0xFF){
 		int32_t a = iqRef-lastIqRef, b = idRef-lastIdRef;

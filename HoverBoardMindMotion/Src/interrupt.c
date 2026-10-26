@@ -89,11 +89,15 @@ void ADC1_COMP_IRQHandler(void){
 			if(COMMUTATION(DRIVEMODE)==COMMUT_SINE){
 				//torque direction from the sign (the angle follows the rotor, not the command);
 				//negated so a positive command gives positive speed. +-32000: linear svpwm range
-				int32_t q = -pwm;
-				if(q>32000) q=32000; else if(q<-32000) q=-32000;
+				int32_t q = -pwm, adv = 0;
+				//field weakening: a command beyond the linear range (32000, SINE_VOLT 800..1000 permille)
+				//becomes phase advance in the direction of motion, up to FW_ADVANCE degrees at 40000
+				int32_t fw = cfgOrDefault(FW_ADVANCE, 0);
+				if(q>32000){ adv = fw ? (q-32000)*fw*182/8000 : 0; q = 32000; if(adv>fw*182) adv = fw*182; }
+				else if(q<-32000){ adv = fw ? (q+32000)*fw*182/8000 : 0; q = -32000; if(adv<-fw*182) adv = -fw*182; }
 				ipark1.Ds = 0;
 				ipark1.Qs = q;
-				ipark1.Theta = HALL1.Angle;
+				ipark1.Theta = (int16_t)(HALL1.Angle+adv);    //182 = 65536/360
 				IPARK_MACRO1(&ipark1);
 				pwm_gen.Mode = SEVENMODE;
 				pwm_gen.Alpha = ipark1.Alpha;
