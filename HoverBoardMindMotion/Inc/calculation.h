@@ -11,5 +11,7 @@ void avgItotal();
 void avgvbat();
 uint32_t updateMotorRPM(uint32_t halltime);
 void PIDrst();
+int SpeedCtrl(int sp, int meas);
+void SpeedCtrlReset(void);
 
 #endif

@@ -146,14 +146,16 @@ void speedupdate(){
 		if(gatesoff){
 			pwm=0;
 			PIDrst();    //no wind-up while the gates are off
+			SpeedCtrlReset();
 		}else{
 			if(DRIVEMODE==COM_VOLT){
 				pwm=speed*PWM_RES/1000;//1000~-1000 for all pwm resolution
 			}else if(DRIVEMODE==COM_SPEED){	
-				pwm= PID2PWM((PID(speed,realspeed)/50));// command the required RPM
-				if(speed==0){
+				if(speed==0){    //coast
 					pwm=0;
-					PIDrst();
+					SpeedCtrlReset();
+				}else{
+					pwm=SpeedCtrl(speed,realspeed);    //speed in rpm
 				}
 			}else if(DRIVEMODE==SINE_VOLT){	
 				pwm= speed*40;// IQ=30000~-30000

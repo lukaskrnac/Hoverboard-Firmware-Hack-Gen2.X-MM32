@@ -42,6 +42,10 @@ FIELDS = {
     44: ("drivemode", "num", "0 COM_VOLT, 1 COM_SPEED, 2 SINE_VOLT, 3 SINE_SPEED"),
     45: ("batfull", "num", "mV"), 46: ("batempty", "num", "mV, <= 20000 disables the low battery cut-off"),
     47: ("timeout", "num", "ms without a command until speed = 0"),
+    48: ("speedkp", "num", "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"),
+    49: ("speedki", "num", "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"),
+    50: ("speedkv", "num", "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 389"),
+    51: ("speedd0", "num", "COM_SPEED feed forward: dead band permille duty, 0 = default 185"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}
 
