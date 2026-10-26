@@ -289,14 +289,14 @@ u32 RCC_GetSysClockFreq(void)
         case RCC_CFGR_SWS_HSE:
             result = HSE_VALUE;
             break;
-/*
-        case RCC_CFGR_SWS_HSI:
-            return (RCC->CR & RCC_CR_HSI_72M) ? HSI_72MHz : HSI_48MHz;
 
-        default:
+        case RCC_CFGR_SWS_HSI:    //system_mm32spin05.c selects this with RCC_CR_HSI_72M set: 72 MHz
+            result = (RCC->CR & RCC_CR_HSI_72M) ? HSI_72MHz : HSI_48MHz;
+            break;
+
+        default:                  //RCC_CFGR_SWS_HSI_DIV6, the reset state
             result = (RCC->CR & RCC_CR_HSI_72M) ? HSI_72MHz_DIV6 : HSI_48MHz_DIV6;
             break;
-				*/
     }
     return result;
 }

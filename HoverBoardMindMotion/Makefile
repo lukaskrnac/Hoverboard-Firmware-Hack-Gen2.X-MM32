@@ -20,8 +20,9 @@ SRC := $(wildcard Src/*.c) \
 INC := -IInc -ILibrary/MM32SPIN05/HAL_Lib/Inc -IDevice/MM32SPIN0x/Include -IDevice/CMSIS/Include
 
 ARCH    := -mcpu=cortex-m0 -mthumb
+# -fno-strict-aliasing: the vendor HAL type-puns peripheral pointers (*(u32*)&gpio)
 CFLAGS  := $(ARCH) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common \
-           -Wall $(INC)
+           -fno-strict-aliasing -Wall $(INC)
 LDFLAGS := $(ARCH) -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs -Wl,--gc-sections \
            -Wl,-Map=$(TARGET).map -Wl,--print-memory-usage
 

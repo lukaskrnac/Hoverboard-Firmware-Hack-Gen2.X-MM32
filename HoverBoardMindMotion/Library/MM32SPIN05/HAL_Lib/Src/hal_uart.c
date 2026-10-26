@@ -85,8 +85,7 @@ void UART_Init(UART_TypeDef* uart, UART_InitTypeDef* init_struct)
     }
     else {
         apbclock = RCC_GetPCLK1Freq();
-    }				
-		apbclock =72000000;//temp fix by AILIFE because RCC_GetPCLK1Freq() always report 8M
+    }
     // Determine the UART_baud
     uart->BRR = (apbclock / init_struct->BaudRate) / 16;
     uart->FRA = (apbclock / init_struct->BaudRate) % 16;
