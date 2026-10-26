@@ -40,6 +40,13 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
       `main` deploys GitLab Pages). Try the console once in Firefox (WebSerial add-on, over http).
 
+- [ ] CANSimple input modes: only PASSTHROUGH. VEL_RAMP (ramp rate), POS_FILTER (bandwidth) and
+      TRAP_TRAJ (velocity/acceleration limits) like ODrive, with their parameters in config words
+      27-31. Position resolution is one hall step (1/90 turn): interpolate with the sine/FOC angle.
+- [ ] Flash: 25.9 of 30 KB used (soft float in the CANSimple parser ~5 KB). Check before adding more.
+- [ ] Bus line above 230400 baud: the open-drain TX needs a stronger pull-up (or push-pull for a
+      single board: config option).
+
 ## Later
 
 - [ ] Speed measurement averages the last 6 hall intervals: it lags during the first electrical turn

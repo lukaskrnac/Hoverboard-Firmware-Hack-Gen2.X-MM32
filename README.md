@@ -44,6 +44,15 @@ protected) chip must be unlocked with a full chip erase first, see the installat
   `#define WATCHDOG` in `Inc/pinout.h`.
 
 ## Control methods
+Two protocols on the same UART (one baud, config field `baud` in units of 100: 1152 = 115200):
+
+- **CANSimple over UART** (firmware 2.0): ODrive's CANSimple messages and units (turns, turns/s, Nm, A,
+  V; float32) in a CRC-protected UART frame, polled per board. It covers set points per control mode,
+  encoder/bus/I_q/torque/power feedback, heartbeat with ODrive error bits, Estop/Clear_Errors, and every
+  configuration word and runtime value as a parameter (RxSdo/TxSdo, ids in `tools/endpoints.json`).
+  Host libraries: `tools/cansimple_uart.py` (Python) and the web console's `protocol.js`.
+- **v1 frames** (start `/`): the original Gen2.x RemoteUartBus, unchanged.
+
 The boards are controlled over the RemoteUartBus protocol, see
 [PROTOCOL.md](https://gitlab.com/ailife8881/remoteuartbus-online/-/blob/main/PROTOCOL.md). The
 [RemoteUartBus web console](https://gitlab.com/ailife8881/remoteuartbus-online) drives and monitors
