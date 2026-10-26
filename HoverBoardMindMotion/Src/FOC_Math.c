@@ -1,9 +1,5 @@
 /*-------------------- Includes -----------------------*/
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#include "../Inc/mcu.h"
 #include "../Inc/FOC_Math.h"
 
 /*--------------------Private macro ------------------*/
@@ -123,7 +119,6 @@ int32_t MCM_Sqrt(int32_t wInput)
   uint8_t biter = 0u;
   int32_t wtemproot;
   int32_t wtemprootnew;
-	int32_t divtemp;
 
   if (wInput > 0)
   {

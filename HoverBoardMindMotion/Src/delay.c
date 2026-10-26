@@ -1,10 +1,9 @@
 
 #include "../Inc/delay.h"
+#include "../Inc/main.h"
 #include "hal_rcc.h"
 
-extern u32 SystemCoreClock;
 static __IO u32 sTimingDelay;
-extern uint32_t millis;
 
 
 void DELAY_Init(void)

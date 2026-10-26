@@ -1,8 +1,6 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#include "../Inc/mcu.h"
+#include "../Inc/main.h"
+#include "../Inc/interrupt.h"
 #include "hal_gpio.h"
 #include "../Inc/pinout.h"
 #include "../Inc/remoteUartBus.h"
@@ -13,22 +11,12 @@
 #include "math.h"
 #include "../Inc/hallhandle.h"
 
-extern uint8_t step;
-extern int speed;
-extern int pwm;
 uint16_t abspwm;
-extern int8_t dir;
-extern int realspeed;
-extern int frealspeed;
-extern int itotal;
-extern uint32_t millis;
 uint32_t lastcommutate;
 uint32_t lasttestrotate;
 int testrotatedir=1;
 uint8_t hallpos(uint8_t dir);
 bool lastdir=0;
-extern uint8_t poweron;
-extern int vbat;
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 

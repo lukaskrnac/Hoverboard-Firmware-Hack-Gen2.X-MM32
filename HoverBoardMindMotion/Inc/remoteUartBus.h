@@ -1,8 +1,10 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#ifndef REMOTEUARTBUS_H
+#define REMOTEUARTBUS_H
+
+#include "mcu.h"
 
 void AnswerMaster(void);
 void RemoteUpdate(void);
+void serialit(void);    //uart rx dma interrupt, one byte in sRxBuffer[0]
+
+#endif

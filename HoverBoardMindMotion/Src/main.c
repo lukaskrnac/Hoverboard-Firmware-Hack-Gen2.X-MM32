@@ -1,9 +1,6 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#include "spin25-redefine.h" 
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#include "../Inc/mcu.h"
+#include "../Inc/main.h"
+#include "../Inc/interrupt.h"
 #include "hal_gpio.h"
 #include "hal_rcc.h"
 #include "hal_adc.h"           
@@ -26,16 +23,11 @@
 
 uint8_t step=1;//very importatnt to set to 1 or it will not work
 uint32_t millis;
-uint32_t lastCommutation;
-uint32_t lastupdate;
-uint32_t lastflicker;
-uint32_t iOdom;
-bool uart;
-bool adc;
-bool comm=1;
+static uint32_t lastupdate;
+static uint32_t lastflicker;
+int32_t iOdom;
 int8_t dir=1;
-uint8_t uartBuffer=0;
-u8 sRxBuffer[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t sRxBuffer[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int vbat;
 int itotal;
 int fvbat;
@@ -46,12 +38,9 @@ int pwm=0;
 int realspeed=0;
 int frealspeed=0;
 uint8_t  wState;
-extern u32 SystemCoreClock;
-uint8_t flicker=0;
+static uint8_t flicker=0;
 uint8_t uarten=1;
 uint8_t halltimen=1;
-extern uint8_t lowbatcount;
-extern uint8_t lowbatperm;
 ////////////////////////////////////////////////////////////////////////////////////////////
 //  compile device specefic firmware for mass produce
 //  change EEPROMEN to 0

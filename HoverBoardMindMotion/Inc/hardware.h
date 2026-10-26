@@ -1,15 +1,10 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#include "spin25-redefine.h"
-#else
-#include "mm32_device.h"                // Device header
-#endif
-#include "hal_conf.h"
-#include "hal_gpio.h" 
-#include "hal_adc.h" 
+#ifndef HARDWARE_H
+#define HARDWARE_H
 
-#ifndef _HARDWARE_H
-#define _HARDWARE_H    //keil bug workaround typedef redefinition with different types
+#include "mcu.h"
+#include "hal_conf.h"
+#include "hal_gpio.h"
+#include "hal_adc.h"
 
 
 
@@ -104,6 +99,13 @@ typedef struct{
   uint16_t af;
 }MM32TIMBK;
 
+
+//pin capability tables for the selected MCU, hardware.c
+extern const MM32GPIO pins[PINCOUNT];
+extern const MM32ADC adcs[ADCCOUNT];
+extern const MM32TIM23 halltims[TIMCOUNT];
+extern const MM32UART uarts[UARTCOUNT];
+extern const MM32TIMBK ocps[TIMBKCOUNT];
 
 void pinMode(uint8_t io,uint8_t state);
 uint8_t digitalRead(uint8_t io);

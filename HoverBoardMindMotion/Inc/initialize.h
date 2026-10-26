@@ -1,8 +1,7 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#ifndef INITIALIZE_H
+#define INITIALIZE_H
+
+#include "mcu.h"
 
 void io_init();
 void TIM1_init(u16 arr, u16 psc);
@@ -15,3 +14,5 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc);
 void HALL_Init(void);
 void Iwdg_Init(u16 IWDG_Prescaler, u16 Reload);
 uint8_t UART_GPIO_Init();
+
+#endif

@@ -12,11 +12,6 @@
 #include "HAL_device.h"
 #endif
 
-extern MM32GPIO pins[PINCOUNT];
-extern MM32UART uarts[UARTCOUNT];
-extern MM32ADC adcs[ADCCOUNT];
-extern MM32TIM23 halltims[TIMCOUNT];
-extern MM32TIMBK ocps[TIMBKCOUNT];
 
 //normal io
 void io_init(){

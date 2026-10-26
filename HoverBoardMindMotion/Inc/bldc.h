@@ -1,15 +1,18 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#ifndef BLDC_H
+#define BLDC_H
+
+#include "mcu.h"
 
 void commutate();
 uint8_t hallpos(uint8_t dir);
 void speedupdate();
-void serialit(void);
 void TIMOCInit();
 
+extern uint16_t abspwm;
+extern uint32_t lastcommutate;
+extern uint8_t lowbatcount;
+extern uint8_t lowbatperm;
+extern const uint8_t hall_to_pos[8];
 
 enum{
 	COM_VOLT=0,
@@ -21,11 +24,4 @@ enum{
 	FOC_TORQUE=6,
 };
 
-
-
-
-
-
-
-
-
+#endif

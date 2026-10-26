@@ -8,9 +8,11 @@
 
 
 
+#ifndef PINOUT_H
+#define PINOUT_H
+
 #include "../Inc/hardware.h"
-extern MM32GPIO pins[PINCOUNT];
-extern uint16_t pinstorage[64];
+extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EEPROM (main.c)
 	
 
 #define HALLAPIN pinstorage[0]
@@ -55,9 +57,4 @@ extern uint16_t pinstorage[64];
 
 //#define WATCHDOG
 
-
-
-
-
-
-
+#endif

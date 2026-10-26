@@ -1,7 +1,8 @@
 #include "hal_uart.h"
 #include "../Inc//pinout.h"
+#include "../Inc/uart.h"
+#include "../Inc/main.h"
 
-extern uint8_t uarten;
 
 void UART_Send_Byte(u8 dat){
     UART_SendData(uarten==1 ? UART1 : UART2, dat);

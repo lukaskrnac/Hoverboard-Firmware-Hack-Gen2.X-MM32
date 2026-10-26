@@ -1,8 +1,5 @@
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#include "../Inc/mcu.h"
+#include "../Inc/main.h"
 #include "../Inc/calculation.h"   
 #include "../Inc/pinout.h"   
 #include "../Inc/bldc.h"   
@@ -19,18 +16,12 @@ int prevpwm=0;
 uint8_t sindex;
 int datasum;
 int avgarr[32];
-extern int realspeed;
-extern int frealspeed;
 uint8_t vindex;
 int vdatasum;
 int vavgarr[32];
-extern int vbat;
-extern int fvbat;
 uint8_t aindex;
 int adatasum;
 int aavgarr[64];
-extern int itotal;
-extern int fitotal;
 
 void PID_Init(){
 	switch(DRIVEMODE){

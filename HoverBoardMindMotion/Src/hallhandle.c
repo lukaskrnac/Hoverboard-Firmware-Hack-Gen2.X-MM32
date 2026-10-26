@@ -1,24 +1,13 @@
 /*-------------------- Includes -----------------------*/
 #include "../Inc/hallhandle.h"
+#include "../Inc/main.h"
+#include "../Inc/interrupt.h"
 #include "../Inc/bldc.h"
-#ifdef TARGET_MM32SPIN25
-#include "HAL_device.h"                 // Device header
-#else
-#include "mm32_device.h"                // Device header
-#endif
+#include "../Inc/mcu.h"
 
 /*------------------- Private variables ---------------*/
 HALLType HALL1;
 int16_t CWShift = 0;
-extern uint8_t dir;
-extern int realspeed;
-extern uint8_t realdir;
-extern uint8_t hall_to_pos[8];
-extern uint8_t halltimen;
-extern uint8_t step;
-extern uint32_t lastcommutate;
-extern uint32_t millis;
-extern int32_t iOdom;
 /*------------------ Private functions ----------------*/
 void HALLModuleInit(HALLType *u);
 void HALLModuleCalc(HALLType *u);

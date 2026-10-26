@@ -16,6 +16,7 @@
 #endif         
 #include "math.h" 
 #include "../Inc/pinout.h"
+#include "../Inc/main.h"
 #include "../Inc/bldc.h"
 #include "../Inc/uart.h"
 #include "stdio.h"
@@ -29,20 +30,11 @@
 
 #pragma pack(1)
 
-extern uint32_t millis;
-extern uint8_t sRxBuffer[10];
 
 uint8_t bAnswerMaster = 0;
 static int16_t iReceivePos = 0;	
 
-extern int pwm;
-extern int32_t speed;
-extern uint8_t  wState;
 
-extern int32_t iOdom;
-extern int fvbat; 							// global variable for battery voltage
-extern int fitotal; 									// global variable for current dc
-extern int realspeed; 									// global variable for real Speed
 
 typedef struct {			// �#pragma pack(1)� needed to get correct sizeof()
    uint8_t cStart;			//  = '/';
@@ -140,7 +132,6 @@ void RemoteUpdate(void){
 	}
 }
 
-extern 	uint32_t steerCounter;
 
 uint32_t iAnswerMaster = 0;
 
@@ -164,7 +155,6 @@ void AnswerMaster(void){
 
 }
 
-extern uint32_t steerCounter;								// Steer counter for setting update rate
 
 uint8_t iRxDataType;
 uint8_t iRxDataSize;

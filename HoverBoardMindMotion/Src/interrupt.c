@@ -3,6 +3,9 @@
 #include "hal_adc.h"
 #include "stdio.h"
 #include "../Inc/pinout.h"
+#include "../Inc/interrupt.h"
+#include "../Inc/main.h"
+#include "../Inc/hardware.h"
 #include "../Inc/bldc.h"
 #include "../Inc/remoteUartBus.h"
 #include "../Inc/calculation.h"
@@ -15,31 +18,14 @@
 #include "../Inc/pwm_gen.h"
 #include "../Inc/hallhandle.h"
 
-extern uint8_t step;
-extern bool uart;
-extern bool adc;
-extern bool comm;
-extern int8_t dir;
-extern double rpm;
-extern uint32_t lastcommutate;
-extern uint32_t millis;
-extern int vbat;
-extern int itotal;
-extern int realspeed;
-extern int frealspeed;
-extern uint8_t hallposprev;
-extern int32_t iOdom;
 uint32_t itotaloffset=0;
 uint8_t poweron=0;
 int iphasea;
 int iphaseb;
 uint32_t iphaseaoffset=0;
 uint32_t iphaseboffset=0;
-extern MM32ADC adcs[10];
 uint16_t vrefint;    //last internal 1.2V reference conversion
 uint8_t realdir=0;
-extern uint8_t hall_to_pos[8];
-extern uint16_t abspwm;
 
 int16_t	TestAngle = 0;
 
