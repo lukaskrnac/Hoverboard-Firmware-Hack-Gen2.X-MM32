@@ -8,6 +8,31 @@
 Check [here](https://github.com/RoboDurden/Hoverboard-Firmware-Hack-Gen2.x/wiki/MM32SPIN05PF%E2%80%90Layout-2.8) for step by step toturial on how to install this firmware on your board
 
 please also check the autodetect&configuration section
+## Building from source (GCC)
+The firmware builds with the open source Arm GNU toolchain, no Keil or vendor pack needed.
+```bash
+cd HoverBoardMindMotion
+make                                   # build/hoverboard.bin, .hex, .elf
+make CROSS=/path/to/bin/arm-none-eabi- # toolchain not on PATH
+```
+Needs `arm-none-eabi-gcc` (tested with 14.2.Rel1) and `make`. The device headers (MindMotion
+register headers, CMSIS) are in `HoverBoardMindMotion/Device/`.
+
+Supported by the GCC build: **MM32SPIN05** (tested on hardware). MM32SPIN06 uses the same
+library and may work but is untested. MM32SPIN25 is not ported yet, see
+`HoverBoardMindMotion/Device/MM32SPIN2x/Source/README.md`.
+
+## Flashing over SWD
+```bash
+pip install pyocd
+cd HoverBoardMindMotion
+make flash                             # = python3 ../tools/mm32flash.py build/hoverboard.bin
+```
+Works with any probe pyOCD supports (ST-Link, DAPLink, J-Link). The board configuration in the
+last 2 KB of flash (written by PinFinder or the RemoteUartBus config command) is kept; the new
+firmware is started without a reset so a self-holding board stays powered. A locked (read
+protected) chip must be unlocked with a full chip erase first, see the installation guide.
+
 ## Control methods
 you must use a ESP32 to control the hacked hoverboard
 

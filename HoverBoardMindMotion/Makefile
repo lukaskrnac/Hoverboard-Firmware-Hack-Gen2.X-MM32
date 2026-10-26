@@ -1,6 +1,7 @@
 # GCC build for the MM32SPIN05 hoverboard firmware.
 #   make                  build build/hoverboard.{elf,bin,hex}
 #   make CROSS=/path/to/arm-none-eabi-    use a toolchain that is not on PATH
+#   make flash            flash over SWD with pyOCD (../tools/mm32flash.py, keeps the board config)
 #   make clean
 
 CROSS   ?= arm-none-eabi-
@@ -45,8 +46,12 @@ $(TARGET).bin: $(TARGET).elf
 $(TARGET).hex: $(TARGET).elf
 	$(OBJCOPY) -O ihex $< $@
 
+PYTHON ?= python3
+flash: $(TARGET).bin
+	$(PYTHON) ../tools/mm32flash.py $<
+
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all clean
+.PHONY: all clean flash
 -include $(DEP)

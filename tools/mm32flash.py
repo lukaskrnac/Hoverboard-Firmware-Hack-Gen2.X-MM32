@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Flash MM32SPIN05/06 firmware over SWD with pyOCD (any probe pyOCD supports; no vendor tools).
+
+    python3 tools/mm32flash.py HoverBoardMindMotion/build/hoverboard.bin
+    python3 tools/mm32flash.py image.bin --backup before.bin       # dump all 32 KB first
+    python3 tools/mm32flash.py image.bin --erase-config            # also wipe the board config
+    python3 tools/mm32flash.py image.bin --start reset             # system reset instead of soft start
+
+pyOCD has no MM32 flash algorithm, so this erases pages through the FLASH registers and programs
+with a 26-byte RAM routine (the CPU does the halfword stores; ST-Link 16-bit debug writes program
+every odd halfword as 0 on this chip).
+
+The last 2 KB (0x08007800) hold the board configuration written by PinFinder / the RemoteUartBus
+config command. They are kept unless --erase-config is given.
+
+--start soft (default) starts the new firmware without a system reset: a reset floats every GPIO,
+which releases the power self-hold latch and switches the board off. Instead the APB peripherals
+are reset (GPIO is on AHB and keeps the latch), interrupts are silenced, any active exception is
+left through an exception return, and the core jumps to the reset vector.
+"""
+import argparse
+import struct
+import time
+
+from pyocd.core.helpers import ConnectHelper
+
+FLASH_REG = 0x40022000
+FLASH_BASE, FLASH_SIZE, PAGE = 0x08000000, 0x8000, 0x400
+CONFIG = 0x08007800
+RCC = 0x40021000
+
+# r0 = dst, r1 = src, r2 = halfword count, r3 = FLASH_REG:
+#   loop: ldrh r4,[r1]; strh r4,[r0]; wait: ldr r5,[r3,#12]; movs r6,#1; tst r5,r6; bne wait
+#         adds r0,#2; adds r1,#2; subs r2,#1; bne loop; bkpt
+PROGRAM_STUB = struct.pack("<13H", 0x880C, 0x8004, 0x68DD, 0x2601, 0x4235, 0xD1FB,
+                           0x3002, 0x3102, 0x3A01, 0xD1F5, 0xBE00, 0xBF00, 0xBF00)
+STUB_AT, BUF_AT, CHUNK, STACK_AT = 0x20000100, 0x20000400, 0x800, 0x20000FF0
+
+
+class Mm32:
+    def __init__(self, target):
+        self.t = target
+
+    def r(self, a):
+        return self.t.read32(a)
+
+    def w(self, a, v):
+        self.t.write32(a, v)
+
+    def unlock(self):
+        if self.r(FLASH_REG + 0x10) & 0x80:
+            self.w(FLASH_REG + 0x04, 0x45670123)
+            self.w(FLASH_REG + 0x04, 0xCDEF89AB)
+        if self.r(FLASH_REG + 0x10) & 0x80:
+            raise RuntimeError("flash is still locked")
+        self.w(FLASH_REG + 0x0C, 0x34)                      # clear EOP, WRPRTERR, PGERR
+
+    def wait(self):
+        while self.r(FLASH_REG + 0x0C) & 1:
+            pass
+        sr = self.r(FLASH_REG + 0x0C)
+        if sr & 0x14:
+            raise RuntimeError("flash error, SR=%08x" % sr)
+
+    def erase(self, start, end):
+        self.unlock()
+        for a in range(start, end, PAGE):
+            self.w(FLASH_REG + 0x10, 0x2)                   # PER
+            self.w(FLASH_REG + 0x14, a)
+            self.w(FLASH_REG + 0x10, 0x42)                  # PER | STRT
+            self.wait()
+        self.w(FLASH_REG + 0x10, 0x80)                      # LOCK
+
+    def run(self, regs, timeout=3.0):
+        for reg, val in regs:
+            self.t.write_core_register(reg, val)
+        self.t.resume()
+        t0 = time.time()
+        while self.t.get_state().name != "HALTED":
+            if time.time() - t0 > timeout:
+                self.t.halt()
+                raise RuntimeError("RAM routine did not finish")
+
+    def program(self, image):
+        self.t.write_memory_block8(STUB_AT, list(PROGRAM_STUB))
+        for off in range(0, len(image), CHUNK):
+            chunk = image[off:off + CHUNK]
+            if chunk == b"\xff" * len(chunk):
+                continue
+            self.t.write_memory_block8(BUF_AT, list(chunk))
+            self.unlock()
+            self.w(FLASH_REG + 0x10, 0x1)                   # PG
+            self.run((("r0", FLASH_BASE + off), ("r1", BUF_AT), ("r2", len(chunk) // 2),
+                      ("r3", FLASH_REG), ("sp", STACK_AT), ("pc", STUB_AT),
+                      ("xpsr", 0x01000000), ("primask", 1)))
+            if self.t.read_core_register("r2") != 0:
+                raise RuntimeError("programming stopped at +0x%x" % off)
+            self.w(FLASH_REG + 0x10, 0x80)
+
+    def soft_start(self):
+        for off in (0x0C, 0x10):                            # APB2RSTR, APB1RSTR
+            self.w(RCC + off, 0xFFFFFFFF)
+            self.w(RCC + off, 0)
+        self.w(0xE000E010, 0)                               # SysTick off
+        self.w(0xE000E180, 0xFFFFFFFF)                      # NVIC ICER
+        self.w(0xE000E280, 0xFFFFFFFF)                      # NVIC ICPR
+        self.w(0xE000ED04, (1 << 25) | (1 << 27))           # ICSR: clear pending SysTick / PendSV
+        # writing PC does not leave handler mode: return from each active exception through a
+        # fake frame whose return address is a bkpt
+        ret_at, frame_at = 0x20000E00, 0x20000F00
+        self.t.write_memory_block8(ret_at, [0x70, 0x47, 0x00, 0xBE])      # bx lr ; bkpt
+        for _ in range(8):
+            if self.t.read_core_register("xpsr") & 0x3F == 0:
+                break
+            self.t.write_memory_block8(frame_at, list(struct.pack("<8I", 0, 0, 0, 0, 0, 0, ret_at + 2, 0x01000000)))
+            self.run((("msp", frame_at), ("sp", frame_at), ("lr", 0xFFFFFFF9), ("pc", ret_at), ("primask", 0)), 1.0)
+        if self.t.read_core_register("xpsr") & 0x3F:
+            raise RuntimeError("could not leave handler mode")
+        sp, pc = self.r(FLASH_BASE), self.r(FLASH_BASE + 4)
+        for reg, val in (("msp", sp), ("sp", sp), ("pc", pc & ~1), ("xpsr", 0x01000000),
+                         ("primask", 0), ("control", 0)):
+            self.t.write_core_register(reg, val)
+        self.t.resume()
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("image", help="raw binary for 0x08000000")
+    ap.add_argument("--erase-config", action="store_true", help="also erase the 2 KB board configuration")
+    ap.add_argument("--backup", metavar="FILE", help="save the whole 32 KB flash before writing")
+    ap.add_argument("--start", choices=("soft", "reset", "none"), default="soft",
+                    help="how to start the new firmware (default: soft, keeps the board powered)")
+    ap.add_argument("--frequency", type=int, default=1000000, help="SWD clock in Hz")
+    a = ap.parse_args()
+
+    image = open(a.image, "rb").read()
+    image += b"\xff" * (len(image) & 1)
+    if FLASH_BASE + len(image) > CONFIG:
+        raise SystemExit("image is %d bytes and would overwrite the config pages at 0x%08x" % (len(image), CONFIG))
+
+    session = ConnectHelper.session_with_chosen_probe(
+        target_override="cortex_m", frequency=a.frequency,
+        options={"connect_mode": "attach", "resume_on_disconnect": True})
+    session.open()
+    mcu = Mm32(session.target)
+    try:
+        mcu.t.halt()
+        if a.backup:
+            open(a.backup, "wb").write(bytes(mcu.t.read_memory_block8(FLASH_BASE, FLASH_SIZE)))
+            print("backup:", a.backup)
+        # always erase the whole application area, so no code of an older, bigger image survives
+        end = FLASH_BASE + FLASH_SIZE if a.erase_config else CONFIG
+        mcu.erase(FLASH_BASE, end)
+        mcu.program(image)
+        back = bytes(mcu.t.read_memory_block8(FLASH_BASE, len(image)))
+        bad = [i for i in range(len(image)) if back[i] != image[i]]
+        if bad:
+            raise SystemExit("verify FAILED at +0x%x (%d bytes differ)" % (bad[0], len(bad)))
+        print("programmed and verified %d bytes, erased 0x%08x-0x%08x%s" %
+              (len(image), FLASH_BASE, end, " (config erased)" if a.erase_config else ""))
+        if a.start == "soft":
+            mcu.soft_start()
+            print("started (soft start, board stays powered)")
+        elif a.start == "reset":
+            print("reset: the board powers off if it is held on by its self-hold latch")
+            try:
+                mcu.t.reset()
+            except Exception:
+                pass
+    finally:
+        try:
+            session.close()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    main()
