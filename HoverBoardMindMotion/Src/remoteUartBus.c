@@ -141,6 +141,10 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 	bConfigSave = 1;
 }
 
+uint8_t RemoteTimedOut(void){
+	return millis - iTimeLastRx > SERIAL_TIMEOUT;
+}
+
 void RemoteUpdate(void){
 
 	if (millis - iTimeLastRx > SERIAL_TIMEOUT){

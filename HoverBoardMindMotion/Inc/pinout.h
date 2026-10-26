@@ -32,6 +32,12 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define RXPIN pinstorage[15]
 #define IPHASEAPIN pinstorage[16]
 #define IPHASEBPIN pinstorage[17]
+//18-22 are unused pin slots, used for numbers; 0 or 65535 (an unset pin slot) = default / off
+#define POS_KP pinstorage[18]      //position: 0.1 rpm per hall step of error, default 20
+#define POS_RPM pinstorage[19]     //position: max speed, rpm, default 100
+#define MOTOR_R pinstorage[20]     //phase resistance incl. the mosfets, mOhm, default 300 (sine torque)
+#define FW_IMAX pinstorage[21]     //FOC field weakening: max negative d current, 0.1 A; default off
+#define FW_ADVANCE pinstorage[22]  //sine field weakening: max phase advance, degrees electrical; default off
 #define OCPPIN pinstorage[23]
 #define OCPREFPIN pinstorage[24]
 
@@ -72,6 +78,8 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 //SINE_SPEED 3); main.c migrates older layouts after loading
 #define CFG_VERSION pinstorage[63]
 #define CFG_VERSION_CURRENT 1
+
+static inline int32_t cfgOrDefault(uint16_t v, int32_t def){ return (v==0||v==0xFFFF) ? def : v; }
 
 #define MAGICNUM_POS 32
 #define MAGIC_NUMBER 0xDCAB

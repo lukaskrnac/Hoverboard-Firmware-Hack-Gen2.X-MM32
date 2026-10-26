@@ -18,6 +18,16 @@ volatile uint8_t gatesoff=0;
 volatile uint8_t coastreq=0;
 volatile uint8_t blockbrake=0;    //block commutation: low side short brake active, the hall isr does not commutate
 static uint16_t brakeduty;        //permille of the period the low sides are on while braking
+static int32_t posHold;           //position mode: target kept while the remote is silent
+static uint8_t posHeld;
+
+//position mode: hall step error -> speed set point (P, limited)
+static int32_t PositionSpeed(int32_t err){
+	int32_t vmax = cfgOrDefault(POS_RPM, 100);
+	int32_t v = err*cfgOrDefault(POS_KP, 20)/10;
+	if(v>vmax) v = vmax; else if(v<-vmax) v = -vmax;
+	return v;
+}
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
@@ -150,6 +160,19 @@ void speedupdate(void){
 		if(speed==0){
 			FocClearTrip();
 		}
+		//position: the command is the target odometer (hall steps, like the Gen2.x-GD32 iOdom input);
+		//without commands the wheel holds where it is instead of going back to target 0
+		int32_t posErr = 0, posSpeed = 0;
+		if(CONTROL(DRIVEMODE)==CTRL_POSITION){
+			if(RemoteTimedOut()){
+				if(!posHeld){ posHold = iOdom; posHeld = 1; }
+			}else{
+				posHold = speed;
+				posHeld = 0;
+			}
+			posErr = posHold-iOdom;
+			posSpeed = PositionSpeed(posErr);
+		}
 		if(gatesoff){
 			pwm=0;
 			SpeedCtrlReset();
@@ -163,6 +186,9 @@ void speedupdate(void){
 					break;
 				case CTRL_TORQUE:
 					FocSetCurrent((int32_t)speed*10);    //0.01 A
+					break;
+				case CTRL_POSITION:
+					FocSetCurrent(FocSpeedCtrl(posSpeed, fastspeed));
 					break;
 				default:
 					FocSetCurrent(FocSpeedCtrl(speed, fastspeed));
@@ -195,6 +221,17 @@ void speedupdate(void){
 						SpeedParams(DRIVEMODE, &p);
 						//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
 						pwm = SpeedCtrl(speed,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
+					}
+					break;
+				case CTRL_POSITION:    //holds at the target like the speed modes at 0 (short brake / zero vector)
+					if(posErr==0&&fastspeed==0){
+						pwm = 0;
+						brake = blk;
+						SpeedCtrlReset();
+					}else{
+						SpeedPlant p;
+						SpeedParams(blk ? COM_SPEED : SINE_SPEED, &p);
+						pwm = SpeedCtrl(posSpeed,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
 					}
 					break;
 				default:
@@ -280,9 +317,9 @@ static void TIMOCInit(void);
 
 uint8_t DriveModeSupported(uint8_t mode){
 	if(COMMUTATION(mode)==COMMUT_FOC){
-		return (mode==FOC_VOLT||mode==FOC_SPEED||mode==FOC_TORQUE)&&FocAvailable();
+		return mode<=FOC_POSITION&&FocAvailable();
 	}
-	return mode==COM_VOLT||mode==COM_SPEED||mode==SINE_VOLT||mode==SINE_SPEED;
+	return mode==COM_VOLT||mode==COM_SPEED||mode==COM_POSITION||mode==SINE_VOLT||mode==SINE_SPEED||mode==SINE_POSITION;
 }
 
 void SetDriveMode(uint8_t mode){

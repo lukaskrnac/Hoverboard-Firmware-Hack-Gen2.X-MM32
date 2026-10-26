@@ -14,6 +14,7 @@
 #define STATE_SHUTOFF        128    //not implemented
 
 void RemoteUpdate(void);
+uint8_t RemoteTimedOut(void);    //no command frame within SERIAL_TIMEOUT
 void serialit(void);    //uart rx dma interrupt, one byte in sRxBuffer[0]
 
 #endif
