@@ -11,10 +11,10 @@ void PARK_MACRO1(PARK_T *u1);
 
 
 /*************************************
-	Function Name£∫PARK_MACRO1
-	Description£∫This function transforms Ialpha°¢Ibeta to Id°¢Iq.
-	Input£∫*u1---PARK_T Structure
-	Output£∫none
+	Function NameÔºöPARK_MACRO1
+	DescriptionÔºöThis function transforms Ialpha„ÄÅIbeta to Id„ÄÅIq.
+	InputÔºö*u1---PARK_T Structure
+	OutputÔºönone
 **************************************/
 void PARK_MACRO1(PARK_T *u1)
 {

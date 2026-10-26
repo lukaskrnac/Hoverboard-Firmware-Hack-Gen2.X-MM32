@@ -14,10 +14,10 @@ void HALLModuleCalc(HALLType *u);
 
 
 /****************************************************************
-	Function Name��HALLModuleInit
-	Description��Initialize HALLModule Parameter
-	Input��none
-	Output��none
+	Function Name：HALLModuleInit
+	Description：Initialize HALLModule Parameter
+	Input：none
+	Output：none
 ****************************************************************/
 void HALLModuleInit(HALLType *u)
 {
@@ -52,10 +52,10 @@ void HALLModuleInit(HALLType *u)
 }
 
 /****************************************************************
-	Function Name��HALLModuleCalc
-	Description��Update the rotor electrical angle and motor speed
-	Input��HALL--Structure HALLType
-	Output��none
+	Function Name：HALLModuleCalc
+	Description：Update the rotor electrical angle and motor speed
+	Input：HALL--Structure HALLType
+	Output：none
 ****************************************************************/
 
 void HALLModuleCalc(HALLType *u){

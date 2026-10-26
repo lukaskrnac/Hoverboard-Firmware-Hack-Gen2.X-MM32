@@ -24,26 +24,26 @@ typedef struct
 
 typedef struct
 {
-	int16_t Dest;		//²Î¿¼Ä¿±êÁ¿
-	int16_t Act;		//Êµ¼ÊÊ¹ÓÃÁ¿
-	int16_t Max;		//×î´óÏŞÖÆÖµ
-	int16_t Min;		//×îĞ¡ÏŞÖÆÖµ
-	int16_t Inc;		//¼ÓËÙ²½¾à
-	int16_t Dec;		//¼ÓËÙ²½¾à
+	int16_t Dest;		//å‚è€ƒç›®æ ‡é‡
+	int16_t Act;		//å®é™…ä½¿ç”¨é‡
+	int16_t Max;		//æœ€å¤§é™åˆ¶å€¼
+	int16_t Min;		//æœ€å°é™åˆ¶å€¼
+	int16_t Inc;		//åŠ é€Ÿæ­¥è·
+	int16_t Dec;		//åŠ é€Ÿæ­¥è·
 }LoopCMP_T; 
 
 typedef struct
 {
-	uint16_t In;             //ÊäÈëÖµ
-	uint16_t MaxIn;          //×î´óÖµÓĞĞ§Öµ
-	uint16_t MinIn;          //×îĞ¡ÖµÓĞĞ§Öµ		
-	uint16_t MaxOut;         //¶ÔÓ¦ÔÊĞí×î´óÊä³öÖµ
-	uint16_t Out;            //Êä³öÖµ
-	uint8_t  OutEn;          //Êä³öÊ¹ÄÜ±êÖ¾
-	uint8_t  State;          //ÊäÈë×´Ì¬
-	float Kslope;       //¶ÔÓ¦Ğ±ÂÊ
+	uint16_t In;             //è¾“å…¥å€¼
+	uint16_t MaxIn;          //æœ€å¤§å€¼æœ‰æ•ˆå€¼
+	uint16_t MinIn;          //æœ€å°å€¼æœ‰æ•ˆå€¼		
+	uint16_t MaxOut;         //å¯¹åº”å…è®¸æœ€å¤§è¾“å‡ºå€¼
+	uint16_t Out;            //è¾“å‡ºå€¼
+	uint8_t  OutEn;          //è¾“å‡ºä½¿èƒ½æ ‡å¿—
+	uint8_t  State;          //è¾“å…¥çŠ¶æ€
+	float Kslope;       //å¯¹åº”æ–œç‡
 }
-NormalizationType; //²ÎÊı¹éÒ»»¯µÄÏà¹Ø±äÁ¿
+NormalizationType; //å‚æ•°å½’ä¸€åŒ–çš„ç›¸å…³å˜é‡
 
 extern NormalizationType RP;
 extern LoopCMP_T RPValue;

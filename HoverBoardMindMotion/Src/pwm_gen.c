@@ -12,10 +12,10 @@ void PWM_GEN_calc(PWM_GEN_T *u1);
 void Update_PWM(PWM_GEN_T *u1);
 
 /*************************************
-	Function Name£∫PWM_GEN_init
-	Description£∫It initializes SVPWM structure
-	Input£∫*u1 --- Structure PWM_GEN_T 
-	Output£∫none
+	Function NameÔºöPWM_GEN_init
+	DescriptionÔºöIt initializes SVPWM structure
+	InputÔºö*u1 --- Structure PWM_GEN_T 
+	OutputÔºönone
 **************************************/
 void PWM_GEN_init(PWM_GEN_T *u1)
 {
@@ -30,10 +30,10 @@ void PWM_GEN_init(PWM_GEN_T *u1)
 }
 
 /*************************************
-	Function Name£∫PWM_GEN_calc
-	Description£∫Computes duty cycle values 
-	Input£∫*u1 --- Structure PWM_GEN_T 
-	Output£∫none
+	Function NameÔºöPWM_GEN_calc
+	DescriptionÔºöComputes duty cycle values 
+	InputÔºö*u1 --- Structure PWM_GEN_T 
+	OutputÔºönone
 **************************************/
 void PWM_GEN_calc(PWM_GEN_T *u1)
 {
@@ -117,7 +117,7 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 	}
 
 	//Compute the change time
-	taon = (32768-t1on-t2on)>>1;		//(1-t1-t2)/2,Q15∏Ò Ω
+	taon = (32768-t1on-t2on)>>1;		//(1-t1-t2)/2,Q15Ê†ºÂºè
 	tbon = taon + t1on;							//taon+t1
 	tcon = tbon + t2on;							//tbon+t2
 		
@@ -269,10 +269,10 @@ void PWM_GEN_calc(PWM_GEN_T *u1)
 }
 
 /****************************************************************
-	Function Name£∫Update_PWM
-	Description£∫Update duty cycle values
+	Function NameÔºöUpdate_PWM
+	DescriptionÔºöUpdate duty cycle values
 	Input: *u1 --- Structure PWM_GEN_T
-	Output£∫none
+	OutputÔºönone
 ****************************************************************/
 void Update_PWM(PWM_GEN_T *u1)
 {

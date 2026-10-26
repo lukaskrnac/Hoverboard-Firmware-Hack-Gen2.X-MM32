@@ -7,8 +7,8 @@
 #include "mm32_device.h"                // Device header
 #endif
 
-#define DUTY_OUTMAX  2249    					//Õ¼¿Õ±ÈÊä³ö×î´óÖµ
-#define DUTY_OUTMIN  20             	//Õ¼¿Õ±ÈÊä³ö×îĞ¡Öµ
+#define DUTY_OUTMAX  2249    					//å ç©ºæ¯”è¾“å‡ºæœ€å¤§å€¼
+#define DUTY_OUTMIN  20             	//å ç©ºæ¯”è¾“å‡ºæœ€å°å€¼
 
 
 typedef struct {
@@ -26,7 +26,7 @@ extern tPIParm CurID;
 extern tPIParm CurIQ;
 extern tPIParm Speed;
 
-extern void InitPI(void); //PI³õÊ¼»¯³ÌĞò
-extern void CalcPI(tPIParm *pParm); //PIÔËËã³ÌĞò
+extern void InitPI(void); //PIåˆå§‹åŒ–ç¨‹åº
+extern void CalcPI(tPIParm *pParm); //PIè¿ç®—ç¨‹åº
 
 #endif

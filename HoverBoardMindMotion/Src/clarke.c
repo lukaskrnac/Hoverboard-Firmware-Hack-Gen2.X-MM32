@@ -20,12 +20,12 @@ CLARKE_T Emf_AB = CLARKE_DEFAULTS;
 void CLARKE_MACRO1(CLARKE_T *u1);
 
 /****************************************************************
-	Function Name£ºCLARKE_MACRO1
-	Description£ºThis function transforms stator currents qIas and 
+	Function Nameï¼šCLARKE_MACRO1
+	Descriptionï¼šThis function transforms stator currents qIas and 
 	qIbs into currents Ialpha and Ibeta in a stationary Alpha Beta
 	reference frame.
-	Input£º*u1---Structure CLARKE_T
-	Output£ºnone
+	Inputï¼š*u1---Structure CLARKE_T
+	Outputï¼šnone
 ****************************************************************/
 void CLARKE_MACRO1(CLARKE_T *u1)
 {

@@ -11,10 +11,10 @@ void IPARK_MACRO1(IPARK_T *u1);
 
 
 /*************************************
-	Function Name£∫IPARK_MACRO1
-	Description£∫This function transforms Vd°¢Vq to Valpha°¢Vbeta.
-	Input£∫*u1--- Structure PARK_T 
-	Output£∫none
+	Function NameÔºöIPARK_MACRO1
+	DescriptionÔºöThis function transforms Vd„ÄÅVq to Valpha„ÄÅVbeta.
+	InputÔºö*u1--- Structure PARK_T 
+	OutputÔºönone
 **************************************/
 void IPARK_MACRO1(IPARK_T *u1)											
 {			

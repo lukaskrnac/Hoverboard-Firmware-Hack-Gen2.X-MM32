@@ -2,15 +2,15 @@
 #include "../Inc/PID.h"
 
 /*------------------- Private variables ---------------*/
-tPIParm CurID;		//ID»·
-tPIParm CurIQ;		//IQ»·
+tPIParm CurID;		//IDçŽ¯
+tPIParm CurIQ;		//IQçŽ¯
 tPIParm Speed;
 
 /****************************************************************
-	Function Name£ºInitPI
-	Description£ºInitialize PID coefficients for torque, flux and speed loop.
-	Input£ºnone
-	Output£ºnone
+	Function Nameï¼šInitPI
+	Descriptionï¼šInitialize PID coefficients for torque, flux and speed loop.
+	Inputï¼šnone
+	Outputï¼šnone
 ****************************************************************/
 void InitPI(void)
 {
@@ -40,10 +40,10 @@ void InitPI(void)
 }
 
 /****************************************************************
-	Function Name£ºCalcPI1
-	Description£ºCompute the PI(D) output for a PI(D) regulation.
-	Input£ºpParm---PI Structure
-	Output£ºnone
+	Function Nameï¼šCalcPI1
+	Descriptionï¼šCompute the PI(D) output for a PI(D) regulation.
+	Inputï¼špParm---PI Structure
+	Outputï¼šnone
 ****************************************************************/
 void CalcPI(tPIParm *pParm)
 {

@@ -64,10 +64,10 @@ void InitNormalization(uint16_t Lowdata,uint16_t highdata,uint16_t maxout,Normal
 void CalcNormalization(uint16_t value,NormalizationType *u);
 
 /*************************************
-	Function Name£ºMCM_Trig_Functions
-	Description£ºSin Cos Chart
-	Input£ºhAngle---[-32768,32767]
-	Output£ºTrig_Components
+	Function Nameï¼šMCM_Trig_Functions
+	Descriptionï¼šSin Cos Chart
+	Inputï¼šhAngle---[-32768,32767]
+	Outputï¼šTrig_Components
 **************************************/
 Trig_Components MCM_Trig_Functions(int16_t hAngle)
 {
@@ -109,10 +109,10 @@ Trig_Components MCM_Trig_Functions(int16_t hAngle)
 }
 
 /*************************************
-	Function Name£ºMCM_Sqrt
-	Description£ºSquare root calculation
-	Input£ºwInput---Calculated value
-	Output£ºwtemprootnew---Square root
+	Function Nameï¼šMCM_Sqrt
+	Descriptionï¼šSquare root calculation
+	Inputï¼šwInput---Calculated value
+	Outputï¼šwtemprootnew---Square root
 **************************************/
 int32_t MCM_Sqrt(int32_t wInput)
 {
@@ -159,11 +159,11 @@ int32_t MCM_Sqrt(int32_t wInput)
 
 
 /*************************************
-	Function Name£ºarctan2
-	Description£ºArctangent2
-	Input£º		y1---cos
+	Function Nameï¼šarctan2
+	Descriptionï¼šArctangent2
+	Inputï¼š		y1---cos
 				x1---sin
-	Output£ºresult---arctan2
+	Outputï¼šresult---arctan2
 **************************************/
 int16_t arctan2(int16_t y1,int16_t x1)
 {
@@ -253,10 +253,10 @@ int16_t arctan2(int16_t y1,int16_t x1)
 }
 	
 /*************************************
-	Function Name£ºMovingAvgInit
-	Description£ºInitialize the loop array
-	Input£º*Data---loop array
-	Output£ºnone
+	Function Nameï¼šMovingAvgInit
+	Descriptionï¼šInitialize the loop array
+	Inputï¼š*Data---loop array
+	Outputï¼šnone
 **************************************/
 void MovingAvgInit(MovingAvgData *Data)
 {
@@ -273,10 +273,10 @@ void MovingAvgInit(MovingAvgData *Data)
 }
 
 /*************************************
-	Function Name£ºMovingAvgCal
-	Description£ºCalculated the average data about the loop array.
-	Input£º*Data---Loop array
-	Output£ºnone
+	Function Nameï¼šMovingAvgCal
+	Descriptionï¼šCalculated the average data about the loop array.
+	Inputï¼š*Data---Loop array
+	Outputï¼šnone
 **************************************/
 void MovingAvgCal(MovingAvgData *Data)
 {
@@ -292,10 +292,10 @@ void MovingAvgCal(MovingAvgData *Data)
 }
 
 /*************************************
-	Function Name£ºLoopCmp_Init
-	Description£ºInitialize the acceleration and deceleration curve
-	Input£ºnone
-	Output£ºnone
+	Function Nameï¼šLoopCmp_Init
+	Descriptionï¼šInitialize the acceleration and deceleration curve
+	Inputï¼šnone
+	Outputï¼šnone
 **************************************/
 void LoopCmp_Init(void)
 {
@@ -308,10 +308,10 @@ void LoopCmp_Init(void)
 }
 
 /*************************************
-	Function Name£ºLoopCmp_Cal
-	Description£ºCalculated the acceleration and deceleration curve
-	Input£º*u1---LoopCMP_T
-	Output£ºnone
+	Function Nameï¼šLoopCmp_Cal
+	Descriptionï¼šCalculated the acceleration and deceleration curve
+	Inputï¼š*u1---LoopCMP_T
+	Outputï¼šnone
 **************************************/
 void LoopCmp_Cal(LoopCMP_T *u1)
 {
@@ -340,14 +340,14 @@ void LoopCmp_Cal(LoopCMP_T *u1)
 }
 
 /****************************************************************
-	Function Name£ºInitNormalization
-	Description£ºInitialize *u, Vsp_out = u->Out = u->Kslope*(u->In - u->MinIn);
-	Input£º 
+	Function Nameï¼šInitNormalization
+	Descriptionï¼šInitialize *u, Vsp_out = u->Out = u->Kslope*(u->In - u->MinIn);
+	Inputï¼š 
 		Lowdata --- Minimum threshold
 		highdata --- Max threshold
 		maxout --- Max output
 		*u --- Stucture NormalizationType
-	Output£ºnone
+	Outputï¼šnone
 ****************************************************************/
 void InitNormalization(u16 Lowdata,u16 highdata,u16 maxout,NormalizationType *u)
 {
@@ -361,10 +361,10 @@ void InitNormalization(u16 Lowdata,u16 highdata,u16 maxout,NormalizationType *u)
 }
 
 /****************************************************************
-	Function Name£ºCalcNormalization
-	Description£ºNormalized the Vsp data .
-	Input£ºnone
-	Output£ºnone
+	Function Nameï¼šCalcNormalization
+	Descriptionï¼šNormalized the Vsp data .
+	Inputï¼šnone
+	Outputï¼šnone
 ****************************************************************/
 void CalcNormalization(u16 value,NormalizationType *u)
 {
