@@ -11,11 +11,15 @@
 //at 115200 ~5 samples per second read ~170 counts (~9 A) off on one channel, mostly for one period,
 //sometimes for 4 in a row; nothing without traffic, a longer adc sample time does not help. A median of
 //3 let the 4 period events through (false CURRENT_LIMIT_VIOLATION trips), and comparing with the last
-//accepted sample locked onto a borderline glitch (then rejected the true values). Now each channel keeps
-//its last 9 raw samples: the newest is used when it is within GLITCH counts (~3 A) of their median,
-//otherwise the median (runs of up to 4 bad samples do not move it). No delay normally; a real step
-//(> ~1 A per period is not possible here at these voltages anyway) shows after up to 4 periods.
-//A trip needs two filtered samples in a row.
+//accepted sample locked onto a borderline glitch (then rejected the true values), and the median of the
+//last 9 lagged the phase current's sine by 4 periods: with field weakening (6-8 A at 150 Hz, ~1.7 A per
+//period) it rejected the true samples and fed the loop stale ones (I_q swung +-3 A, the wheel shook). A
+//straight line through the last two samples ran away on one accepted outlier (made-up 20 A trips).
+//Now the filter works on d / q (park()), which are nearly constant at any speed with the smooth tracker
+//angle: a period more than 3 A off the last accepted d / q is held at that, for up to 4 periods in a row,
+//then taken again (no lock on); after an angle jump it starts again. The phase currents for the trip and
+//the bus current come from the filtered d / q, the trip one period later (after the angle). The offset
+//calibration (standing, zero vector) keeps a median of 9 per channel. A trip needs two periods in a row.
 //
 //Loop: every pwm period in the adc isr. Park angle = hall estimator angle minus its 1.5 period lead
 //(that lead is for the pwm output; the currents were sampled now); PI per axis in mV with back emf feed
@@ -51,6 +55,11 @@ static uint8_t calN, offValid, armedPeriods, tripN;
 #define HIST 9
 static int16_t hist1[HIST], hist2[HIST];    //raw samples per channel, ring
 static uint8_t histPos;
+static int32_t lastD, lastQ;          //last accepted d / q current, mA (glitch filter)
+static int16_t lastThS;
+static uint8_t dqOk, rejDq;
+#define GLITCH_MA 3000                //mA
+#define ANGLE_JUMP 2731               //15 deg el: the filter starts again
 volatile uint16_t focGlitches;     //samples replaced by the median, diagnostic
 static int32_t ia, ib, ic;         //mA, this period
 static int32_t intD, intQ;         //integrators, uV
@@ -154,13 +163,14 @@ void FocMeasure(void){
 		if(offValid) itotal = itotalPhase = 0;    //gates off: no bus current (the shunt reads noise)
 		return;
 	}
+	if(armedPeriods<=2) dqOk = 0;    //the dq filter starts again (park())
 	if(armedPeriods==2){ for(uint8_t k=0;k<HIST;k++){ hist1[k] = (int16_t)r1; hist2[k] = (int16_t)r2; } }
-	hist1[histPos] = (int16_t)r1; hist2[histPos] = (int16_t)r2;
-	histPos = (uint8_t)((histPos+1)%HIST);
-	int32_t m1 = median9(hist1), m2 = median9(hist2);
-	if(r1-m1>GLITCH||m1-r1>GLITCH){ r1 = m1; focGlitches++; }
-	if(r2-m2>GLITCH||m2-r2>GLITCH){ r2 = m2; focGlitches++; }
 	if(!offValid){    //FocControl() applies the zero vector until the offsets are known
+		hist1[histPos] = (int16_t)r1; hist2[histPos] = (int16_t)r2;
+		histPos = (uint8_t)((histPos+1)%HIST);
+		int32_t m1 = median9(hist1), m2 = median9(hist2);
+		if(r1-m1>GLITCH||m1-r1>GLITCH) r1 = m1;
+		if(r2-m2>GLITCH||m2-r2>GLITCH) r2 = m2;
 		if(armedPeriods>=4&&realspeed==0&&(!sine||pwm==0)){    //sine: its zero vector at command 0
 			calSum1 += r1; calSum2 += r2;
 			if(++calN==64){
@@ -182,9 +192,38 @@ void FocMeasure(void){
 	}
 	if(sine&&(pwm>MOD_MAX||pwm<-MOD_MAX)){    //the low side time is too short for a valid sample
 		itotal = itotalPhase;
+		dqOk = 0;
 		return;
 	}
+	itotal = itotalPhase;    //from the previous period's filtered currents (park())
 	sampleOk = 1;
+}
+
+//d and q current (electrical frame) of this period's sample, after HALLModuleCalc(): the estimator
+//angle minus its 1.5 period lead (that lead is for the pwm output; the currents were sampled now)
+static void park(int32_t* id, int32_t* iq){
+	int16_t th = HALL1.Angle;
+	int16_t thS = fastspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*3/2)) : th;
+	Trig_Components sc = MCM_Trig_Functions(thS);
+	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
+	int32_t d = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
+	int32_t q = (beta*sc.hCos>>15)-(alpha*sc.hSin>>15);
+	//glitch filter (see the top): against the last accepted d / q (nearly constant at any speed), held
+	//for up to 4 periods; it starts again after an angle jump (start, reversal, sector centre at low speed)
+	int16_t dth = (int16_t)(thS-lastThS-HALL1.MoveDir*HALL1.IncAngle);
+	lastThS = thS;
+	if(!dqOk||dth>ANGLE_JUMP||dth<-ANGLE_JUMP){
+		dqOk = 1; rejDq = 0;
+	}else if((d-lastD>GLITCH_MA||lastD-d>GLITCH_MA||q-lastQ>GLITCH_MA||lastQ-q>GLITCH_MA)&&rejDq<4){
+		d = lastD; q = lastQ; rejDq++; focGlitches++;
+		alpha = (d*sc.hCos>>15)-(q*sc.hSin>>15);    //phase currents back (inverse park, Clarke)
+		beta = (d*sc.hSin>>15)+(q*sc.hCos>>15);
+		ia = alpha; ib = (-alpha+(beta*56756>>15))/2; ic = -ia-ib;    //56756 = sqrt(3) Q15
+	}else{
+		rejDq = 0;
+	}
+	lastD = d; lastQ = q;
+	*id = d; *iq = q;
 	int32_t trip = CurrentHardMax();
 	if(ia>trip||ia<-trip||ib>trip||ib<-trip||ic>trip||ic<-trip){
 		if(++tripN>=2){
@@ -197,18 +236,7 @@ void FocMeasure(void){
 	}
 	//bus current = sum of duty * phase current; the CCRs read back are the ones active in this period
 	int32_t n = PWM_RES;
-	itotal = itotalPhase = ((n-(int32_t)TIM1->CCR1)*ia+(n-(int32_t)TIM1->CCR2)*ib+(n-(int32_t)TIM1->CCR3)*ic)/n/10;
-}
-
-//d and q current (electrical frame) of this period's sample, after HALLModuleCalc(): the estimator
-//angle minus its 1.5 period lead (that lead is for the pwm output; the currents were sampled now)
-static void park(int32_t* id, int32_t* iq){
-	int16_t th = HALL1.Angle;
-	int16_t thS = fastspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*3/2)) : th;
-	Trig_Components sc = MCM_Trig_Functions(thS);
-	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
-	*id = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
-	*iq = (beta*sc.hCos>>15)-(alpha*sc.hSin>>15);
+	itotalPhase = ((n-(int32_t)TIM1->CCR1)*ia+(n-(int32_t)TIM1->CCR2)*ib+(n-(int32_t)TIM1->CCR3)*ic)/n/10;
 	focId = (int16_t)*id;
 	focIq = (int16_t)-*iq;
 	iqAcc += focIq-(iqAcc>>5);
@@ -321,7 +349,10 @@ void FocControl(void){
 	//shook and the speed swung +-100 rpm.
 	int32_t fwmax = cfgOrDefault(FW_IMAX, 0)*100;
 	//at most 60 % of the current limit: on the circle the q current is not regulated, with 7 of 10 A the
-	//total ran past the limit (12.7 A) and tripped; 6 A: 818 rpm (520 without), 9.6 A, ~1.2 m/s^2
+	//total ran past the limit (12.7 A) and tripped. Bench (24 V, omega*L ~0.37 V per A at 600 rpm):
+	//520 rpm without, ~600 rpm with 5-6 A, ~680 rpm with 9 A (current_soft_max 15 A), ~1.1 m/s^2.
+	//(Earlier "815 rpm" came from the median glitch filter feeding stale currents: the real d current
+	//was larger and uncontrolled, ~180 W from the supply unloaded.)
 	if(fwmax>imax*6/10) fwmax = imax*6/10;
 	if(fwmax&&vmag){
 		fwId -= (vmag-vmax*95/100)/64;

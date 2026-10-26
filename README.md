@@ -91,9 +91,10 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
 - **Field weakening** is off by default (CANSimple: `hoverboard.foc.field_weakening_current`,
   `hoverboard.sine.field_weakening_advance`; the console's drive panel has both).
   - FOC: `fwimax`, the most negative d current, at most 60 % of the current limit. A controller sets
-    the d current so the current loops keep 5 % voltage headroom. Bench wheel at 24 V: 520 rpm
-    without, ~720 rpm with 4 A, ~815 rpm with 6 A (then ~9.5 A phase current and ~180 W from the
-    supply, unloaded).
+    the d current so the current loops keep 5 % voltage headroom. Each amp of d current saves
+    omega*L of voltage (~0.37 V at 600 rpm on the bench motor, L ~0.46 mH), so the gain is modest:
+    at 24 V 520 rpm without, ~600 rpm with 5-6 A, ~680 rpm with 9 A (`current_soft_max` 15 A).
+    More speed needs more d current, i.e. a higher current limit.
   - Sine: `fwadvance`, phase advance in degrees. Sine field weakening has no current control and is
     expensive; see `Inc/pinout.h`.
   - Above the speed the battery voltage allows, the back EMF is higher than the bus: a coast (gates

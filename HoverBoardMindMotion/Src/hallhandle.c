@@ -10,6 +10,9 @@
 HALLType HALL1;
 volatile int32_t fastspeed;
 volatile uint8_t hallAngleSure;    //the angle is known: a regular edge, its interpolation not run out
+static uint32_t pllTh, pllBnd;     //angle tracker: angle, the boundary of the last edge (2^32 per electrical turn)
+static int32_t pllW;               //its speed, angle per pwm period, signed
+static uint8_t pllOn;
 static uint32_t edgeMs;    //millis at the last hall edge: interval timing past the 65 ms of the us timer
 static volatile int16_t CWShift = 0;    //extra sine angle advance in the direction of motion (65536 = 360 deg el), tuning over SWD
 /*------------------ Private functions ----------------*/
@@ -146,35 +149,52 @@ void HALLModuleCalc(HALLType *u){
 			u->Angle = (int16_t)u->CWAngleTab[raw];
 			u->IncAngleMax = 0;
 			hallAngleSure = 0;
+			pllOn = 0;
 		}else if(edge){
-			hallAngleSure = 1;
-			//the edge is seen here up to one pwm period (228 us) late: the angle at the boundary plus
-			//the time since the edge (the timer count), plus a lead for the output of 9/8 periods:
-			//measured with FOC at 300 and 510 rpm, where the d voltage the loops settle at (no d current)
-			//is 0, i.e. the frame is on the rotor. With 1.5 periods (right only while the detection
-			//delay was not counted) it ran 0.4 periods ahead: +3.7 deg at 510 rpm, growing with speed,
-			//the back emf on d that field weakening could not stand. The interpolation may run one period past the next boundary, whose
-			//detection is late as well. A fixed lead for both, as before, stalled the angle at the sector
-			//end and then jumped a double step: up to ~12 deg el of error at 500 rpm, current ripple that
-			//grew with speed (FOC, worst with field weakening).
+			//an alpha-beta tracker (a PLL on the hall edges): angle and speed run on every period; an
+			//edge corrects the angle by 1/8 of the error to its boundary and the speed by 1/64 of it per
+			//sector (1/4..1/32 per edge measured: 1/8 and 1/16 shook least, 1/8 follows faster). The edge is seen here up to a period late: its boundary plus the time since (the
+			//timer count). Snapping the angle to every edge (as before) passed the edge jitter (+-20 %
+			//of an interval with field weakening current) straight into the angle, and a d current turns
+			//angle noise into torque (|id| * sin(error)): 20-60 Hz shaking with field weakening that grew
+			//with the d current. The rotor (inertia) turns smoothly: the edges correct, they do not set.
 			int32_t s = u->MoveDir;
-			//speed of the last interval, not the average of six: that lagged ~3.5 intervals behind a speed
-			//change, the extrapolated angle ran ahead / behind, and a field weakening d current turned the
-			//error into torque that grew it (shook and tripped from 4 A). The sectors are equal within
-			//1.5 deg on the bench motor: the error of one interval's speed over a sector is about that.
-			u->IncAngle = (int16_t)(((uint32_t)PWM_RES*16384/54)/u->HallTime[i]);    //65536*2*PWM_RES/72/6/interval
-			int32_t done = (int32_t)(u->IncAngle*since/228);
-			u->IncAngleMax = 10922+u->IncAngle-done;
-			u->Angle = (int16_t)(u->CWAngleTab[raw] - s*5461 + s*(done+u->IncAngle*9/8) + s*CWShift);
+			uint32_t ivl = u->HallTime[i];    //us
+			uint32_t k = (uint32_t)PWM_RES*16384/54;    //65536*2*PWM_RES/72/6 / interval: per period, 65536 per turn
+			uint32_t q = k/ivl, r = k%ivl;    //(k<<16)/ivl in 32 bits: 2^32 per turn
+			int32_t wMeas = s*(int32_t)((q<<16)+(((r<<8)/ivl)<<8));
+			uint32_t bnd = (uint32_t)(uint16_t)(u->CWAngleTab[raw]-s*5461)<<16;
+			uint32_t meas = bnd+(uint32_t)(wMeas/228*(int32_t)since);
+			int32_t e = (int32_t)(meas-pllTh);
+			if(!pllOn||(pllW>0)!=(s>0)||e>(2731<<16)||e<-(2731<<16)){    //start, reversal, > 15 deg off
+				pllTh = meas; pllW = wMeas; pllOn = 1;
+			}else{
+				int32_t n = (int32_t)(ivl/228);
+				pllTh += (uint32_t)(e/8);
+				pllW += e/64/(n<1 ? 1 : n);
+			}
+			pllBnd = bnd;
+			hallAngleSure = 1;
 		}else if(millis-lastcommutate>250){    //standing: middle of the sector
 			u->Angle = (int16_t)u->CWAngleTab[raw];
 			u->IncAngleMax = 0;
 			hallAngleSure = 0;
-		}else if(u->IncAngleMax >= u->IncAngle){
-			u->IncAngleMax -= u->IncAngle;
-			u->Angle += u->MoveDir*u->IncAngle;
-		}else{
-			hallAngleSure = 0;    //no edge where one was due: the rotor is slower, the angle runs ahead
+			pllOn = 0;
+		}else if(pllOn){
+			//at most one sector (and a period) past the last edge: no edge where one was due means the
+			//rotor is slower; the angle waits there and the d current is off until the next edge (a
+			//negative d current in a frame ahead of the rotor brakes it, it stalled and rocked)
+			uint32_t next = pllTh+(uint32_t)pllW;
+			int32_t travel = (int32_t)(next-pllBnd), aw = pllW<0 ? -pllW : pllW;
+			if(u->MoveDir<0) travel = -travel;
+			if(travel<=(10922<<16)+aw) pllTh = next; else hallAngleSure = 0;
+		}
+		if(pllOn){
+			//output lead 9/8 periods (the centre of the next pwm period): measured with FOC at 300 and
+			//510 rpm, where the d voltage the loops settle at (no d current) is 0 (frame on the rotor)
+			int32_t aw = pllW<0 ? -pllW : pllW;
+			u->IncAngle = (int16_t)(aw>>16);
+			u->Angle = (int16_t)((pllTh+(uint32_t)(pllW/8*9))>>16)+u->MoveDir*CWShift;
 		}
 	}
 	//block commutation: evaluated every time, so a direction change or a mode switch takes effect at
