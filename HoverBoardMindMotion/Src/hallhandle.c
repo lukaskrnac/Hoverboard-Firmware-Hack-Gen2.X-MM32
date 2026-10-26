@@ -62,7 +62,7 @@ void HALLModuleCalc(HALLType *u){
 	static uint8_t i = 0;
 	uint8_t j = 0;
 	uint8_t raw = hallpos(1);    //hall state C*4+B*2+A, independent of the commanded direction
-	uint8_t com = DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED;
+	uint8_t com = COMMUTATION(DRIVEMODE)==COMMUT_BLOCK;
 
 	//RunHallValue is the hall state as seen by the commutation: complemented (7-raw) for the other direction
 	u->RunHallValue = u->CMDDIR==1 ? raw : 7-raw;

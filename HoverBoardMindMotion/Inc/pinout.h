@@ -59,6 +59,11 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define SINE_D0 pinstorage[55]     //SINE_SPEED feed forward: dead band in permille, default 10
 
 
+//config layout version: 0 = before the drive mode encoding commutation*4 + control (SINE_VOLT was 2,
+//SINE_SPEED 3); main.c migrates older layouts after loading
+#define CFG_VERSION pinstorage[63]
+#define CFG_VERSION_CURRENT 1
+
 #define MAGICNUM_POS 32
 #define MAGIC_NUMBER 0xDCAB
 

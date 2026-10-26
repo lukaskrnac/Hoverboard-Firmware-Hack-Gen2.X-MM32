@@ -165,7 +165,7 @@ void speedupdate(void){
 		dir=-1;
 		}
 		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
-		if(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED){
+		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
 			TIM1->CCR1=abspwm;
 			TIM1->CCR2=abspwm;
 			TIM1->CCR3=abspwm;
@@ -190,8 +190,12 @@ void gatesOutput(uint8_t on){
 //the isr arms the gates again and the speed controllers restart from the measured speed.
 static void TIMOCInit(void);
 
+uint8_t DriveModeSupported(uint8_t mode){
+	return mode==COM_VOLT||mode==COM_SPEED||mode==SINE_VOLT||mode==SINE_SPEED;
+}
+
 void SetDriveMode(uint8_t mode){
-	if(mode==DRIVEMODE){
+	if(mode==DRIVEMODE||!DriveModeSupported(mode)){
 		return;
 	}
 	NVIC_DisableIRQ(ADC_COMP_IRQn);
@@ -208,7 +212,7 @@ void SetDriveMode(uint8_t mode){
 }
 
 static void TIMOCInit(void){
-	if(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED){
+	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
 		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
 		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);
 		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM1);

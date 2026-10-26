@@ -96,7 +96,7 @@ void ADC1_COMP_IRQHandler(void){
 				HALL1.CMDDIR = -dir;
 				HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
 
-				if(!(DRIVEMODE==COM_VOLT||DRIVEMODE==COM_SPEED)){
+				if(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK){
 					if(DRIVEMODE==FOC_VOLT||DRIVEMODE==FOC_SPEED||DRIVEMODE==FOC_TORQUE){
 						//CLARK
 						clarke1.As = iphasea;

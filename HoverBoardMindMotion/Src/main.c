@@ -84,6 +84,13 @@ s32 main(void){
 		}
 	}
 
+	if(CFG_VERSION<1){    //old drive mode numbers; saved with the next config frame
+		if(DRIVEMODE==2) DRIVEMODE=SINE_VOLT;
+		else if(DRIVEMODE==3) DRIVEMODE=SINE_SPEED;
+		CFG_VERSION=1;
+	}
+	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
+
 	//initialize normal gpio
 	io_init();
 	//hall gpio init

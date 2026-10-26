@@ -39,7 +39,7 @@ FIELDS = {
     37: ("pwmres", "num", "TIM1 period"), 38: ("slaveid", "num", "RemoteUartBus slave id"),
     39: ("windings", "num", "motor poles"), 40: ("invlowside", "num", "1 = low side gate drive inverted"),
     41: ("softocp", "num", "A, averaged bus current limit, 0 = off"), 42: ("hardocp", "num", "adc watchdog current limit, adc counts above zero"),
-    44: ("drivemode", "num", "0 COM_VOLT, 1 COM_SPEED, 2 SINE_VOLT, 3 SINE_SPEED"),
+    44: ("drivemode", "num", "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"),
     45: ("batfull", "num", "mV"), 46: ("batempty", "num", "mV, <= 20000 disables the low battery cut-off"),
     47: ("timeout", "num", "ms without a command until speed = 0"),
     48: ("speedkp", "num", "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"),
@@ -50,6 +50,7 @@ FIELDS = {
     53: ("sineki", "num", "SINE_SPEED: 0.1 permille per rpm*s, 0 = default 85"),
     54: ("sinekv", "num", "SINE_SPEED feed forward: 0.1 rpm/V at 100% modulation, 0 = default 242"),
     55: ("sined0", "num", "SINE_SPEED feed forward: dead band permille, 0 = default 10"),
+    63: ("cfgversion", "num", "config layout: 0 = old drive mode numbers (2/3 = sine), migrated at boot"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}
 

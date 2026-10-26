@@ -62,7 +62,7 @@ typedef struct {			// "#pragma pack(1)" needed to get correct sizeof()
    uint8_t 	iSlave;			//  contains the slave id this message is intended for
 	 float  fBattFull;    // 10s LiIon = 42.0;
 	 float  fBattEmpty;    // 10s LiIon = 27.0;
-	 uint8_t  iDriveMode;      //  MM32: 0=COM_VOLT, 1=COM_SPEED, 2=SINE_VOLT, 3=SINE_SPEED
+	 uint8_t  iDriveMode;      //  commutation*4 + control (0 pwm, 1 speed, 2 torque, 3 position), bldc.h
    int8_t 	iSlaveNew;			//  if >= 0 contains the new slave id saved to eeprom
    uint16_t checksum;
 } SerialServer2HoverConfig;
@@ -135,10 +135,7 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 	{
 		BAT_EMPTY = pData->fBattEmpty * 1000;
 	}
-	if (pData->iDriveMode <= SINE_SPEED)
-	{
-		SetDriveMode(pData->iDriveMode);
-	}
+	SetDriveMode(pData->iDriveMode);    //ignored if not supported
 	if (pData->iSlaveNew >= 0 && 0)    //disabled!
 		SLAVE_ID = pData->iSlaveNew;
 	bConfigSave = 1;
