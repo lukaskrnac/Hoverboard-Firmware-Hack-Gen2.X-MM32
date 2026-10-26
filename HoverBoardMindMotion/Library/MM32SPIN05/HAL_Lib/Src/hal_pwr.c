@@ -110,7 +110,10 @@ void PWR_EnterSTOPMode(u32 regulator, u8 stop_entry)
 
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
 
-    (stop_entry == PWR_STOPEntry_WFI) ? __WFI() : __WFE();
+    if (stop_entry == PWR_STOPEntry_WFI)
+        __WFI();
+    else
+        __WFE();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

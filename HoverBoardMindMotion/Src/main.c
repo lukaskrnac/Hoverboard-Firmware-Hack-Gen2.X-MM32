@@ -4,7 +4,6 @@
 #else
 #include "mm32_device.h"                // Device header
 #endif
-#include "RTE_Components.h"             // Component selection
 #include "hal_gpio.h"
 #include "hal_rcc.h"
 #include "hal_adc.h"           

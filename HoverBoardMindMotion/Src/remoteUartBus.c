@@ -44,7 +44,7 @@ extern int fvbat; 							// global variable for battery voltage
 extern int fitotal; 									// global variable for current dc
 extern int realspeed; 									// global variable for real Speed
 
-typedef struct {			// ´#pragma pack(1)´ needed to get correct sizeof()
+typedef struct {			// ï¿½#pragma pack(1)ï¿½ needed to get correct sizeof()
    uint8_t cStart;			//  = '/';
    //uint16_t cStart;		//  = #define START_FRAME         0xABCD
    uint8_t  iDataType;  //  0 = unique id for this data struct
@@ -53,7 +53,7 @@ typedef struct {			// ´#pragma pack(1)´ needed to get correct sizeof()
    uint8_t  wState;   // 1=ledGreen, 2=ledOrange, 4=ledRed, 8=ledUp, 16=ledDown   , 32=Battery3Led, 64=Disable, 128=ShutOff
    uint16_t checksum;
 } SerialServer2Hover;
-typedef struct {			// ´#pragma pack(1)´ needed to get correct sizeof()
+typedef struct {			// ï¿½#pragma pack(1)ï¿½ needed to get correct sizeof()
    uint8_t cStart;			//  = '/';
    //uint16_t cStart;		//  = #define START_FRAME         0xABCD
    uint8_t  iDataType;  //  1 = unique id for this data struct
@@ -65,7 +65,7 @@ typedef struct {			// ´#pragma pack(1)´ needed to get correct sizeof()
    uint16_t checksum;
 } SerialServer2HoverMaster;
 
-typedef struct {			// ´#pragma pack(1)´ needed to get correct sizeof()
+typedef struct {			// ï¿½#pragma pack(1)ï¿½ needed to get correct sizeof()
    uint8_t cStart;			//  = '/';
    //uint16_t cStart;		//  = #define START_FRAME         0xABCD
    uint8_t  iDataType;  //  2 = unique id for this data struct
@@ -80,7 +80,7 @@ typedef struct {			// ´#pragma pack(1)´ needed to get correct sizeof()
 static uint8_t aReceiveBuffer[255];	//sizeof(SerialServer2Hover)
 
 #define START_FRAME         0xABCD       // [-] Start frme definition for reliable serial communication
-typedef struct{				// ´#pragma pack(1)´ needed to get correct sizeof()
+typedef struct{				// ï¿½#pragma pack(1)ï¿½ needed to get correct sizeof()
    uint16_t cStart;
    uint8_t iSlave;		//  the slave id this message is sent from
    int16_t iSpeed;		// 100* km/h
@@ -89,6 +89,12 @@ typedef struct{				// ´#pragma pack(1)´ needed to get correct sizeof()
    int32_t iOdom;		// hall steps
    uint16_t checksum;
 } SerialHover2Server;
+
+// wire format sizes (see the GD32 project's remoteUartBus.c), checked so a compiler change cannot alter them
+_Static_assert(sizeof(SerialServer2Hover) == 8, "SerialServer2Hover must be 8 bytes");
+_Static_assert(sizeof(SerialServer2HoverMaster) == 11, "SerialServer2HoverMaster must be 11 bytes");
+_Static_assert(sizeof(SerialServer2HoverConfig) == 15, "SerialServer2HoverConfig must be 15 bytes");
+_Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 bytes");
 
 
 
