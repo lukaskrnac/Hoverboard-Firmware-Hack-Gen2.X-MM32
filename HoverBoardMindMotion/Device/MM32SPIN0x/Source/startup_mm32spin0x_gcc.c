@@ -1,10 +1,21 @@
 // GCC startup for MM32SPIN05/06: vector table, .data/.bss init, then SystemInit() and main().
 // Vector order follows the MindMotion Keil startup (startup_mm32spin06xx_s_keil.s).
 #include <stdint.h>
+#include "mm32_device.h"
 
 extern uint32_t _sidata, _sdata, _edata, _sbss, _ebss, _estack;
 extern void SystemInit(void);
 extern int main(void);
+
+// Fault, unexpected interrupt or main() returned: switch the bridge off before hanging. The pwm timer
+// keeps running with its last compare values (in sine mode a static voltage vector, i.e. DC current
+// through the windings). AOEN is cleared too, it would set MOEN again at the next update event.
+// The independent watchdog then resets the chip; on boards with a power latch that switches them off.
+static void Trap(void)
+{
+    TIM1->BDTR &= ~(TIM_BDTR_AOEN | TIM_BDTR_MOEN);
+    for (;;);
+}
 
 void Reset_Handler(void)
 {
@@ -15,12 +26,12 @@ void Reset_Handler(void)
         *dst++ = 0;
     SystemInit();
     main();
-    for (;;);
+    Trap();
 }
 
 void Default_Handler(void)
 {
-    for (;;);
+    Trap();
 }
 
 #define WEAK_IRQ(name) void name(void) __attribute__((weak, alias("Default_Handler")))

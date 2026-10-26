@@ -149,7 +149,7 @@ def main():
         if new == words:
             print("no change")
             return
-        mcu.t.halt()
+        mcu.halt()
         slot = write_slot(mcu, page, new)
         print("written to slot %d" % slot)
         if a.restart:

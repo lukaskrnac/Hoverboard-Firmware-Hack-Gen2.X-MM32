@@ -91,8 +91,8 @@ s32 main(void){
 	adc_Init();
 	//adc interrupt
 	NVIC_Configure(ADC_COMP_IRQn, 0);
-	#ifdef WATCHDOG//watchdog
-	Iwdg_Init(IWDG_Prescaler_32, 0xff);
+	#ifdef WATCHDOG
+	Iwdg_Init(IWDG_Prescaler_32, 0xff);    //LSI 40 kHz / 32 / 256 = ~200 ms; every blocking wait below feeds it
 	#endif
 	//serial1.begin(19200);
 	uarten=UART_GPIO_Init();
@@ -129,6 +129,7 @@ s32 main(void){
 			DELAY_Ms(50);
 			digitalWrite(BUZZERPIN, 0);
 			DELAY_Ms(50);
+			IWDG_ReloadCounter();
 		}
 	}
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);    //Software start conversion
@@ -215,6 +216,7 @@ s32 main(void){
 						DELAY_Ms(150);
 						digitalWrite(BUZZERPIN, 0);
 						DELAY_Ms(150);
+						IWDG_ReloadCounter();
 					}
 				}
 				while(digitalRead(BUTTONPIN)) {    //wait for release

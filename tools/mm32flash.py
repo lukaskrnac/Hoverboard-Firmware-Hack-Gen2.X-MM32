@@ -28,6 +28,9 @@ FLASH_REG = 0x40022000
 FLASH_BASE, FLASH_SIZE, PAGE = 0x08000000, 0x8000, 0x400
 CONFIG = 0x08007800
 RCC = 0x40021000
+IWDG_KR, DBGMCU_CR = 0x40003000, 0x40013404
+RCC_APB2ENR_DBGMCU, DBGMCU_CR_IWDG_STOP = 1 << 22, 1 << 8
+DMA1_CCR = [0x40020008 + 0x14 * n for n in range(5)]      # channel 1..5 configuration (bit 0 = EN)
 
 # r0 = dst, r1 = src, r2 = halfword count, r3 = FLASH_REG:
 #   loop: ldrh r4,[r1]; strh r4,[r0]; wait: ldr r5,[r3,#12]; movs r6,#1; tst r5,r6; bne wait
@@ -46,6 +49,21 @@ class Mm32:
 
     def w(self, a, v):
         self.t.write32(a, v)
+
+    def halt(self):
+        """Halt the core with the independent watchdog frozen (the firmware runs it at ~200 ms; it
+        cannot be stopped once started, and its reset powers latched boards off) and the DMA stopped:
+        a halt does not stop the firmware's UART RX DMA, which wrote received bus bytes into the
+        programming buffer (its 1-byte target sRxBuffer was at BUF_AT + 0x18)."""
+        self.t.halt()
+        for ccr in DMA1_CCR:
+            self.w(ccr, self.r(ccr) & ~1)
+        self.w(RCC + 0x18, self.r(RCC + 0x18) | RCC_APB2ENR_DBGMCU)
+        self.w(DBGMCU_CR, self.r(DBGMCU_CR) | DBGMCU_CR_IWDG_STOP)
+        self.feed()
+
+    def feed(self):
+        self.w(IWDG_KR, 0xAAAA)                             # reload; harmless if it is not running
 
     def unlock(self):
         if self.r(FLASH_REG + 0x10) & 0x80:
@@ -74,6 +92,7 @@ class Mm32:
     def run(self, regs, timeout=3.0):
         for reg, val in regs:
             self.t.write_core_register(reg, val)
+        self.feed()
         self.t.resume()
         t0 = time.time()
         while self.t.get_state().name != "HALTED":
@@ -123,6 +142,7 @@ class Mm32:
         for reg, val in (("msp", sp), ("sp", sp), ("pc", pc & ~1), ("xpsr", 0x01000000),
                          ("primask", 0), ("control", 0)):
             self.t.write_core_register(reg, val)
+        self.feed()
         self.t.resume()
 
 
@@ -147,7 +167,7 @@ def main():
     session.open()
     mcu = Mm32(session.target)
     try:
-        mcu.t.halt()
+        mcu.halt()
         if a.backup:
             open(a.backup, "wb").write(bytes(mcu.t.read_memory_block8(FLASH_BASE, FLASH_SIZE)))
             print("backup:", a.backup)

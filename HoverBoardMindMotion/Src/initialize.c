@@ -330,6 +330,10 @@ void adc_Init(void){
 }
 
 void Iwdg_Init(u16 IWDG_Prescaler, u16 Reload){
+	//stop the watchdog while a debugger halts the core (tools/mm32flash.py also feeds it)
+	RCC->APB2ENR |= RCC_APB2ENR_DBGMCU;
+	DBGMCU->CR |= DBGMCU_CR_IWDG_STOP;
+
 	//Start the internal low-speed clock and wait for the clock to be ready
 	RCC_LSICmd(ENABLE);
 	while(RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET);
@@ -348,16 +352,3 @@ void Iwdg_Init(u16 IWDG_Prescaler, u16 Reload){
 	IWDG_ReloadCounter();
 	IWDG_Enable();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

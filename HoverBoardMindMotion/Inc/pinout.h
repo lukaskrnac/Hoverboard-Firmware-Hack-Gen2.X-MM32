@@ -63,7 +63,7 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define MAGIC_NUMBER 0xDCAB
 
 
-
-//#define WATCHDOG
+//independent watchdog, ~200 ms (main.c). A watchdog reset releases the power latch: the board switches off.
+#define WATCHDOG
 
 #endif
