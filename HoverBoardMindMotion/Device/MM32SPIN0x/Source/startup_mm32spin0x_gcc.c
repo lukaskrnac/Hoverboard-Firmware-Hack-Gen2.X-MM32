@@ -21,6 +21,7 @@ static void Trap(void)
 void Reset_Handler(void)
 {
     uint32_t *src = &_sidata, *dst = &_sdata;
+    RCC->AHBENR |= RCC_AHBENR_HWDIV;    // integer division runs on it (Src/hwdiv.S)
     while (dst < &_edata)
         *dst++ = *src++;
     for (dst = &_sbss; dst < &_ebss;)

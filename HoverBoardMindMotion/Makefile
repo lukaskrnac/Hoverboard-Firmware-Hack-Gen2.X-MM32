@@ -17,6 +17,7 @@ SRC := $(wildcard Src/*.c) \
        $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
        Device/MM32SPIN0x/Source/system_mm32spin05.c \
        Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
+ASRC := $(wildcard Src/*.S)
 
 # vendor and CMSIS headers as system headers: their warnings are not ours to fix
 INC := -IInc -isystem Library/MM32SPIN05/HAL_Lib/Inc -isystem Device/MM32SPIN0x/Include -isystem Device/CMSIS/Include
@@ -26,6 +27,10 @@ ARCH    := -mcpu=cortex-m0 -mthumb
 # -flto: 3 KB less flash (of 30 KB); the SWD tools still find the globals by name
 CFLAGS  := $(ARCH) -Os -flto -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common \
            -fno-strict-aliasing -Wall $(INC)
+# make TRACE=1: the FOC capture buffer for SWD tools (foc.c, 768 bytes of RAM)
+ifeq ($(TRACE),1)
+CFLAGS  += -DFOC_TRACE
+endif
 # stricter for our own code (Src/, startup); the vendor HAL sources keep -Wall
 WARN    := -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wundef
 $(BUILD)/Src/%.o $(BUILD)/Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.o: CFLAGS += $(WARN)
@@ -33,17 +38,24 @@ $(BUILD)/Src/%.o $(BUILD)/Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.o: CFL
 LDFLAGS := $(ARCH) -Os -flto -T$(LDSCRIPT) --specs=nano.specs --specs=nosys.specs -nostartfiles -Wl,--gc-sections \
            -Wl,-Map=$(TARGET).map -Wl,--print-memory-usage
 
-OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o))
+OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o) $(ASRC:.S=.o))
 DEP := $(OBJ:.o=.d)
 
 all: $(TARGET).bin $(TARGET).hex
 
-# objects and the link depend on this Makefile: a flag change rebuilds everything
-$(BUILD)/%.o: %.c Makefile
+# objects and the link depend on this Makefile and on the flags used (TRACE=1, CROSS on the command line):
+# a flag change rebuilds everything
+FLAGS_STAMP := $(BUILD)/flags.txt
+$(shell mkdir -p $(BUILD); echo '$(CC) $(CFLAGS)' | cmp -s - $(FLAGS_STAMP) || echo '$(CC) $(CFLAGS)' > $(FLAGS_STAMP))
+$(BUILD)/%.o: %.c Makefile $(FLAGS_STAMP)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
-$(TARGET).elf: $(OBJ) $(LDSCRIPT) Makefile
+$(BUILD)/%.o: %.S Makefile $(FLAGS_STAMP)
+	@mkdir -p $(dir $@)
+	$(CC) $(ARCH) -c $< -o $@
+
+$(TARGET).elf: $(OBJ) $(LDSCRIPT) Makefile $(FLAGS_STAMP)
 	$(CC) $(LDFLAGS) $(OBJ) -lm -o $@
 	$(SIZE) $@
 
