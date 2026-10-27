@@ -246,7 +246,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 | c434093 | table-driven GPIO, commutation, block brake and LED code (-1.2 KB) |
 | 41bff1f | CANSimple: negative values stored as 0 in config words (they wrapped: -2.5 V undervoltage = 63 V) |
 | 932084a | mm32flash: UART DMA stopped while halted (EN = 0 does not stop it), reprogram on verify failure |
-| (next) | PinFinder 2.0 in this tree (TUI + agent mode, `tools/pinfinder.py`), shared commutation/config code, `tools/cfgfields.py`; passive buzzer; charger state over CANSimple |
+| 6746b49 | PinFinder 2.0 in this tree (TUI + agent mode, `tools/pinfinder.py`), shared commutation/config code, `tools/cfgfields.py`; passive buzzer; charger state over CANSimple |
 
 Verification for every change: flashed to the bench board and checked with RemoteUartBus telemetry
 (bus replies, speed steps, CPU load by IPSR sampling); refactors also by comparing `objdump -d -r` of
