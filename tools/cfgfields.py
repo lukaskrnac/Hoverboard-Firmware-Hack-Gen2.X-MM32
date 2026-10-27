@@ -79,6 +79,13 @@ FIELDS = {
     84: ("imuscl", "pin", "IMU I2C SCL"),
     85: ("imuaddr", "num", "IMU 7 bit I2C address"),
     86: ("imuid", "num", "IMU id register value (WHO_AM_I / CHIP_ID)"),
+    87: ("hallang1", "num", "angle (65536 per electrical turn) where hall state 1 starts, rising angle (calibrate hall); 0/65535 = built-in"),
+    88: ("hallang2", "num", "hall state 2 edge (calibrate hall)"),
+    89: ("hallang3", "num", "hall state 3 edge"),
+    90: ("hallang4", "num", "hall state 4 edge"),
+    91: ("hallang5", "num", "hall state 5 edge"),
+    92: ("hallang6", "num", "hall state 6 edge"),
+    93: ("vbatgain", "num", "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}

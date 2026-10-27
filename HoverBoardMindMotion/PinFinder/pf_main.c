@@ -10,7 +10,7 @@
 //state the shared modules use (main.h, pinout.h)
 volatile uint32_t millis;
 uint8_t uarten = 1;
-uint16_t pinstorage[128] = PINSTORAGE_DEFAULTS;
+uint16_t pinstorage[128];    //CfgDefaults() first (an initializer here would be a second 256 byte copy)
 
 static char line[64];
 static uint8_t len;
@@ -33,8 +33,8 @@ int main(void){
 	SysTick_Config(SystemCoreClock/1000);
 	NVIC_SetPriority(SysTick_IRQn, 0);
 	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA|RCC_AHBENR_GPIOB|RCC_AHBENR_GPIOC|RCC_AHBENR_GPIOD, ENABLE);
+	CfgDefaults();    //the extension words stay default if the board has no extension record
 	if(ConfigLoad()) ConfigMigrate();
-	else CfgDefaults();
 	CfgMarkSaved();
 	LatchHold();    //first: the user may be holding the power button
 	MotorInit();

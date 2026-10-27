@@ -54,7 +54,9 @@ void MotorInit(void);
 void GatesOff(void);
 void BlockStep(uint8_t step, uint16_t duty);    //block commutation step 1..6 (bldc.c's table) at duty / PWM_PERIOD
 extern uint16_t fieldCcr[3];
-void FieldVector(uint8_t k, int32_t mv);    //k = 0..11: field at k x 30 deg el (even k: step k/2+1), complementary
+void FieldVector(uint8_t k, int32_t mv);
+void FieldAngle(uint16_t th, int32_t mv);    //field at th (65536 per electrical turn, the main firmware's angle)
+int32_t Sin16(uint16_t a);                   //Q15    //k = 0..11: field at k x 30 deg el (even k: step k/2+1), complementary
 uint16_t DutyForMv(int32_t mv);         //duty for this average phase voltage at the measured (or assumed 42 V) battery
 uint8_t PinFree(uint16_t pin);          //not SWD, not configured for anything (pins in words 0-17, 23, 24)
 uint8_t HallState(void);                //C*4 + B*2 + A (the main firmware's hallpos(1))
@@ -75,12 +77,17 @@ void CfgDefaults(void);
 //pf_detect.c: the detections; each prints results and ends with ok() / err()
 void DetectHall(int32_t mv);
 void DetectVbat(int32_t expect_mv);
-void DetectCurrent(int32_t mv);
+void DetectCurrent(int32_t mv, int32_t shunt_uohm);
 void ScanWindow(uint8_t k, int32_t mv, uint16_t pin);        //phase current pins, then the bus current pin and its calibration
 void ShowAdc(void);
 void DetectButton(uint32_t ms);
 void DetectCharger(uint32_t ms);
 void DetectImu(void);                   //pf_imu.c
+//pf_calib.c
+void CalHall(int32_t mv);
+void CalPoles(uint32_t ms);
+void CalRL(int32_t mv);
+void CalKv(const char* which, int32_t top);
 void StepHold(uint8_t s, int32_t mv, uint32_t ms);
 void Rotate(int32_t permille, uint32_t ms);
 void RotateRun(int32_t permille);       //one main loop pass of the TUI's test rotation

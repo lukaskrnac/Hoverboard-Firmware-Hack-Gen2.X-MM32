@@ -202,6 +202,10 @@ void DetectVbat(int32_t expect_mv){
 	}
 	VBATPIN = best;
 	kvp("vbat", VBATPIN);
+	if(expect_mv>0){    //the divider from the measured voltage, 0.001 (the integer vbatdivider is 3 % steps)
+		int32_t pmv = PinMv(best);
+		if(pmv>0){ VBAT_GAIN = (uint16_t)(expect_mv*1000/pmv); kvi("vbatgain", VBAT_GAIN); }
+	}
 	kvmv("battery", VbatMv());
 	ok();
 }
@@ -260,7 +264,7 @@ void DetectButton(uint32_t ms){
 	kvp("button", p);
 	kvi("released", from);
 	kvi("pressed", to);
-	if(to!=1) warn("the pin does not read 1 while pressed: the main firmware expects high = pressed");
+	if(to!=1) warn("not 1 while pressed: the main firmware expects high = pressed");
 	ok();
 }
 
@@ -420,8 +424,8 @@ static uint8_t debuggerAttached(void){
 //Releases the free pins one at a time; before each the pin is saved as LATCHPIN. If the board switches
 //off, it was the latch: the next start holds it. If all pins pass, the board has no latch (slave board).
 void LatchFind(void){
-	if(debuggerAttached()) warn("a debugger is attached: if it powers the MCU, the board cannot switch off and no latch is found");
-	note("release the power button now. The board switches off when the latch pin is found: switch it on again.");
+	if(debuggerAttached()) warn("debugger attached: if it powers the MCU, no latch is found");
+	note("release the power button. The board switches off at the latch pin: switch it on again.");
 	Wait(2000);
 	holdAll = 1;
 	uint16_t keep = LATCHPIN;
@@ -445,7 +449,7 @@ void LatchFind(void){
 	master = 0;
 	releasePins();
 	kvp("latch", PIN_NONE);
-	note("still powered: no latch pin (a slave board, or powered from the debugger)");
+	note("still powered: no latch (slave board, or debugger supply)");
 	ok();
 }
 
@@ -513,7 +517,7 @@ static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint8_t n){    /
 	}
 }
 
-void DetectCurrent(int32_t mv){
+void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	if(mv<=0) mv = 1000;
 	uint32_t mask = freeAdcMask();
 	int32_t zero[16], v[16];
@@ -580,84 +584,66 @@ void DetectCurrent(int32_t mv){
 	uint8_t kx = (uint8_t)((4*x+12-7)%12);
 	//phase x's current from the phase current pins (I_x = -(I_a + I_b)), mA
 	#define PHASE_X_MA() (-(((v[ca]-zero[ca])/16)*sg+((v[cb]-zero[cb])/16)*sg)*gain/10)
-	//1: the pin: the largest increase from 0.67 to 2 x mv, one channel per conversion (a scan converts its
-	//channels ~1.7 us apart, the active vector is ~+-7 us)
-	int32_t lo[16], hi[16], curLo = 0, curHi = 0;
-	for(uint8_t s=0;s<2;s++){
-		FieldVector(kx, s ? mv*2 : mv*2/3);
+	//8 levels (0.75 .. 2.5 x mv), every candidate pin sampled in the middle of the active vector, one channel
+	//per conversion (a scan converts its channels ~1.7 us apart, the window is ~+-7 us). The bus pin is the
+	//one that rises steadily with the current (op-amp inputs read high-impedance noise there: flat or jumpy)
+	static uint16_t avg[8][16];    //counts x 8
+	float xs[8];
+	for(uint8_t s=0;s<8;s++){
+		FieldVector(kx, mv*(s+3)/4);
 		Wait(60);
 		uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
 		for(uint8_t c=0;c<16;c++){
 			int32_t one[16];
 			if(!(mask>>c&1)) continue;
-			sampleAvg(1u<<c, at, one, 32);
-			if(s) hi[c] = one[c]/32; else lo[c] = one[c]/32;
+			sampleAvg(1u<<c, at, one, 64);
+			avg[s][c] = (uint16_t)(one[c]/8);
 		}
 		sampleAvg(mask, 1, v, 16);
-		if(s) curHi = PHASE_X_MA(); else curLo = PHASE_X_MA();
-		progress(s+1, 10);
-	}
-	FieldVector(0, 0);
-	uint16_t best = PIN_NONE;
-	int32_t bestDelta = 0;
-	for(uint8_t i=0;i<ADCCOUNT;i++){
-		uint8_t c = (uint8_t)adcs[i].channel;
-		uint16_t p = adcs[i].io;
-		if(!(mask>>c&1)||p==IPHASEAPIN||p==IPHASEBPIN) continue;
-		if(hi[c]-lo[c]>bestDelta){ bestDelta = hi[c]-lo[c]; best = p; }
-	}
-	kvi("bus_test_current_ma", curHi);
-	if(best==PIN_NONE||bestDelta<4||curHi-curLo<1000){ GatesOff(); progressEnd(); err("no bus current pin found"); return; }
-	ITOTALPIN = best;
-	kvp("itotal", best);
-	//2: calibration on that pin: 8 levels, 128 samples each; least squares counts = slope * A + zero over
-	//the points above the adc's zero (the bench board's shunt zero is below it)
-	int8_t c = AdcChannel(best);
-	float sx = 0, sy = 0, sxx = 0, sxy = 0;
-	uint8_t np = 0;
-	for(uint8_t s=0;s<8;s++){
-		FieldVector(kx, mv*(s+3)/4);    //0.75 .. 2.5 x mv
-		Wait(60);
-		int32_t one[16];
-		sampleAvg(1u<<c, (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2), one, 128);
-		sampleAvg(mask, 1, v, 16);
-		float y = (float)one[c]/128.0f, xx = (float)PHASE_X_MA()/1000.0f;
-		kv("point"); outi(PHASE_X_MA()); out(agent ? " ma " : " mA "); outfix(one[c]*100/128, 2); nl();
-		if(y>=3.0f){ sx += xx; sy += y; sxx += xx*xx; sxy += xx*y; np++; }
-		progress(s+3, 10);
+		xs[s] = (float)PHASE_X_MA()/1000.0f;    //A
+		progress(s+1, 8);
 	}
 	FieldVector(0, 0);
 	GatesOff();
 	progressEnd();
-	float den = (float)np*sxx-sx*sx;
-	if(np<3||den<0.01f){ warn("too few points above the adc zero: divider not calibrated"); ok(); return; }
-	float slope = ((float)np*sxy-sx*sy)/den;    //counts per A
-	float z = (sy-slope*sx)/(float)np;          //counts at 0 A
-	//itotal = divider x Vpin: divider = A / V = 1 / (counts per A x VDD / 4096)
-	int32_t div = slope>0.0f ? (int32_t)(4096000.0f/(slope*(float)VddMv())) : 0;
+	kvi("bus_test_current_ma", (int32_t)(xs[7]*1000.0f));
+	uint16_t best = PIN_NONE;
+	float slope = 0, z = 0;
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint8_t c = (uint8_t)adcs[i].channel;
+		uint16_t p = adcs[i].io;
+		if(!(mask>>c&1)||p==IPHASEAPIN||p==IPHASEBPIN) continue;
+		//least squares over the points above the adc's zero (a shunt's zero can be below it), rising steadily
+		float sx = 0, sy = 0, sxx = 0, sxy = 0;
+		uint8_t np = 0, steady = 1;
+		for(uint8_t s=0;s<8;s++){
+			float y = (float)avg[s][c]/8.0f;
+			if(s&&avg[s][c]+4<avg[s-1][c]) steady = 0;    //falls by more than half a count
+			if(y<3.0f) continue;
+			sx += xs[s]; sy += y; sxx += xs[s]*xs[s]; sxy += xs[s]*y; np++;
+		}
+		float den = (float)np*sxx-sx*sx;
+		if(!steady||np<3||den<0.01f) continue;
+		float a = ((float)np*sxy-sx*sy)/den;
+		if(a>0.5f&&a>slope){ slope = a; z = (sy-a*sx)/(float)np; best = p; }
+	}
+	if(best==PIN_NONE){ err("no bus current pin found"); return; }
+	ITOTALPIN = best;
+	kvp("itotal", best);
+	int32_t div = (int32_t)(4096000.0f/(slope*(float)VddMv()));    //divider = A / V = 1 / (counts per A x VDD / 4096)
 	kvi("counts_per_a_x100", (int32_t)(slope*100.0f));
 	kvi("zero_counts_x100", (int32_t)(z*100.0f));
-	kvi("points", np);
+	if(shunt_uohm>0){
+		//the shunt value is the reference: counts per A = R x 4096 / VDD; the phase currents read the measured
+		//slope / that too high, so the phase gain scales by it
+		float cTrue = (float)shunt_uohm*4.096f/(float)VddMv();    //uOhm * 4096 / mV / 1000
+		int32_t g = (int32_t)((float)gain*slope/cTrue);    //(the zero is in counts: unchanged)
+		div = (int32_t)(1000000.0f/(float)shunt_uohm);
+		if(g>50&&g<5000){ IPHASE_GAIN = (uint16_t)g; kvi("iphasegain", g); }
+	}
 	if(div>0&&div<65535){ ITOTAL_DIVIDER = (uint16_t)div; kvi("itotaldivider", div); }
 	ITOTAL_ZERO = (uint16_t)(z<0.0f ? (int32_t)(-z*100.0f) : 0);
 	kvi("itotalzero", ITOTAL_ZERO);
 	ok();
 }
 
-//diagnostics: hold field direction k and sample a pin at counter values 0 .. period (32 steps)
-void ScanWindow(uint8_t k, int32_t mv, uint16_t pin){
-	int8_t ch = AdcChannel(pin);
-	if(ch<0||k>11){ err("scan <k 0-11> <mV> <adc pin>"); return; }
-	pinMode((uint8_t)pin, INPUT_ADC);
-	FieldVector(k, mv);
-	Wait(50);
-	kvi("ccr_a", fieldCcr[0]); kvi("ccr_b", fieldCcr[1]); kvi("ccr_c", fieldCcr[2]);
-	for(uint16_t at=1;at<PWM_PERIOD;at=(uint16_t)(at+PWM_PERIOD/32)){
-		int32_t sum = 0;
-		for(uint8_t i=0;i<8;i++){ AdcScanAt(1u<<ch, at); sum += AdcValue((uint8_t)ch); }
-		kv("at"); outi(at); outc(' '); outi(sum/8); nl();
-	}
-	AdcScanTriggered(0);
-	GatesOff();
-	ok();
-}

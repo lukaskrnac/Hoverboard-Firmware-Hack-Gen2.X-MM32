@@ -46,24 +46,11 @@ static int32_t millivolts(const char* s){
 
 static void help(void){
 	static const char* const h[] = {
-		"info                      chip, supply, board type",
-		"list | get <name> | set <name> <value|pin|none>   config words (names as tools/mm32config.py)",
-		"save | revert | defaults  write to flash / reload from flash / start over (RAM)",
-		"detect hall [mV]          hall pins, the motor steps slowly (default 2000 mV)",
-		"detect vbat [V|mV]        battery pin (closest to the measured voltage: 36.5 or 36500)",
-		"detect current [mV]       phase current pins, bus current pin + calibration",
-		"detect imu                I2C IMU on free pins with pull-ups",
-		"detect button [ms]        press the power button within ms",
-		"detect charger [ms]       plug/unplug the charger within ms",
-		"detect latch              power latch (the board switches off when found)",
-		"adc                       voltage at every free adc pin",
-		"hall                      hall state now (turn the wheel by hand)",
-		"pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]",
-		"rotate <permille> [ms]    hall commutation test, -1000..1000",
-		"step <1-6|101-112> [mV] [ms]  hold a block step / field direction, then hall state, currents",
-		"gen                       pinstorage initializer for a fixed firmware",
-		"poweroff",
-		"tui | agent               switch the front end",
+		"info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults | gen",
+		"detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | latch",
+		"calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max]",
+		"adc | hall | pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]",
+		"step <1-6|101-112> [mV] [ms] | rotate <permille> [ms] | poweroff | tui | agent",
 	};
 	for(uint8_t i=0;i<sizeof(h)/sizeof(h[0]);i++){
 		if(agent) out("# ");
@@ -161,12 +148,19 @@ void Command(char* line){
 		if(!a1) err("detect what? hall vbat current imu button charger latch");
 		else if(!strcmp(a1, "hall")) DetectHall((int32_t)optnum(a2));
 		else if(!strcmp(a1, "vbat")) DetectVbat(millivolts(a2));
-		else if(!strcmp(a1, "current")) DetectCurrent((int32_t)optnum(a2));
+		else if(!strcmp(a1, "current")) DetectCurrent((int32_t)optnum(a2), millivolts(a3));    //shunt mOhm -> uOhm
 		else if(!strcmp(a1, "imu")) DetectImu();
 		else if(!strcmp(a1, "button")) DetectButton(optnum(a2));
 		else if(!strcmp(a1, "charger")) DetectCharger(optnum(a2));
 		else if(!strcmp(a1, "latch")) LatchFind();
 		else err("detect what? hall vbat button charger latch");
+	}
+	else if(!strcmp(c, "calibrate")){
+		if(a1&&!strcmp(a1, "hall")) CalHall((int32_t)optnum(a2));
+		else if(a1&&!strcmp(a1, "poles")) CalPoles(optnum(a2));
+		else if(a1&&!strcmp(a1, "rl")) CalRL((int32_t)optnum(a2));
+		else if(a1&&!strcmp(a1, "kv")) CalKv(a2, (int32_t)optnum(a3));
+		else err("calibrate what? hall poles rl kv");
 	}
 	else if(!strcmp(c, "adc")){ ShowAdc(); ok(); }
 	else if(!strcmp(c, "hall")){
@@ -175,7 +169,6 @@ void Command(char* line){
 		ok();
 	}
 	else if(!strcmp(c, "pin")) pinCmd(a1, a2, a3);
-	else if(!strcmp(c, "scan")) ScanWindow((uint8_t)optnum(a1), (int32_t)optnum(a2), a3 ? PinByName(a3) : PIN_NONE);
 	else if(!strcmp(c, "step")) StepHold((uint8_t)optnum(a1), (int32_t)optnum(a2), optnum(a3));
 	else if(!strcmp(c, "rotate")){
 		uint8_t g;

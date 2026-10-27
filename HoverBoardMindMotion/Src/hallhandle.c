@@ -14,6 +14,7 @@ volatile uint8_t hallAngleSure;    //the angle is known: a regular edge, its int
 volatile uint16_t hallInvalid;    //invalid hall readings (diagnostic)
 volatile int16_t hallAngleSample;  //rotor angle at this period's current sample (Angle has the output lead)
 volatile int32_t hallPosFine;      //position, 1/POS_FINE hall step (odometer and the angle in the sector)
+static uint16_t bndLo[8], bndHi[8];  //per hall state its edges (lower: entered with rising angle, upper)
 static uint32_t pllTh, pllBnd;     //angle tracker: angle, the boundary of the last edge (2^32 per electrical turn)
 static int32_t pllW;               //its speed, angle per pwm period, signed
 static uint8_t pllOn;
@@ -50,6 +51,24 @@ void HALLModuleInit(HALLType *u)
 	u->CWAngleTab[2] = 0;
 	u->CWAngleTab[6] = 10922;
 	u->CWAngleTab[4] = 21844;
+	//calibrated edges (PinFinder calibrate hall, all six set): the state from its edge to the next state's
+	//edge, the centre in the middle. Unset: +-30 deg around the table above (the bench motor, within 1.5 deg)
+	uint8_t cal = 1;
+	for(i=1;i<=6;i++) if(HALL_ANG(i)==0||HALL_ANG(i)==0xFFFF) cal = 0;
+	for(i=1;i<=6;i++){
+		uint16_t lo = (uint16_t)(u->CWAngleTab[i]-5461), width = 10922;
+		if(cal){
+			lo = HALL_ANG(i);
+			width = 0xFFFF;
+			for(uint8_t j=1;j<=6;j++){    //the next edge above (circular)
+				uint16_t d = (uint16_t)(HALL_ANG(j)-lo);
+				if(j!=i&&d&&d<width) width = d;
+			}
+			u->CWAngleTab[i] = (uint16_t)(lo+width/2);
+		}
+		bndLo[i] = lo;
+		bndHi[i] = (uint16_t)(lo+width);
+	}
 
 
 
@@ -155,7 +174,7 @@ void HALLModuleCalc(HALLType *u){
 
 	//sine: rotor angle (65536 per electrical turn) from the hall sectors. Measured on the bench motor
 	//(d-axis vector swept over two turns): the hall states are centred on CWAngleTab, their boundaries
-	//at +-30 deg (5461), within 1.5 deg. At an edge the rotor is on the boundary just crossed; between
+	//at +-30 deg (5461), within 1.5 deg; other motors: the calibrated edges (bndLo / bndHi, HALL_ANG). At an edge the rotor is on the boundary just crossed; between
 	//edges the angle is interpolated at the measured speed, at most one sector. The old code put the
 	//angle on the sector centre at the edge (30 deg ahead) and interpolated as if this ran every 62.5 us
 	//instead of every pwm period (2*ARR/72 MHz = 227.6 us), so the angle lagged and jumped.
@@ -182,7 +201,7 @@ void HALLModuleCalc(HALLType *u){
 			uint32_t k = (uint32_t)TIM1->ARR*16384/54;    //65536*2*ARR/72/6 / interval: per period, 65536 per turn
 			uint32_t q = k/ivl, r = k%ivl;    //(k<<16)/ivl in 32 bits: 2^32 per turn
 			int32_t wMeas = s*(int32_t)((q<<16)+(((r<<8)/ivl)<<8));
-			uint32_t bnd = (uint32_t)(uint16_t)(u->CWAngleTab[raw]-s*5461)<<16;
+			uint32_t bnd = (uint32_t)(s>0 ? bndLo[raw] : bndHi[raw])<<16;    //the edge just crossed
 			uint32_t meas = bnd+(uint32_t)(wMeas/(int32_t)per*(int32_t)since);
 			//compared with this period's prediction. It was compared with the last period's angle (the
 			//advance below runs only between edges): every error one period of travel too large (6 deg

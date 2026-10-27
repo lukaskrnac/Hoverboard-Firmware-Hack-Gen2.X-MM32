@@ -136,21 +136,38 @@ void BlockStep(uint8_t s, uint16_t duty){
 	outputs(s<7 ? blockCcer[s] : 0, duty);
 }
 
-//Field direction k x 30 deg el with all six switches complementary (the main firmware's sine / FOC output,
-//PWM2: the low sides conduct around the counter's zero, where the adc samples), so the phase current is
-//continuous: phase X duty 1/2 + mv/vbat x cos(theta - 120 X), theta = 210 + 30 k deg. mv is the phase
-//voltage amplitude; even k is the direction of block step k/2+1.
+//Static fields with all six switches complementary (the main firmware's sine / FOC output, PWM2: the low
+//sides conduct around the counter's zero, where the adc samples), so the phase current is continuous. mv
+//is the phase voltage amplitude.
 uint16_t fieldCcr[3];    //the last FieldVector()'s compare values (phases A, B, C)
 
-void FieldVector(uint8_t k, int32_t mv){
-	static const int16_t cos12[12] = { 1000, 866, 500, 0, -500, -866, -1000, -866, -500, 0, 500, 866 };
-	int32_t vb = VbatMv(), arr = PWM_PERIOD;
+//sin(a) in Q15, a: 65536 per turn (quarter table, linear interpolation: < 0.01 % error)
+int32_t Sin16(uint16_t a){
+	static const int16_t q[65] = { 0, 804, 1608, 2410, 3212, 4011, 4808, 5602, 6393, 7179, 7962, 8739, 9512, 10278,
+		11039, 11793, 12539, 13279, 14010, 14732, 15446, 16151, 16846, 17530, 18204, 18868, 19519, 20159, 20787,
+		21403, 22005, 22594, 23170, 23731, 24279, 24811, 25329, 25832, 26319, 26790, 27245, 27683, 28105, 28510,
+		28898, 29268, 29621, 29956, 30273, 30571, 30852, 31113, 31356, 31580, 31785, 31971, 32137, 32285, 32412,
+		32521, 32609, 32678, 32728, 32757, 32767 };
+	uint16_t x = a&0x3FFF;
+	if(a&0x4000) x = (uint16_t)(0x4000-x);
+	int32_t i = x>>8, f = x&255;
+	int32_t v = i>=64 ? q[64] : q[i]+((q[i+1]-q[i])*f>>8);
+	return (a&0x8000) ? -v : v;
+}
+
+//field at angle th (65536 per electrical turn: the main firmware's frame) with all six switches
+//complementary: phase X duty 1/2 + mv/vbat x cos(th - 120 X deg)
+void FieldAngle(uint16_t th, int32_t mv){
+	static int32_t vb;    //the battery voltage, measured every 100 ms (the kv drive calls this in a loop)
+	static uint32_t vbT;
+	if(!vb||millis-vbT>100){ vb = VbatMv(); vbT = millis; }
+	int32_t arr = PWM_PERIOD;
 	if(vb<10000||vb>60000) vb = 42000;
 	if(mv>vb/4) mv = vb/4;
 	volatile u32* ccr[3] = { &TIM1->CCR1, &TIM1->CCR2, &TIM1->CCR3 };
 	for(uint8_t x=0;x<3;x++){
-		int32_t c = cos12[(7+k+12-4*x)%12];
-		fieldCcr[x] = (uint16_t)(arr/2-arr*mv/vb*c/1000);
+		int32_t c = Sin16((uint16_t)(th+16384-x*21845));
+		fieldCcr[x] = (uint16_t)(arr/2-arr*mv/vb*c/32768);
 		*ccr[x] = fieldCcr[x];
 	}
 	const uint32_t all = TIM_CCER_CC1EN|TIM_CCER_CC1NEN|TIM_CCER_CC2EN|TIM_CCER_CC2NEN|TIM_CCER_CC3EN|TIM_CCER_CC3NEN;
@@ -159,6 +176,11 @@ void FieldVector(uint8_t k, int32_t mv){
 	TIM1->CCER = (TIM1->CCER&~all)|all;
 	TIM1->EGR = TIM_EventSource_COM;
 	TIM1->BDTR |= TIM_BDTR_MOEN;
+}
+
+//direction k of 12: 210 + 30 k deg (even k: the direction of block step k/2+1)
+void FieldVector(uint8_t k, int32_t mv){
+	FieldAngle((uint16_t)((uint32_t)((7+k)%12)*65536/12), mv);
 }
 
 uint16_t DutyForMv(int32_t mv){

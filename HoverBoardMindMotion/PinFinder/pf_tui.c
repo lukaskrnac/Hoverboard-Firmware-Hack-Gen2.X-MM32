@@ -24,6 +24,12 @@ static void ledLine(void){
 	out("    ");
 }
 
+static void rule(void){
+	outc(' ');
+	for(uint8_t i=0;i<72;i++) outc('-');
+	nl();
+}
+
 static void heading(const char* s){
 	nl();
 	color(1);
@@ -66,16 +72,15 @@ static void draw(void){
 	if(VBATPIN<PINCOUNT){ out("   battery "); outfix(VbatMv()/10, 2); out(" V"); }
 	if(CfgChanged()){ color(33); out("   unsaved changes (s)"); color(0); }
 	nl();
-	out(" ------------------------------------------------------------------------");
-	nl();
+	rule();
 	for(uint8_t r=0;r<5;r++){
 		for(uint8_t c=0;c<4;c++) mapCell(map[r][c]);
 		nl();
 	}
-	out(" ------------------------------------------------------------------------");
-	nl();
+	rule();
 	out(" 1 hall sensors   2 LEDs/buzzer   3 battery   4 power button   5 charger"); nl();
 	out(" 6 power latch    7 slave id      8 test motor   9 power off   a all"); nl();
+	out(" calibrate: h hall angles   p poles   m motor R/L   k kv   d current sensing"); nl();
 	out(" c command line   s save   r revert   i info   ? help   @ agent mode"); nl();
 	out("> ");
 }
@@ -111,7 +116,7 @@ static void ledStart(void){
 	heading("LEDs and buzzer");
 	out("The other free pins are "); out(ledLow ? "floating" : "pulled up (LEDs on)"); out(", the tried pin blinks."); nl();
 	out(" w/s next/previous pin   r g b red/green/blue(orange) LED   u l upper/lower LED"); nl();
-	out(" z buzzer   t tone on this pin   p buzzer without own oscillator (beeps only with t)"); nl();
+	out(" z buzzer   p passive buzzer (no oscillator)   t tone on this pin"); nl();
 	out(" m other pins on/off   Enter back"); nl();
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		if(PinFree(p)) pinMode((uint8_t)p, ledLow ? INPUT : INPUT_PULLUP);
@@ -225,7 +230,7 @@ void TuiKey(int c){
 	case '3':
 		heading("battery voltage");
 		ShowAdc();
-		out("Type the battery voltage you measure (36.5 or 36500), or just Enter: the pin reading 20..45 V"); nl();
+		out("Battery voltage you measure (36.5), or Enter: the pin at 20..45 V"); nl();
 		lineStart("detect vbat ");
 		break;
 	case '4': heading("power button"); DetectButton(0); after(); break;
@@ -236,6 +241,11 @@ void TuiKey(int c){
 	case '9': PowerOff(); after(); break;
 	case 'a': detectAll(); break;
 	case 'c': lineStart(""); break;
+	case 'h': heading("hall edge angles"); CalHall(0); after(); break;
+	case 'p': heading("pole count"); CalPoles(0); after(); break;
+	case 'm': heading("phase resistance and inductance"); CalRL(0); after(); break;
+	case 'k': heading("speed constants"); CalKv("block", 0); CalKv("sine", 0); after(); break;
+	case 'd': lineStart("detect current 1000 "); out("  (+ the shunt value in mOhm if known, e.g. 3)"); break;
 	case 's': CfgSave(); note("saved"); after(); break;
 	case 'r': if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); draw(); break;
 	case 'i': heading("info"); Info(); after(); break;

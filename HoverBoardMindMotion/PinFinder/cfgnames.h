@@ -88,6 +88,13 @@
 	F(84, 1, "imuscl") \
 	F(85, 0, "imuaddr") \
 	F(86, 0, "imuid") \
+	F(87, 0, "hallang1") \
+	F(88, 0, "hallang2") \
+	F(89, 0, "hallang3") \
+	F(90, 0, "hallang4") \
+	F(91, 0, "hallang5") \
+	F(92, 0, "hallang6") \
+	F(93, 0, "vbatgain") \
 	F(96, 0, "extmagic") \
 
-#define CFG_FIELD_COUNT 88
+#define CFG_FIELD_COUNT 95

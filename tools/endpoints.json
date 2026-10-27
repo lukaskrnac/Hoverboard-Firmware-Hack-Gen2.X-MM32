@@ -524,6 +524,48 @@
    "access": "rw",
    "unit": "IMU id register value (WHO_AM_I / CHIP_ID)"
   },
+  "hoverboard.config.hallang1": {
+   "id": 87,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "angle (65536 per electrical turn) where hall state 1 starts, rising angle (calibrate hall); 0/65535 = built-in"
+  },
+  "hoverboard.config.hallang2": {
+   "id": 88,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 2 edge (calibrate hall)"
+  },
+  "hoverboard.config.hallang3": {
+   "id": 89,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 3 edge"
+  },
+  "hoverboard.config.hallang4": {
+   "id": 90,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 4 edge"
+  },
+  "hoverboard.config.hallang5": {
+   "id": 91,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 5 edge"
+  },
+  "hoverboard.config.hallang6": {
+   "id": 92,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 6 edge"
+  },
+  "hoverboard.config.vbatgain": {
+   "id": 93,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"
+  },
   "hoverboard.config.extmagic": {
    "id": 96,
    "type": "uint16",

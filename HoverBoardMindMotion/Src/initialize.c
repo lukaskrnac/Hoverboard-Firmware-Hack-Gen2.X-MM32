@@ -116,53 +116,29 @@ void BLDC_init(void){
 	}
 }
 
-//timer1 automatic output
+//timer1 automatic output. Register writes, the values the vendor HAL's struct inits wrote (TIM_TimeBaseInit,
+//TIM_OCxInit, TIM_BDTRConfig: 1 KB less, checked by a register dump of the running firmware)
 void TIM1_init(u16 arr, u16 psc){
-	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-	TIM_OCInitTypeDef  TIM_OCInitStructure;
-	TIM_BDTRInitTypeDef  TIM_BDTRInitStructure;
-
-	RCC_APB2PeriphClockCmd(RCC_APB2ENR_TIM1, ENABLE);
-
-	TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-	TIM_TimeBaseStructure.TIM_Period = arr;
-	TIM_TimeBaseStructure.TIM_Prescaler = psc;
-	//Setting Clock Segmentation
-	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_TimeBaseStructure.TIM_RepetitionCounter = 1;
-	///TIM Upward Counting Mode
-	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_CenterAligned1;
-	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
-
-	TIM_OCStructInit(&TIM_OCInitStructure);
-	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
-	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-	TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
-	TIM_OCInitStructure.TIM_Pulse = 0;
-	TIM_OCInitStructure.TIM_OCNPolarity = INVERT_LOWSIDE ? TIM_OCNPolarity_Low : TIM_OCNPolarity_High;
-	TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Reset;
-	TIM_OCInitStructure.TIM_OCNIdleState = TIM_OCNIdleState_Reset;
-
-	TIM_OC1Init(TIM1, &TIM_OCInitStructure);
-	TIM_OC2Init(TIM1, &TIM_OCInitStructure);
-	TIM_OC3Init(TIM1, &TIM_OCInitStructure);
-	TIM_OCInitStructure.TIM_Pulse = 1; 							//0% duty cycle
-	TIM_OC4Init(TIM1, &TIM_OCInitStructure);
-
-	TIM_CCPreloadControl(TIM1, ENABLE);
-	TIM_ITConfig(TIM1, TIM_IT_COM, ENABLE);
-	TIM_CtrlPWMOutputs(TIM1, ENABLE);
-
-	TIM_BDTRStructInit(&TIM_BDTRInitStructure);
-	// Automatic Output enable, Break, dead time and lock configuration
-	TIM_BDTRInitStructure.TIM_OSSIState = TIM_OSSIState_Enable;
-	TIM_BDTRInitStructure.TIM_OSSRState = TIM_OSSRState_Enable;
-	TIM_BDTRInitStructure.TIM_Break = TIM_Break_Enable;
-	TIM_BDTRInitStructure.TIM_BreakPolarity = AWDG ? TIM_BreakPolarity_High : TIM_BreakPolarity_Low ;
-	TIM_BDTRInitStructure.TIM_DeadTime = 1;
-	TIM_BDTRInitStructure.TIM_LOCKLevel = TIM_LOCKLevel_OFF;
-	TIM_BDTRInitStructure.TIM_AutomaticOutput = TIM_AutomaticOutput_Enable;
-	TIM_BDTRConfig(TIM1, &TIM_BDTRInitStructure);
+	RCC->APB2ENR |= RCC_APB2ENR_TIM1;
+	//centre aligned 1, clock division 1, an update every period (repetition 1)
+	TIM1->CR1 = (TIM1->CR1&~(TIM_CR1_CKD|TIM_CR1_CMS|TIM_CR1_DIR))|TIM_CounterMode_CenterAligned1;
+	TIM1->RCR = 1;
+	TIM1->ARR = arr;
+	TIM1->PSC = psc;
+	TIM1->EGR = TIM_PSCReloadMode_Immediate;
+	//channels 1-3: PWM2, both outputs on, pulse 0, low sides inverted if configured; channel 4: PWM2 at 1, the
+	//adc trigger (output on, no pin); idle states low
+	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|TIM_OCMode_PWM2|TIM_OCMode_PWM2<<8;
+	TIM1->CCMR2 = (TIM1->CCMR2&~(TIM_CCMR2_OC3M|TIM_CCMR2_OC4M))|TIM_OCMode_PWM2|TIM_OCMode_PWM2<<8;
+	uint32_t np = INVERT_LOWSIDE ? TIM_CCER_CC1NP : 0, ch = TIM_CCER_CC1EN|TIM_CCER_CC1NEN|np;
+	TIM1->CCER = ch|ch<<4|ch<<8|TIM_CCER_CC4EN;
+	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
+	TIM1->CCR4 = 1;
+	TIM1->CR2 = (TIM1->CR2&~(TIM_CR2_OIS1|TIM_CR2_OIS1N|TIM_CR2_OIS2|TIM_CR2_OIS2N|TIM_CR2_OIS3|TIM_CR2_OIS3N|TIM_CR2_OIS4))|TIM_CR2_CCPC;
+	TIM1->DIER |= TIM_DIER_COMI;
+	//automatic output enable (the gates come on at the next update), break input, dead time 1. MOE stays
+	//clear here as after the HAL's BDTR write: AOE sets it
+	TIM1->BDTR = TIM_BDTR_OSSR|TIM_BDTR_OSSI|1|TIM_BDTR_BKEN|(AWDG ? TIM_BDTR_BKP : 0)|TIM_BDTR_AOEN;
 	if(!AWDG){
 		if(OCPREFPIN<PINCOUNT){
 			/*
@@ -196,7 +172,7 @@ void TIM1_init(u16 arr, u16 psc){
 			}
 		}
 	}
-	TIM_Cmd(TIM1, ENABLE);
+	TIM1->CR1 |= TIM_CR1_CEN;
 }
 
 //interrupt
@@ -208,21 +184,15 @@ void NVIC_Configure(u8 ch, u8 pri){
 	NVIC_Init(&NVIC_InitStruct);
 }
 //uart
-void UARTX_Init(u32 baudrate,uint8_t uart){
-	UART_InitTypeDef UART_InitStructure;
+void UARTX_Init(u32 baudrate,uint8_t uart){    //8N1, rx + tx, dma requests; registers as the HAL's UART_Init
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_UART1, ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART2, ENABLE);
-	//Baud rate
-	UART_StructInit(&UART_InitStructure);
-	UART_InitStructure.BaudRate = baudrate;
-	UART_InitStructure.WordLength = UART_WordLength_8b;
-	UART_InitStructure.StopBits = UART_StopBits_1;
-	UART_InitStructure.Parity = UART_Parity_No;
-	UART_InitStructure.HWFlowControl = UART_HWFlowControl_None;
-	UART_InitStructure.Mode = UART_Mode_Rx | UART_Mode_Tx;
-	UART_Init(uart==1 ? UART1 : UART2, &UART_InitStructure);
-	UART_Cmd(uart==1 ? UART1 : UART2, ENABLE);
-	UART_DMACmd(uart==1 ? UART1 : UART2, UART_DMAReq_EN, ENABLE);
+	UART_TypeDef* u = uart==1 ? UART1 : UART2;
+	u->CCR = (u->CCR&~(UART_CCR_CHAR|UART_CCR_SPB0|UART_CCR_SPB1|UART_CCR_PEN|UART_CCR_PSEL))|UART_WordLength_8b;
+	uint32_t div = (uart==1 ? RCC_GetPCLK2Freq() : RCC_GetPCLK1Freq())/baudrate;
+	u->BRR = div/16;
+	u->FRA = div%16;
+	u->GCR = (u->GCR&~UART_GCR_AUTOFLOW)|UART_GCR_TX|UART_GCR_RX|UART_GCR_UART|UART_GCR_DMA;
 }
 
 uint8_t UART_GPIO_Init(void){

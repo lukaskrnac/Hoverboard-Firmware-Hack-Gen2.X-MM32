@@ -75,6 +75,14 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       it: CANSimple (a bit in the heartbeat's controller/axis flags or a new SDO endpoint
       `hoverboard.charger_connected`, plus `tools/endpoints.json`), the v1 RemoteUartBus reply (a state
       bit), and the web console. Optional policy: refuse to arm while charging (config switch).
+- [x] **Calibrations (2026-10-28):** `calibrate hall` (edges within ~2 deg of hallcal.py, repeat +-1.5 deg;
+      main firmware uses `hallang1..6`, FOC drive test passes), `calibrate poles` (needs a person turning the
+      wheel: not run yet), `calibrate rl` (bench 285-298 mOhm, 308-344 uH: the 460 uH default is high),
+      `calibrate kv` (block 366 / 162 vs tuned 395 / 185, sine 230 vs 242), `vbatgain` (24.87 V vs PSU 24.86),
+      `detect current` with the shunt value. The bus pin choice is now the steadily rising pin over 8
+      levels (PA0, an op-amp input, rose more in a 2-level test). TIM1 / UART init as register writes in
+      initialize.c (identical register dump, -204 B main firmware). PinFinder 30.1 / 30 KB: little room left.
+      Open: which bus calibration is right (shunt marking?), `calibrate poles` with a person, inverted halls.
 - [ ] **P8 More targets.** One source tree, `make MCU=...`:
       - MM32SPIN06: same library as SPIN05, untested with GCC; check the pin table, flash/RAM size,
         linker script, the op-amps (if any) and the hardware divider.

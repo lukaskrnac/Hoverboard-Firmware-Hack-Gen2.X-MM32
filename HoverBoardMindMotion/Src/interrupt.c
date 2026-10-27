@@ -59,7 +59,9 @@ void ADC1_COMP_IRQHandler(void){
 			//32 bit is enough for dividers below 4369.
 			vrefint = ADC1->ADDR15;
 			if(vrefint){
-				vbat = (int32_t)((uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
+				uint32_t vg = VBAT_GAIN;    //0.001: gain*adc*120/1000 = gain*adc/25*3 (32 bit)
+				vbat = (int32_t)(vg&&vg!=0xFFFF ? vg*analogRead(VBATPIN)/25u*3u/vrefint
+				                                : (uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
 				//a zero below adc 0 (ITOTAL_ZERO) reads 0 up to that current (0.76 A on the bench board), then
 				//the shifted value
 				int32_t raw = (int32_t)analogRead(ITOTALPIN)-(int32_t)itotaloffset;

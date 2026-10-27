@@ -558,6 +558,48 @@
    "meaning": "IMU id register value (WHO_AM_I / CHIP_ID)"
   },
   {
+   "index": 87,
+   "name": "hallang1",
+   "kind": "num",
+   "meaning": "angle (65536 per electrical turn) where hall state 1 starts, rising angle (calibrate hall); 0/65535 = built-in"
+  },
+  {
+   "index": 88,
+   "name": "hallang2",
+   "kind": "num",
+   "meaning": "hall state 2 edge (calibrate hall)"
+  },
+  {
+   "index": 89,
+   "name": "hallang3",
+   "kind": "num",
+   "meaning": "hall state 3 edge"
+  },
+  {
+   "index": 90,
+   "name": "hallang4",
+   "kind": "num",
+   "meaning": "hall state 4 edge"
+  },
+  {
+   "index": 91,
+   "name": "hallang5",
+   "kind": "num",
+   "meaning": "hall state 5 edge"
+  },
+  {
+   "index": 92,
+   "name": "hallang6",
+   "kind": "num",
+   "meaning": "hall state 6 edge"
+  },
+  {
+   "index": 93,
+   "name": "vbatgain",
+   "kind": "num",
+   "meaning": "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"
+  },
+  {
    "index": 96,
    "name": "extmagic",
    "kind": "num",
