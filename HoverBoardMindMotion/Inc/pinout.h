@@ -43,6 +43,8 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define IMU_ID pinstorage[86]
 #define IMU_MOUNT pinstorage[97]       //IMU mounting (PinFinder calibrate imu; imumath.h)
 #define IMU_REST(k) pinstorage[98+(k)] //gravity when level, chip axes k 0-2, int16 (1024 = 1 g): zero pitch and roll
+#define IR_PIN(k) pinstorage[101+(k)]  //infrared foot sensors k 0-1 (PinFinder detect ir)
+#define IR_MODE pinstorage[103]        //4 bits per sensor: level while covered 1 low / 2 high, + 4 x pull 1 none / 2 up / 3 down
 #define HALL_ANG(h) pinstorage[86+(h)]   //h 1..6 (words 87-92): angle (65536 per electrical turn) where hall state h
                                          //starts with rising angle (PinFinder calibrate hall); unset: +-30 deg
                                          //around the built-in sector centres
@@ -134,10 +136,10 @@ static inline int32_t cfgOrDefault(uint16_t v, int32_t def){ return (v==0||v==0x
 
 //the record a board without a saved configuration starts from (main firmware: does not boot; PinFinder:
 //detects into it). Layout version 0 values (baud 19200 in baud): ConfigMigrate() brings it up to date.
-#define PINSTORAGE_DEFAULTS {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, \
-	0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, \
-	0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xDCAB, 31, 250, 0, 19200, 8192, 1, 30, 0, 10, 300, 1, 1, 42000, \
-	32000, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+//words 32-47 of the defaults (the rest: unset 0xFFFF, 48-63 0, the extension magic); PinFinder builds the
+//record from this in a loop instead of a second 256 byte table
+#define PINSTORAGE_WORDS_32_47 0xDCAB, 31, 250, 0, 19200, 8192, 1, 30, 0, 10, 300, 1, 1, 42000, 32000, 1000
+#define PINSTORAGE_DEFAULTS {[0 ... 31] = 0xFFFF, [32] = PINSTORAGE_WORDS_32_47, [48 ... 63] = 0, \
 	[64 ... 95] = 0xFFFF, [EXT_MAGIC_POS] = EXT_MAGIC, [97 ... 127] = 0xFFFF}
 
 #define MAGICNUM_POS 32

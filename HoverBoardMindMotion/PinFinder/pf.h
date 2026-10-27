@@ -82,6 +82,7 @@ void ScanWindow(uint8_t k, int32_t mv, uint16_t pin);        //phase current pin
 void ShowAdc(void);
 void DetectButton(uint32_t ms);
 void DetectCharger(uint32_t ms);
+void DetectIr(uint32_t ms);
 void DetectImu(void);                   //pf_imu.c
 void CalImu(void);
 //pf_calib.c

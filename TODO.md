@@ -71,6 +71,12 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         QMI8658); a non axis-aligned mounting is only levelled (pitch / roll stay about the nearest axes).
       - **Done:** charger detect pin (`detect charger`, tried by the user) and the hall angle calibration
         (`calibrate hall`, see Calibrations).
+      - **Done (2026-10-28): infrared foot sensors** (`detect ir`: ir1, ir2, irmode = level + pull per sensor,
+        the charger's detection as a shared helper); main firmware: `hoverboard.foot_sensors` 0x115 and heartbeat
+        byte 7 bits 1-2. Not tried with real sensors (the bench board has none; the firmware side was tested
+        by pulling two free pins over SWD). To make room in PinFinder: the default record built in a loop
+        (PINSTORAGE_WORDS_32_47), the option lists in error messages point to help, the legacy `gen` command
+        removed. Open: a policy (e.g. disarm when no foot is on the pads), if wanted.
 - [x] **P6 Buzzer without an internal oscillator**: `buzzerpassive=2` (word 79): low battery alarm toggled
       in the adc isr (2.2 kHz), melodies by busy waiting (`Beep()`); PinFinder LED screen `t` tone / `p`
       passive buzzer, agent `pin <p> tone`. Not tried with a passive buzzer yet (the bench one is active).
@@ -184,7 +190,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash 28.8 of 30 KB (1.9 KB free; PinFinder 30.6 of 30 KB, 84 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.

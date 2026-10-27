@@ -596,6 +596,24 @@
    "access": "rw",
    "unit": "IMU gravity when level, chip z"
   },
+  "hoverboard.config.ir1": {
+   "id": 101,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "infrared foot sensor 1 (PinFinder detect ir; irmode)"
+  },
+  "hoverboard.config.ir2": {
+   "id": 102,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "infrared foot sensor 2"
+  },
+  "hoverboard.config.irmode": {
+   "id": 103,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "foot sensors, 4 bits each (ir1 bits 0-3, ir2 4-7): level while covered 1 low / 2 high (default high), + 4 x input 1 floating / 2 pull-up / 3 pull-down"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",
@@ -720,7 +738,13 @@
    "id": 276,
    "type": "uint8",
    "access": "r",
-   "unit": "1 while the charger is connected (charge pin; also heartbeat byte 7)"
+   "unit": "1 while the charger is connected (charge pin; also heartbeat byte 7 bit 0)"
+  },
+  "hoverboard.foot_sensors": {
+   "id": 277,
+   "type": "uint8",
+   "access": "r",
+   "unit": "bit 0 / 1: infrared foot sensor ir1 / ir2 covered (PinFinder detect ir); also heartbeat byte 7 bits 1-2"
   },
   "axis0.controller.config.vel_limit": {
    "id": 288,

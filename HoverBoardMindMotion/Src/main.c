@@ -38,6 +38,7 @@ volatile uint8_t  wState = STATE_LED_BATTLEVEL;    //battery LEDs until the remo
 static uint8_t flicker=0;
 volatile uint8_t buzzTone;    //passive buzzer: the adc isr makes the tone
 volatile uint8_t charging;    //charger connected (CHARGEPIN, debounced)
+volatile uint8_t footPads;    //infrared foot sensors covered: bit k = IR_PIN(k) (debounced)
 static uint8_t chargeRaw;
 static uint32_t chargeT;
 uint8_t uarten=1;
@@ -202,6 +203,14 @@ s32 main(void){
 			uint8_t c = digitalRead(CHARGEPIN)==(cfgOrDefault(CHARGE_LEVEL, 2)==2);
 			if(c!=chargeRaw){ chargeRaw = c; chargeT = millis; }
 			else if(millis-chargeT>50) charging = c;
+		}
+		for(uint8_t k=0;k<2;k++){    //infrared foot sensors, 50 ms debounce like the charger
+			static uint8_t footRaw;
+			static uint32_t footT[2];
+			if(IR_PIN(k)>=PINCOUNT) continue;
+			uint8_t c = digitalRead(IR_PIN(k))==((cfgOrDefault(IR_MODE, 0)>>(4*k)&3)!=1);    //level 1 low, else high
+			if(c!=(footRaw>>k&1)){ footRaw ^= (uint8_t)(1<<k); footT[k] = millis; }
+			else if(millis-footT[k]>50) footPads = (uint8_t)((footPads&~(1<<k))|c<<k);
 		}
 		if(millis-lastupdate>1){//speed pid loop
 			speedupdate();

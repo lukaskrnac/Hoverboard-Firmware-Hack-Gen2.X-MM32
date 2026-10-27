@@ -54,7 +54,7 @@ enum{
 	EP_VBUS = 0x100, EP_IBUS, EP_POS_ESTIMATE, EP_VEL_ESTIMATE, EP_IQ_MEASURED, EP_IQ_SETPOINT,
 	EP_AXIS_STATE, EP_ACTIVE_ERRORS, EP_DISARM_REASON, EP_ODOMETER, EP_CONTROL_MODE, EP_INPUT_MODE,
 	EP_COMMUTATION, EP_INPUT_POS, EP_INPUT_VEL, EP_INPUT_TORQUE, EP_INPUT_VOLTAGE, EP_TORQUE_CONSTANT,
-	EP_ID_SETPOINT, EP_FAST_SPEED, EP_CHARGER,
+	EP_ID_SETPOINT, EP_FAST_SPEED, EP_CHARGER, EP_FOOT_SENSORS,
 	//ODrive parameters (float, ODrive units), stored in the config words
 	EP_VEL_LIMIT = 0x120, EP_POS_GAIN, EP_VEL_GAIN, EP_VEL_INTEGRATOR_GAIN, EP_CURRENT_SOFT_MAX,
 	EP_CURRENT_HARD_MAX, EP_TORQUE_CONSTANT_CFG, EP_POLE_PAIRS, EP_PHASE_RESISTANCE, EP_WATCHDOG_TIMEOUT,
@@ -136,7 +136,7 @@ static uint8_t getMsg(uint8_t cmd, uint8_t* d){
 		case CMD_HEARTBEAT:
 			wrU32(d, axisErrors|axisDisarm);
 			d[4] = gatesoff ? AXIS_IDLE : AXIS_CLOSED_LOOP;    //the state in effect (v1 frames arm with bit 64)
-			d[5] = 0; d[6] = posDone; d[7] = charging;    //byte 7 (unused by ODrive): charger connected
+			d[5] = 0; d[6] = posDone; d[7] = (uint8_t)(charging|footPads<<1);    //byte 7 (unused by ODrive): bit 0 charger, 1-2 foot sensors
 			return 8;
 		case CMD_GET_ERROR:
 			wrU32(d, axisErrors); wrU32(d+4, axisDisarm);
@@ -452,6 +452,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_ID_SETPOINT: if(write) focIdRef = (int32_t)v; r = (uint32_t)focIdRef; break;
 			case EP_FAST_SPEED: r = (uint32_t)fastspeed; break;
 			case EP_CHARGER: r = charging; break;
+			case EP_FOOT_SENSORS: r = footPads; break;
 			case EP_IMU_STATE: r = imuState; break;
 			case EP_SAVE_CONFIGURATION: if(!write) return 0; RemoteSaveConfig(); break;
 			case EP_CLEAR_ERRORS: if(!write) return 0; axisDisarm = 0; FocClearTrip(); break;

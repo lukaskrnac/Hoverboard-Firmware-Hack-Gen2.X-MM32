@@ -100,5 +100,8 @@
 	F(98, 0, "imurestx") \
 	F(99, 0, "imuresty") \
 	F(100, 0, "imurestz") \
+	F(101, 1, "ir1") \
+	F(102, 1, "ir2") \
+	F(103, 0, "irmode") \
 
-#define CFG_FIELD_COUNT 99
+#define CFG_FIELD_COUNT 102

@@ -192,10 +192,10 @@ uint16_t DutyForMv(int32_t mv){
 
 uint8_t PinFree(uint16_t pin){
 	if(pin>=PINCOUNT||pin==PA13||pin==PA14) return 0;    //SWD
-	for(uint8_t i=0;i<=17;i++){    //pins 0-17 (11 = charger), 23, 24, 83, 84
+	for(uint8_t i=0;i<=17;i++){    //pins 0-17 (11 = charger), 23, 24, 83, 84, 101, 102
 		if(pinstorage[i]==pin) return 0;
 	}
-	return OCPPIN!=pin&&OCPREFPIN!=pin&&IMU_SDA!=pin&&IMU_SCL!=pin;
+	return OCPPIN!=pin&&OCPREFPIN!=pin&&IMU_SDA!=pin&&IMU_SCL!=pin&&IR_PIN(0)!=pin&&IR_PIN(1)!=pin;
 }
 
 uint8_t HallState(void){

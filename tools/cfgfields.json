@@ -628,6 +628,24 @@
    "name": "imurestz",
    "kind": "num",
    "meaning": "IMU gravity when level, chip z"
+  },
+  {
+   "index": 101,
+   "name": "ir1",
+   "kind": "pin",
+   "meaning": "infrared foot sensor 1 (PinFinder detect ir; irmode)"
+  },
+  {
+   "index": 102,
+   "name": "ir2",
+   "kind": "pin",
+   "meaning": "infrared foot sensor 2"
+  },
+  {
+   "index": 103,
+   "name": "irmode",
+   "kind": "num",
+   "meaning": "foot sensors, 4 bits each (ir1 bits 0-3, ir2 4-7): level while covered 1 low / 2 high (default high), + 4 x input 1 floating / 2 pull-up / 3 pull-down"
   }
  ]
 }

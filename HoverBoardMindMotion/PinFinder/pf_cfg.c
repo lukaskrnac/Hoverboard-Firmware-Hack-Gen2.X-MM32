@@ -97,8 +97,9 @@ void CfgSave(void){
 	CfgMarkSaved();
 }
 
-void CfgDefaults(void){
-	static const uint16_t def[128] = PINSTORAGE_DEFAULTS;
-	memcpy(pinstorage, def, sizeof(def));
+void CfgDefaults(void){    //PINSTORAGE_DEFAULTS (pinout.h), built: only words 32-47 are a table
+	static const uint16_t mid[16] = { PINSTORAGE_WORDS_32_47 };
+	for(uint8_t i=0;i<128;i++) pinstorage[i] = i<32||i>=64 ? 0xFFFF : (i<48 ? mid[i-32] : 0);
+	pinstorage[EXT_MAGIC_POS] = EXT_MAGIC;
 	ConfigMigrate();
 }

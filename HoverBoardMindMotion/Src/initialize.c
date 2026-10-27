@@ -40,10 +40,13 @@ void io_init(void){
 	if(BUZZERPIN<PINCOUNT){
 		pinMode(BUZZERPIN, OUTPUT);
 	}
+	static const uint8_t pull[] = { INPUT, INPUT, INPUT_PULLUP, INPUT_PULLDOWN };    //0 / 1 floating, 2 up, 3 down
 	if(CHARGEPIN<PINCOUNT){
-		static const uint8_t pull[] = { INPUT, INPUT_PULLUP, INPUT_PULLDOWN };
 		uint32_t p = cfgOrDefault(CHARGE_PULL, 1);
-		pinMode(CHARGEPIN, pull[p>=1&&p<=3 ? p-1 : 0]);
+		pinMode(CHARGEPIN, pull[p<=3 ? p : 0]);
+	}
+	for(uint8_t k=0;k<2;k++){    //infrared foot sensors: IR_MODE bits 2-3 (+4 for the second)
+		if(IR_PIN(k)<PINCOUNT) pinMode(IR_PIN(k), pull[cfgOrDefault(IR_MODE, 0)>>(4*k+2)&3]);
 	}
 }
 

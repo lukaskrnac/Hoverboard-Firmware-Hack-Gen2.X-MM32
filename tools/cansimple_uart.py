@@ -106,7 +106,8 @@ class Bus:
         if d is None: return None
         err, state, proc, done, charger = struct.unpack("<IBBBB", d[:8])
         return dict(errors=err, error_names=[v for k, v in ERRORS.items() if err & k], state=state, procedure_result=proc,
-                    trajectory_done=done, charger_connected=charger & 1)    # byte 7: hoverboard extension
+                    trajectory_done=done, charger_connected=charger & 1,    # byte 7: hoverboard extension
+                    foot_sensors=(charger >> 1) & 3)
 
     def get_error(self, node):
         d = self.request(node, "GET_ERROR")

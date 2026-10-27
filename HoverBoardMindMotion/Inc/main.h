@@ -18,6 +18,7 @@ extern volatile int realspeed;           //measured speed
 extern volatile uint8_t wState;          //state byte from the remote
 extern volatile uint8_t buzzTone;        //passive buzzer on: the adc isr toggles the pin (2.2 kHz)
 extern volatile uint8_t charging;        //charger connected
+extern volatile uint8_t footPads;        //infrared foot sensors covered, bit 0 / 1 = ir1 / ir2
 extern uint8_t uarten;          //uart in use: 1 = UART1, 2 = UART2
 extern uint8_t halltimen;       //hall timer: 1 = TIM2, 0 = TIM3
 

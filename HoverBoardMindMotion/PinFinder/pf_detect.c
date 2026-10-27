@@ -270,23 +270,45 @@ void DetectButton(uint32_t ms){
 
 //start with the charger disconnected: the pin that changes when it is connected, and how to read it
 //(the main firmware: CHARGE_LEVEL, CHARGE_PULL)
-void DetectCharger(uint32_t ms){
+//an input the user switches (charger, infrared foot sensor): the pin that changes, its level while active
+//(1 low, 2 high) and its input mode (1 floating, 2 pull-up, 3 pull-down; states 0 / 1 driven, 2 floating:
+//floating while active, it is pulled towards the other level). 0: no pin changed (the old pin stays)
+static uint8_t userInput(uint16_t* pin, uint32_t ms, uint8_t* level, uint8_t* pull){
 	uint8_t from, to;
-	if(!ms) ms = 30000;
-	uint16_t keep = CHARGEPIN;
-	CHARGEPIN = PIN_NONE;
+	uint16_t keep = *pin;
+	*pin = PIN_NONE;
+	uint16_t p = waitChange(keep, ms ? ms : 30000, &from, &to);
+	if(p==PIN_NONE){ *pin = keep; err("no pin changed"); return 0; }
+	*level = (uint8_t)((to==2 ? !from : to) ? 2 : 1);
+	*pull = to==2 ? (from ? 3 : 2) : (from==2 ? (to ? 3 : 2) : 1);
+	*pin = p;
+	return 1;
+}
+
+void DetectCharger(uint32_t ms){
+	uint8_t level, pull;
 	note("plug in the charger (start unplugged; any key cancels)");
-	uint16_t p = waitChange(keep, ms, &from, &to);
-	if(p==PIN_NONE){ CHARGEPIN = keep; err("no pin changed"); return; }
-	//states: 0 / 1 driven, 2 floating. Connected floating: pull towards the other level
-	uint8_t level = to==2 ? !from : to;
-	uint8_t pull = to==2 ? (from ? 3 : 2) : (from==2 ? (to ? 3 : 2) : 1);
-	CHARGEPIN = p;
-	CHARGE_LEVEL = (uint16_t)(level ? 2 : 1);
+	if(!userInput(&CHARGEPIN, ms, &level, &pull)) return;
+	CHARGE_LEVEL = level;
 	CHARGE_PULL = pull;
-	kvp("charge", p);
-	kvi("chargelevel", CHARGE_LEVEL);
-	kvi("chargepull", CHARGE_PULL);
+	kvp("charge", CHARGEPIN);
+	kvi("chargelevel", level);
+	kvi("chargepull", pull);
+	ok();
+}
+
+//the two infrared foot sensors, one after the other (the first one is no longer free for the second)
+void DetectIr(uint32_t ms){
+	uint16_t mode = 0;
+	for(uint8_t k=0;k<2;k++){
+		uint8_t level, pull;
+		note(k ? "now cover the other one" : "cover one infrared foot sensor (any key cancels)");
+		if(!userInput(&IR_PIN(k), ms, &level, &pull)) return;
+		mode = (uint16_t)(mode|(level|pull<<2)<<(4*k));
+		kvp(k ? "ir2" : "ir1", IR_PIN(k));
+	}
+	IR_MODE = mode;
+	kvi("irmode", mode);
 	ok();
 }
 

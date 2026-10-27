@@ -46,8 +46,8 @@ static int32_t millivolts(const char* s){
 
 static void help(void){
 	static const char* const h[] = {
-		"info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults | gen",
-		"detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | latch",
+		"info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults",
+		"detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | ir [ms] | latch",
 		"calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max] | imu",
 		"adc | hall | pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]",
 		"step <1-6|101-112> [mV] [ms] | rotate <permille> [ms] | poweroff | tui | agent",
@@ -111,7 +111,7 @@ static void pinCmd(const char* name, const char* mode, const char* arg){
 		}
 		pinMode((uint8_t)p, INPUT);
 	}
-	else{ err("mode: high low pullup pulldown input read blink tone"); return; }
+	else{ err("pin mode? (help)"); return; }
 	ok();
 }
 
@@ -152,15 +152,16 @@ void Command(char* line){
 			else if(!strcmp(w, "imu")) DetectImu();
 			else if(!strcmp(w, "button")) DetectButton(optnum(a2));
 			else if(!strcmp(w, "charger")) DetectCharger(optnum(a2));
+			else if(!strcmp(w, "ir")) DetectIr(optnum(a2));
 			else if(!strcmp(w, "latch")) LatchFind();
-			else err("detect what? hall vbat current imu button charger latch");
+			else err("detect what? (help)");
 		}else{
 			if(!strcmp(w, "hall")) CalHall((int32_t)optnum(a2));
 			else if(!strcmp(w, "poles")) CalPoles(optnum(a2));
 			else if(!strcmp(w, "rl")) CalRL((int32_t)optnum(a2));
 			else if(!strcmp(w, "kv")) CalKv(a2, (int32_t)optnum(a3));
 			else if(!strcmp(w, "imu")) CalImu();
-			else err("calibrate what? hall poles rl kv imu");
+			else err("calibrate what? (help)");
 		}
 	}
 	else if(!strcmp(c, "adc")){ ShowAdc(); ok(); }
@@ -175,14 +176,6 @@ void Command(char* line){
 		uint8_t g;
 		int32_t pm = num(a1, &g);
 		if(!g) err("rotate <permille> [ms]"); else Rotate(pm, optnum(a2));
-	}
-	else if(!strcmp(c, "gen")){
-		kv("pinstorage");
-		outc('{');
-		for(uint8_t i=0;i<128;i++){ if(i) out(", "); outi(pinstorage[i]); }
-		outc('}');
-		nl();
-		ok();
 	}
 	else if(!strcmp(c, "poweroff")) PowerOff();
 	else if(!strcmp(c, "tui")){ agent = 0; TuiStart(); }

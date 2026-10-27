@@ -24,7 +24,7 @@ register headers, CMSIS) are in `HoverBoardMindMotion/Device/`. A change of the 
 
 Integer division runs on the chip's hardware divider (`Src/hwdiv.S`) and floats on a compact soft
 float (`Src/softfloat.c`, round to nearest even like libgcc, subnormals read as 0); both replace
-libgcc's routines. Size: 28.8 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
+libgcc's routines. Size: 29.1 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
 worst case stack, main loop plus nested interrupts, is ~670 bytes).
 
 MCUs (`make MCU=...`, `Inc/mcu.h`). All four share the SPIN05 register headers and HAL: their
@@ -211,7 +211,7 @@ https://youtu.be/hCaIlEKzI3A
 * software and hardware over current protection
 * sine wave mode to drive the motor with more torque and higher effiency
 * FOC with two measured phase currents; pwm, speed, torque and position control for block, sine and FOC; field weakening
-### Buzzer and charger
+### Buzzer, charger and foot sensors
 * `buzzerpassive=2` for a buzzer without its own oscillator (a plain piezo or magnetic buzzer stays
   silent on a steady level): it gets a 2.2 kHz square wave (the low battery alarm from the adc
   interrupt, the melodies by busy waiting). Default: an active buzzer, switched on and off.
@@ -220,6 +220,10 @@ https://youtu.be/hCaIlEKzI3A
   CANSimple in heartbeat byte 7 (bit 0; ODrive leaves the byte unused) and as the parameter
   `hoverboard.charger_connected` (0x114). The v1 reply has no free field, so v1 masters do not see it.
   `chargelock=2` keeps the gates off while the charger is connected.
+* `ir1`, `ir2` (+ `irmode`, PinFinder's `detect ir`): the infrared foot pad sensors, debounced 50 ms,
+  reported as `hoverboard.foot_sensors` (0x115, bit 0 / 1 = sensor covered) and in heartbeat byte 7
+  bits 1-2. Reported only: nothing in the drive logic depends on them. Tested without sensors (pins
+  pulled up / down over SWD); no board with them here.
 ### IMU
 * The IMU found by PinFinder's `detect imu` (`imusda`, `imuscl`, `imuaddr`) is read when it has the
   InvenSense register map: address 0x68/0x69 (MPU-6050/6500/9250, ICM-206xx and clones; not
@@ -278,13 +282,13 @@ python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
 | `calibrate imu` | the IMU's mounting: the board stands still as when driving (up, and the level), then is tilted forward by 20-60 deg and held (gravity moves towards -forward) -> `imumount` (1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z), `imurestx/y/z` (gravity at rest: zero pitch and roll) |
 | `detect imu` | free pins with an external pull-up, every pair tried as bit-banged I2C; the address and id register (MPU-6xxx incl. the 0x2E clone, ICM-2xxxx/4xxxx, BMI160/270, LSM6DS*, QMI8658, LIS3DH, SC7A20, QMA*; an unknown chip at an IMU address is kept as `unknown`) -> `imusda`, `imuscl`, `imuaddr`, `imuid` |
 | `detect button [ms]`, `detect charger [ms]` | the pin that changes while you press the button / connect the charger (pins read with pull-up and pull-down: driven 0/1 or floating) |
+| `detect ir [ms]` | the two infrared foot sensors: cover one, then the other when asked; per sensor the pin that changes, its level while covered and its input pull (as `detect charger`) -> `ir1`, `ir2`, `irmode` |
 | `detect latch` | releases the free pins one by one, saving each as the latch first: the board switches off at the latch pin, the next start holds it |
 | `adc`, `hall` | voltages of the free adc pins, hall state now |
 | `pin <pin> high\|low\|pullup\|pulldown\|input\|read\|blink\|tone [ms]` | drive a free pin (LEDs, buzzer); `read` works on any pin: level, voltage (adc pins), what it is used as |
 | `step <1-6\|101-112> [mV] [ms]` | hold a block step or field direction; hall state and the currents (triggered like the main firmware) |
 | `scan <k> <mV> <pin>` | hold field direction k (0-11) and sample a pin at 32 points of the pwm period |
 | `rotate <permille> [ms]` | hall commutation test as the main firmware does it; counts forward/backward hall steps |
-| `gen` | `pinstorage` initializer for a firmware with a fixed configuration |
 | `poweroff` | |
 
 A browser page for the same, over Web Serial: `pinfinder.html` in the

@@ -91,5 +91,8 @@ FIELDS = {
     98: ("imurestx", "num", "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"),
     99: ("imuresty", "num", "IMU gravity when level, chip y"),
     100: ("imurestz", "num", "IMU gravity when level, chip z"),
+    101: ("ir1", "pin", "infrared foot sensor 1 (PinFinder detect ir; irmode)"),
+    102: ("ir2", "pin", "infrared foot sensor 2"),
+    103: ("irmode", "num", "foot sensors, 4 bits each (ir1 bits 0-3, ir2 4-7): level while covered 1 low / 2 high (default high), + 4 x input 1 floating / 2 pull-up / 3 pull-down"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}
