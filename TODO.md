@@ -3,9 +3,100 @@
 State of the `gcc-build` branch (local, not pushed). Bench setup: MM32SPIN05 board on a 24 V bench
 supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave header (TX PB6 / RX PB4).
 
+## PinFinder and board support (requested 2026-10-27)
+
+Order: P1 is the base for the rest (P2-P7 extend that build, P8 is a protocol on top of P2). PinFinder
+stays a separate firmware image (the main firmware has 4.6 KB of flash left), built from this tree so
+it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
+
+- [ ] **P1 PinFinder on GCC, in this tree.** Port `origin/pin-finder` (`autodetect.c` + its main loop,
+      Keil only) as a second target: `make pinfinder` -> `build/pinfinder.bin`, flashed with the same
+      `mm32flash.py` (keeps the config page; soft start). Needs: `volatile` on the globals the UART ISR
+      writes (its busy-waits hang under GCC, e.g. the ANSI terminal check; the scratch build in
+      `~/.cache/opencode-scratch/mm32-hover/pinfinder/` works around it with -O0), battery voltages in
+      mV with integer printf (no float printf: blank values now), the config written in the current
+      layout (`CFG_VERSION_CURRENT`, the extension record 64-127 left alone), the power latch detection
+      fixed when the MCU is powered from the debugger. Done when: every existing menu item works on the
+      bench board and the result boots the main firmware unchanged.
+- [ ] **P2 Non-interactive mode for agents/scripts.** A line protocol next to the TUI, selected by the
+      first line received (e.g. `@` prefix) or a config bit, no ANSI, no prompts, no confirmations:
+      one command per line (`detect hall`, `detect led`, `detect vbat`, `detect itotal`, `detect iphase`,
+      `detect button`, `detect imu`, `detect charger`, `get <idx|name>`, `set <name> <value>`, `list`,
+      `save`, `erase`, `rotate <duty> <ms>`, `poweroff`, `info`), each answered with `key=value` lines
+      and a final `ok` / `err <code> <text>`, pin names as `PA7`, not table indices. Long detections
+      print `progress <n>/<m>` and accept `abort`. Host side: `tools/pinfinder.py` (pyserial) with
+      `--json` output, used by the web tool and by the bench tests; document it in README.
+- [ ] **P3 TUI.** Today: a numbered menu, raw ANSI, results scroll away. Wanted: one screen with the
+      pin map (each config slot, its pin, how it was found: detected / manual / default), status line
+      (vcc, vbat, chip id + flash size, firmware version), the menu, and a log area; detections update
+      the map in place; `?` help per item; works without ANSI (the existing terminal check falls back to
+      plain lines); confirmation only for erase / save / motor rotation. Keep it inside the flash budget
+      of the PinFinder image (check `size` after each step).
+- [ ] **P4 Web GUI config tool.** A page in the console repo (`remoteuartbus-online`, e.g.
+      `pinfinder.html`) over WebSerial using the P2 protocol: pin map table, buttons
+      per detection with progress, edit any config word with names/units from the same source as
+      `tools/endpoints.json` / `pinout.h`, save, export/import the config as JSON, "flash main firmware"
+      hint. Also usable against the main firmware's CANSimple config endpoints for the words both
+      share. UI test like `uitest/` (headless chrome, WS bridge).
+- [ ] **P5 New detections.**
+      - **Phase current pins** (`IPHASEAPIN`/`IPHASEBPIN`/`IPHASE_CFG`/`IPHASE_GAIN`): with the gates on and
+        a small static SVPWM vector swept over 360 deg (as `opaprobe.py`), sample every free ADC pin at the
+        low-side window; pins whose reading follows a sinusoid of the vector angle are phase currents.
+        The phase of each sinusoid gives the phase (A/B/C) and the sign gives bit 2 of `IPHASE_CFG`; the
+        amplitude against the bus shunt (calibrated by a locked-rotor step, `blockcal.py`) gives the gain.
+        Boards without op-amps/phase shunts: report "none" (FOC not available, sine falls back to the
+        bus shunt).
+      - **DC (bus) current pin** (`ITOTALPIN`): existing item 4 only finds a pin that moves; add the zero
+        offset (`ITOTAL_ZERO`, below adc 0 on the bench board) and the divider (`ITOTAL_DIVIDER`) from a
+        locked-rotor block step against the phase currents (or against a known load if there are none).
+      - **IMU**: scan I2C on the hardware I2C pin pairs (PD0/PD1 on the bench board) and bit-banged on
+        other free pin pairs with pull-ups; probe 0x68/0x69 (MPU-6050/6500/9250, ICM-20xxx: WHO_AM_I
+        0x75), 0x6A/0x6B (LSM6DS*: 0x0F), BMI160 (0x68, CHIP_ID 0x00 = 0xD1); report bus pins, address,
+        chip. Store pins + type in new config words (extension record).
+      - **Charger detect pin** (bench: PB10): ask the user to plug/unplug the charger, find the input that
+        follows it (pull-up and pull-down tried), store pin + polarity.
+      - **Hall angle calibration** (the item below, moved into PinFinder).
+- [ ] **P6 Buzzer without an internal oscillator** (passive piezo/magnetic buzzer): the firmware only
+      sets the pin high (`main.c`), which is silent on a passive buzzer. Config word: buzzer type
+      (active / passive) + tone. Passive: toggle the pin from the ADC ISR (4.39 kHz -> 2.2 kHz tone, no
+      timer needed, works on any pin; a divider in the ISR gives lower tones), or a free timer channel
+      if the pin has one (TIM3/TIM14/16/17, check which are free: TIM1 PWM, TIM2/TIM3 are used now).
+      PinFinder's LED/buzzer detection asks "did you hear it" for both drive types and stores the type.
+- [ ] **P7 Charger state to the remote.** Read the charger pin (P5) in the main loop, debounced; report
+      it: CANSimple (a bit in the heartbeat's controller/axis flags or a new SDO endpoint
+      `hoverboard.charger_connected`, plus `tools/endpoints.json`), the v1 RemoteUartBus reply (a state
+      bit), and the web console. Optional policy: refuse to arm while charging (config switch).
+- [ ] **P8 More targets.** One source tree, `make MCU=...`:
+      - MM32SPIN06: same library as SPIN05, untested with GCC; check the pin table, flash/RAM size,
+        linker script, the op-amps (if any) and the hardware divider.
+      - MM32SPIN25: needs the MM32SPIN2x pack headers (`Device/MM32SPIN2x/Source/README.md`), its HAL is
+        vendored in `Library/MM32SPIN25`; different pin count/AFs, op-amps (`hal_op.c`), flash/RAM size
+        and the config page address (to check).
+      - MM32F030 / MM32F031 (and the `origin/pinfinder-spin280` branch's MM32SPIN0280): general-purpose
+        M0 parts on some boards; vendor headers, clock tree (maximum clock to check: PWM_RES and every
+        timing assume 72 MHz), no gate driver/op-amps.
+      Runtime: PinFinder reports the chip (DBGMCU IDCODE, flash size register) and refuses a firmware
+      built for another MCU; the flasher checks the same before programming.
+- [ ] **P9 Still not detected / features to consider** (review, then promote to items):
+      - E-stop input (bench PB0) and WS2812 header (PB12): detect + support (E-stop = disarm like the
+        CANSimple Estop; WS2812 status LED like the RGB LED).
+      - Pole pairs (`WINDINGS`): count hall edges per wheel turn (the user turns the wheel one turn, or
+        the motor turns slowly with a mark/camera).
+      - Motor R and L (`MOTOR_R`, `PHASE_L`): ODrive-style motor calibration (dc step for R, ac/step
+        response for L) with the phase currents; torque constant / kv (`TORQUE_CONST`, `SINE_KV`) from a
+        free run at a known modulation.
+      - Battery voltage divider (`VBAT_DIVIDER`): the user enters the measured voltage once.
+      - Low-side polarity (`INVERT_LOWSIDE`) and the over-current comparator pins (`OCPPIN`/`OCPREFPIN`):
+        detect safely (gate driver input states with the bridge unpowered?) or keep manual with a warning.
+      - Master/slave UART (the second board link) and the remote UART pins: `finduartloop` exists for
+        the debug port; extend to both.
+      - Temperature: MCU internal sensor (ADC channel) and an NTC pin if fitted; report + derate.
+      - Battery cell count from the measured voltage -> suggested `BAT_FULL`/`BAT_EMPTY`.
+      - Headlight / brake light outputs on some boards (detect like the LEDs).
+
 ## Next
 
-- [ ] **Hall angle calibration in PinFinder.** The sine angle estimator uses `CWAngleTab` (hall state
+- [ ] **Hall angle calibration in PinFinder** (see P5). The sine angle estimator uses `CWAngleTab` (hall state
       centres) and assumes the sector boundaries at ±30° (`hallhandle.c`). That was measured on one
       bench motor; other motors or hall placements can differ. Add a PinFinder menu item that:
       1. puts TIM1 in sine output mode, applies a small d-axis vector (Ds only, ~5 % of 32768) at a
@@ -19,12 +110,6 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       Reference: the host-side version that produced the numbers (core halted, SWD):
       `~/.cache/opencode-scratch/mm32-hover/hallcal.py`. Measured boundaries: 29.9, 90.7, 149.0,
       211.0, 269.6, 329.8° (±1.5°). Keep the vector small: the bus current spikes to ~11 A raw.
-- [ ] **PinFinder on GCC.** The `pin-finder` branch is Keil-only and needs the same work as main:
-      vendored headers/Makefile, and the globals written by the serial interrupt made `volatile`
-      (its busy-waits hang under GCC otherwise, e.g. the ANSI terminal check). A scratch build with
-      those fixes works (`~/.cache/opencode-scratch/mm32-hover/pinfinder/`). It has no float printf,
-      so the battery-voltage menu prints blank values: print in mV with integers instead.
-      Its power-latch detection gives wrong results when the MCU is powered from the debugger.
 - [ ] Bus current in sine mode on boards **without** phase current pins: the shunt is sampled at the
       zero vector and reads ~0 (noise); they need a second sample inside an active vector. (With the
       pins, sine now uses the phase currents like FOC, up to 90 % modulation.)
@@ -122,10 +207,8 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] RemoteUartBus: state bit 128 (shut off) and `slaveNew` are not implemented; there is no read
       command for the configuration (the console cannot show the board's drive mode). A position mode
       (GD32 drive mode 3, odometer target) would be the useful new mode.
-- [ ] MM32SPIN06 untested with the GCC build; MM32SPIN25 not ported (needs the MM32SPIN2x pack
-      headers, see `HoverBoardMindMotion/Device/MM32SPIN2x/Source/README.md`).
-- [ ] Unused board hardware on the bench board: charger detect PB10, E-stop PB0, I2C PD0/PD1, WS2812
-      headers. (PA0–PA6 are not comparators: the PFOP's op-amps, phase B/C current, see README.)
+- MM32SPIN06/25, charger, E-stop, I2C/IMU, WS2812: moved to P5-P9 above. (PA0–PA6 on the bench board
+  are not comparators: the PFOP's op-amps, phase B/C current, see README.)
 
 ## Done (this branch)
 
