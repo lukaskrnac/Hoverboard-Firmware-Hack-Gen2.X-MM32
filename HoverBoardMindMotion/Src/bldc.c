@@ -197,6 +197,9 @@ void speedupdate(void){
 		//at command 0 re-armed while the set point was still high (VEL_RAMP): the wheel shot off. v1
 		//masters have no Clear_Errors: there the trip still clears at command 0.
 		if(focTrip&&cmdSource==2) axisDisarm |= ERR_CURRENT_LIMIT_VIOLATION;
+		//a disarm by error leaves the axis IDLE (ODrive): Clear_Errors alone switched the gates back on
+		//with the old set point; now the master arms again (Set_Axis_State CLOSED_LOOP_CONTROL)
+		if(axisDisarm) axisState = AXIS_IDLE;
 		gatesoff = lowbatperm || axisDisarm || idle;
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a

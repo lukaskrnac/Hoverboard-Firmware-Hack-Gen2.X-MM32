@@ -187,7 +187,10 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			break;
 		case CMD_SET_AXIS_STATE:
 			if(len>=4){
+				//the axis state takes effect for CANSimple commands only (v1: state bit 64): a board that
+				//had no set point yet (boot) ignored IDLE and kept driving
 				uint32_t st = rdU32(d);
+				cmdSource = 2;
 				if(st==AXIS_IDLE) axisState = AXIS_IDLE;
 				else if(st==AXIS_CLOSED_LOOP&&!axisDisarm){ axisState = AXIS_CLOSED_LOOP; RemoteFeedWatchdog(); }
 			}
@@ -403,7 +406,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 				memcpy(&r, ep==EP_IQ_MEASURED ? q+4 : q, 4); break;
 			}
 			case EP_AXIS_STATE:
-				if(write){ if(v==AXIS_IDLE) axisState = AXIS_IDLE; else if(v==AXIS_CLOSED_LOOP&&!axisDisarm) axisState = AXIS_CLOSED_LOOP; }
+				if(write){ cmdSource = 2; if(v==AXIS_IDLE) axisState = AXIS_IDLE; else if(v==AXIS_CLOSED_LOOP&&!axisDisarm) axisState = AXIS_CLOSED_LOOP; }
 				r = axisState; break;
 			case EP_ACTIVE_ERRORS: r = axisErrors; break;
 			case EP_DISARM_REASON: r = axisDisarm; break;
