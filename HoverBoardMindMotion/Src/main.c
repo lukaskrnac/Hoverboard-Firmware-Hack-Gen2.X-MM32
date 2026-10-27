@@ -58,6 +58,12 @@ static void DelayFed(uint32_t ms){
 	}
 }
 
+static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured pins are ignored)
+	digitalWrite(LEDRPIN, r);
+	digitalWrite(LEDGPIN, g);
+	digitalWrite(LEDBPIN, b);
+}
+
 s32 main(void){
 	DELAY_Init();
 	if(!restorecfg()&&EEPROMEN){    //if data in eeprom is not valid, do not boot up
@@ -161,46 +167,20 @@ s32 main(void){
 		digitalWrite(LEDUPIN, (state&STATE_LED_UP)!=0);    //unconfigured pins are ignored
 		digitalWrite(LEDDPIN, (state&STATE_LED_DOWN)!=0);
 		if(!(state&STATE_LED_BATTLEVEL)){    //the remote sets the LEDs
-			digitalWrite(LEDGPIN, (state&STATE_LED_GREEN)!=0);
-			digitalWrite(LEDBPIN, (state&STATE_LED_ORANGE)!=0);
-			digitalWrite(LEDRPIN, (state&STATE_LED_RED)!=0);
+			setRGB((state&STATE_LED_RED)!=0, (state&STATE_LED_GREEN)!=0, (state&STATE_LED_ORANGE)!=0);
 		}else if(LEDRPIN<PINCOUNT&&LEDGPIN<PINCOUNT&&LEDBPIN<PINCOUNT){
-			int32_t bat_range = (int32_t)BAT_FULL-BAT_EMPTY;
-			int32_t bat_10 = BAT_EMPTY+bat_range*10/100;
-			int32_t bat_20 = BAT_EMPTY+bat_range*20/100;
-			int32_t bat_50 = BAT_EMPTY+bat_range*50/100;
-			int32_t bat_60 = BAT_EMPTY+bat_range*60/100;
-			int32_t bat_70 = BAT_EMPTY+bat_range*70/100;
 			if(BAT_FULL>20000&&BAT_FULL<65000&&BAT_EMPTY>20000&&BAT_EMPTY<65000&&BAT_FULL>BAT_EMPTY){
-				if(vbat*10>bat_70){
-					digitalWrite(LEDRPIN,0);
-					digitalWrite(LEDGPIN,1);
-					digitalWrite(LEDBPIN,0);
-				}else if(vbat*10>bat_60){
-					digitalWrite(LEDRPIN,0);
-					digitalWrite(LEDGPIN,1);
-					digitalWrite(LEDBPIN,1);
-				}else if(vbat*10>bat_50){
-					digitalWrite(LEDRPIN,0);
-					digitalWrite(LEDGPIN,0);
-					digitalWrite(LEDBPIN,1);
-				}else if(vbat*10>bat_20){
-					digitalWrite(LEDRPIN,1);
-					digitalWrite(LEDGPIN,0);
-					digitalWrite(LEDBPIN,1);
-				}else if(vbat*10>bat_10){
-					digitalWrite(LEDRPIN,1);
-					digitalWrite(LEDGPIN,0);
-					digitalWrite(LEDBPIN,0);
-				}else{
-					digitalWrite(LEDRPIN,flicker);
-					digitalWrite(LEDGPIN,0);
-					digitalWrite(LEDBPIN,0);
+				//battery level: above 70 % of the range green, 60 % green + orange (the LEDB pin), 50 % orange,
+				//20 % red + orange, 10 % red, below that red flashing
+				static const uint8_t level[5][2] = { {70, 2}, {60, 3}, {50, 1}, {20, 5}, {10, 4} };    //percent, rgb bits
+				int32_t bat_range = (int32_t)BAT_FULL-BAT_EMPTY;
+				uint8_t rgb = flicker ? 4 : 0;
+				for(uint8_t k=0;k<5;k++){
+					if(vbat*10>(int32_t)BAT_EMPTY+bat_range*level[k][0]/100){ rgb = level[k][1]; break; }
 				}
+				setRGB(rgb&4, rgb&2, rgb&1);
 			}else{
-				digitalWrite(LEDRPIN,digitalRead(HALLAPIN));
-				digitalWrite(LEDGPIN,digitalRead(HALLBPIN));
-				digitalWrite(LEDBPIN,digitalRead(HALLCPIN));
+				setRGB(digitalRead(HALLAPIN), digitalRead(HALLBPIN), digitalRead(HALLCPIN));
 			}
 		}
 		if(BUZZERPIN<PINCOUNT){

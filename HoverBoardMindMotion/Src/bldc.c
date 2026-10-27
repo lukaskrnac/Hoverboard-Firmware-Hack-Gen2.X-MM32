@@ -118,72 +118,29 @@ uint8_t hallpos(uint8_t forward){
 	return HallValue;
 }
 
-void commutate(){//U,V,W(A,B,C)
+//TIM1 channels 1-3: output compare mode (all three) and the CCER enable bits CCxE / CCxNE (the polarity
+//bits stay), then the COM event: with CCPC set (TIM1_init) these registers are preloaded and switch
+//together at that event
+#define CCER_EN (TIM_CCER_CC1EN|TIM_CCER_CC1NEN|TIM_CCER_CC2EN|TIM_CCER_CC2NEN|TIM_CCER_CC3EN|TIM_CCER_CC3NEN)
+static void tim1Outputs(uint32_t mode, uint32_t en){
+	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|mode|mode<<8;
+	TIM1->CCMR2 = (TIM1->CCMR2&~TIM_CCMR2_OC3M)|mode;
+	TIM1->CCER = (TIM1->CCER&~CCER_EN)|en;
+	TIM1->EGR = TIM_EventSource_COM;
+}
 
-	if(step == 1) {//-1,0,1
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Enable);
-	}else if(step == 2) {//0,-1,1
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Enable);
-	}else if(step == 3) {//1,-1,0
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Enable);
-	}else if(step == 4) {//1,0,-1
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Enable);
-	}else if(step == 5) {//0,1,-1
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Enable);
-	}else if(step == 6) {//-1,1,0
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Disable);
-		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Enable);
-	}else{//0,0,0
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Disable);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Disable);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Disable);
-	}
-
-	TIM_GenerateEvent(TIM1, TIM_EventSource_COM);//apply changes
+//block commutation: per step the output of one channel is enabled (CCxE: its high side), the
+//complementary output of another (CCxNE: its low side), the third channel is off
+void commutate(void){//U,V,W(A,B,C)
+	static const uint16_t en[7] = { 0,
+		TIM_CCER_CC3EN|TIM_CCER_CC1NEN,    //1: -1,0,1
+		TIM_CCER_CC3EN|TIM_CCER_CC2NEN,    //2: 0,-1,1
+		TIM_CCER_CC1EN|TIM_CCER_CC2NEN,    //3: 1,-1,0
+		TIM_CCER_CC1EN|TIM_CCER_CC3NEN,    //4: 1,0,-1
+		TIM_CCER_CC2EN|TIM_CCER_CC3NEN,    //5: 0,1,-1
+		TIM_CCER_CC2EN|TIM_CCER_CC1NEN,    //6: -1,1,0
+	};
+	tim1Outputs(TIM_OCMode_PWM1, step<7 ? en[step] : 0);    //other steps: 0,0,0
 }
 
 
@@ -473,13 +430,7 @@ void BlockBrake(uint8_t on){
 		blockbrake = 1;
 		brakeduty = 0;
 		TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD;
-		for(uint8_t ch=0;ch<3;ch++){
-			uint16_t c = ch==0 ? TIM_Channel_1 : (ch==1 ? TIM_Channel_2 : TIM_Channel_3);
-			TIM_SelectOCxM(TIM1, c, TIM_OCMode_PWM1);
-			TIM_CCxCmd(TIM1, c, TIM_CCx_Disable);
-			TIM_CCxNCmd(TIM1, c, TIM_CCxN_Enable);
-		}
-		TIM_GenerateEvent(TIM1, TIM_EventSource_COM);
+		tim1Outputs(TIM_OCMode_PWM1, TIM_CCER_CC1NEN|TIM_CCER_CC2NEN|TIM_CCER_CC3NEN);    //low sides only
 		NVIC_EnableIRQ(ADC_COMP_IRQn);
 	}
 	if(brakeduty<1000){
@@ -532,28 +483,6 @@ void SetDriveMode(uint8_t mode){
 }
 
 static void TIMOCInit(void){
-	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM1);
-		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM1);
-		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM1);
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Disable);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Disable);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Disable);
-		commutate();
-	}else{
-		TIM_SelectOCxM(TIM1, TIM_Channel_1, TIM_OCMode_PWM2);
-		TIM_SelectOCxM(TIM1, TIM_Channel_2, TIM_OCMode_PWM2);
-		TIM_SelectOCxM(TIM1, TIM_Channel_3, TIM_OCMode_PWM2);
-		TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Enable);
-		TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_2, TIM_CCxN_Enable);
-		TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Enable);
-		TIM_CCxNCmd(TIM1, TIM_Channel_3, TIM_CCxN_Enable);
-
-	}
-	TIM_GenerateEvent(TIM1, TIM_EventSource_COM);
+	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK) commutate();    //the outputs of the current step
+	else tim1Outputs(TIM_OCMode_PWM2, CCER_EN);    //sine / FOC: all six switch complementary
 }

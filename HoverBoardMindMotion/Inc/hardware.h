@@ -76,11 +76,6 @@ enum{
 };
 
 typedef struct{
-  uint8_t port;
-  uint16_t pin;
-  uint8_t pinSrc;
-}MM32GPIO;
-typedef struct{
   uint8_t io;
   uint16_t channel;
 }MM32ADC;
@@ -112,6 +107,8 @@ uint8_t digitalRead(uint8_t io);
 uint16_t analogRead(uint8_t io);
 void digitalWrite(uint8_t io, uint8_t state);
 void pinModeAF(uint8_t io,uint8_t af);
+void gpioMode(GPIO_TypeDef* gpio, uint8_t pin, uint8_t mode);    //by port and pin number (pins outside the table)
+void gpioAF(GPIO_TypeDef* gpio, uint8_t pin, uint8_t af);
 
 
 

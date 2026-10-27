@@ -103,33 +103,12 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
 
 //6 bldc pin
 void BLDC_init(void){
-	GPIO_InitTypeDef GPIO_InitStructure;
-	//high side
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_2);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_2);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_2);
-	//low side
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource13, GPIO_AF_2);
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource14, GPIO_AF_2);
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_2);
-	GPIO_StructInit(&GPIO_InitStructure);
-
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-
+	for(uint8_t i=0;i<3;i++){    //high sides PA8-10 (CH1-3), low sides PB13-15 (CH1N-3N)
+		gpioAF(GPIOA, (uint8_t)(8+i), GPIO_AF_2);
+		gpioAF(GPIOB, (uint8_t)(13+i), GPIO_AF_2);
+		gpioMode(GPIOA, (uint8_t)(8+i), GPIO_Mode_AF_PP);
+		gpioMode(GPIOB, (uint8_t)(13+i), GPIO_Mode_AF_PP);
+	}
 }
 
 //timer1 automatic output
