@@ -216,8 +216,6 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Naming is mixed (camelCase, snake_case, Hungarian `iSpeed`/`bConfigRx`, vendor `u8`/`s32`
       next to stdint; config macros like `DRIVEMODE` are lvalues of `pinstorage[]`): clean up file by
       file when a file gets real work, not in one sweep.
-- [ ] `UART_GPIO_Init()`: the last matching table entry wins (PB7 is both UART1 RX and UART2 TX):
-      select the UART from the TX/RX pair instead of relying on table order.
 - [ ] RemoteUartBus: state bit 128 (shut off) and `slaveNew` are not implemented; there is no read
       command for the configuration (the console cannot show the board's drive mode). A position mode
       (GD32 drive mode 3, odometer target) would be the useful new mode.

@@ -195,19 +195,28 @@ void UARTX_Init(u32 baudrate,uint8_t uart){    //8N1, rx + tx, dma requests; reg
 	u->GCR = (u->GCR&~UART_GCR_AUTOFLOW)|UART_GCR_TX|UART_GCR_RX|UART_GCR_UART|UART_GCR_DMA;
 }
 
+//the uart whose tx entry is TXPIN and rx entry is RXPIN (a pin can be on two uarts: PB7 is UART1 RX and
+//UART2 TX on the SPIN05); with no full pair the uart with one of them
 uint8_t UART_GPIO_Init(void){
-	uint8_t uart=1;
-	for(uint8_t i=0;i<UARTCOUNT;i++){
-		if(uarts[i].io==TXPIN||uarts[i].io==RXPIN){
-			pinModeAF(uarts[i].io,uarts[i].af);
-			if(uarts[i].tx){
-				//open drain: several boards share one RemoteUartBus line, the master's rx must have a pull-up
-				pinMode(uarts[i].io, OUTPUT_AF_OD);
-			}else{
-				pinMode(uarts[i].io, INPUT);
-			}
-			uart=uarts[i].uart;
+	uint8_t uart=1, best=0, t=UARTCOUNT, r=UARTCOUNT;
+	for(uint8_t u=1;u<=2;u++){
+		uint8_t ut=UARTCOUNT, ur=UARTCOUNT;
+		for(uint8_t i=0;i<UARTCOUNT;i++){
+			if(uarts[i].uart!=u) continue;
+			if(uarts[i].tx&&uarts[i].io==TXPIN) ut=i;
+			if(!uarts[i].tx&&uarts[i].io==RXPIN) ur=i;
 		}
+		uint8_t n=(uint8_t)((ut<UARTCOUNT)+(ur<UARTCOUNT));
+		if(n>best){ best=n; uart=u; t=ut; r=ur; }
+	}
+	if(t<UARTCOUNT){
+		//open drain: several boards share one RemoteUartBus line, the master's rx must have a pull-up
+		pinModeAF(uarts[t].io,uarts[t].af);
+		pinMode(uarts[t].io, OUTPUT_AF_OD);
+	}
+	if(r<UARTCOUNT){
+		pinModeAF(uarts[r].io,uarts[r].af);
+		pinMode(uarts[r].io, INPUT);
 	}
 	return uart;
 }
