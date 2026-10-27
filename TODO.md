@@ -32,12 +32,9 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       halls can measure); the target is int16 (the command field). Sine takes 1.6-2.2 s per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
       same command; block torque depends on the shunt calibration.
-- [ ] FOC field weakening: the most negative d current is capped at 60 % of the current limit
-      because on the voltage circle the q current is not regulated (7 of 10 A ran to 12.7 A and
-      tripped). The gain is modest on this motor (omega*L ~0.37 V/A at 600 rpm): ~600 rpm with 6 A,
-      ~680 rpm with 9 A. On the circle the scaled vector gives d only a share of the voltage, so the
-      d current stays below its reference at the top speed (-6..-7 of -9 A); a d current floor from
-      the back emf could hold more, and help braking from above base speed without the bus rising.
+- [ ] FOC field weakening at the very top (13 A d current, ~850 rpm at 24 V): vibration 2.4 m/s^2
+      (1.1-1.2 up to 9 A). Braking from above base speed still raises a bench supply's bus (ramps
+      pause and no braking current above `batfull`; set `batfull` near the supply voltage there).
 - [ ] At high current and speed (field weakening) the ST-Link and the FTDI drop off USB now and then
       (ground noise through the shared USB ground, the hub resets). Test scripts read over the bus
       there; an isolator on the SWD/UART link would help.
