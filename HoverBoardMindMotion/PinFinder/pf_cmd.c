@@ -28,13 +28,29 @@ static uint32_t optnum(const char* s){    //optional positive argument, 0 = defa
 	return g&&v>0 ? (uint32_t)v : 0;
 }
 
+//a voltage in V ("24.8", "36") or mV ("24800"): with a decimal point or below 100 it is volts; 0 = none
+static int32_t millivolts(const char* s){
+	int32_t v = 0, frac = 0, scale = 1;
+	uint8_t dot = 0;
+	if(!s) return 0;
+	for(;*s;s++){
+		if(*s=='.'&&!dot){ dot = 1; continue; }
+		if(*s<'0'||*s>'9') return 0;
+		if(dot){ if(scale<1000){ frac = frac*10+(*s-'0'); scale *= 10; } }
+		else v = v*10+(*s-'0');
+		if(v>100000) return 0;
+	}
+	if(dot||v<100) return v*1000+frac*1000/scale;
+	return v;
+}
+
 static void help(void){
 	static const char* const h[] = {
 		"info                      chip, supply, board type",
 		"list | get <name> | set <name> <value|pin|none>   config words (names as tools/mm32config.py)",
 		"save | revert | defaults  write to flash / reload from flash / start over (RAM)",
 		"detect hall [mV]          hall pins, the motor steps slowly (default 2000 mV)",
-		"detect vbat [mV]          battery pin (closest to the measured voltage)",
+		"detect vbat [V|mV]        battery pin (closest to the measured voltage: 36.5 or 36500)",
 		"detect current [mV]       phase current pins, bus current pin + calibration",
 		"detect imu                I2C IMU on free pins with pull-ups",
 		"detect button [ms]        press the power button within ms",
@@ -78,12 +94,24 @@ static void setWord(const char* name, const char* val){
 static void pinCmd(const char* name, const char* mode, const char* arg){
 	uint16_t p = name ? PinByName(name) : PIN_NONE;
 	if(p==PIN_NONE){ err("pin name, e.g. PB9"); return; }
+	if(!mode||!strcmp(mode, "read")){    //any pin, its mode unchanged: level, the voltage on adc pins, what it is
+		kvi(PinName(p), digitalRead((uint8_t)p));
+		uint8_t analog = p==VBATPIN||p==ITOTALPIN||p==IPHASEAPIN||p==IPHASEBPIN;
+		if(AdcChannel(p)>=0&&(analog||PinFree(p))){    //not on pins the board drives or reads digitally
+			kvmv("pin", PinMv(p));
+			if(!analog) pinMode((uint8_t)p, INPUT);
+		}
+		for(uint8_t i=0;i<128;i++){
+			if(CfgIsPin(i)&&pinstorage[i]==p) kvs("used_as", CfgName(i));
+		}
+		ok();
+		return;
+	}
 	if(!PinFree(p)&&p!=LEDRPIN&&p!=LEDGPIN&&p!=LEDBPIN&&p!=LEDUPIN&&p!=LEDDPIN&&p!=BUZZERPIN&&p!=pinstorage[11]){
-		err("pin in use (SWD, uart, latch, hall, ...)");
+		err("pin in use (SWD, uart, latch, hall, ...): only read is allowed");
 		return;
 	}
 	uint32_t ms = optnum(arg);
-	if(!mode||!strcmp(mode, "read")){ pinMode((uint8_t)p, INPUT); kvi(PinName(p), digitalRead((uint8_t)p)); ok(); return; }
 	if(!strcmp(mode, "high")){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 1); }
 	else if(!strcmp(mode, "low")){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 0); }
 	else if(!strcmp(mode, "pullup")) pinMode((uint8_t)p, INPUT_PULLUP);
@@ -132,7 +160,7 @@ void Command(char* line){
 	else if(!strcmp(c, "detect")){
 		if(!a1) err("detect what? hall vbat current imu button charger latch");
 		else if(!strcmp(a1, "hall")) DetectHall((int32_t)optnum(a2));
-		else if(!strcmp(a1, "vbat")) DetectVbat((int32_t)optnum(a2));
+		else if(!strcmp(a1, "vbat")) DetectVbat(millivolts(a2));
 		else if(!strcmp(a1, "current")) DetectCurrent((int32_t)optnum(a2));
 		else if(!strcmp(a1, "imu")) DetectImu();
 		else if(!strcmp(a1, "button")) DetectButton(optnum(a2));

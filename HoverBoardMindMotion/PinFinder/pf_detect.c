@@ -192,15 +192,12 @@ void DetectVbat(int32_t expect_mv){
 			inrange++;
 		}
 	}
-	if(expect_mv<=0&&inrange!=1){
+	if((expect_mv<=0&&inrange!=1)||best==PIN_NONE||(expect_mv>0&&bestd>expect_mv/5)){
 		ShowAdc();
-		err(inrange ? "several pins look like a battery voltage: give the measured voltage, detect vbat <mV>"
-		            : "no pin reads 20..45 V: give the measured voltage, detect vbat <mV>");
-		return;
-	}
-	if(best==PIN_NONE||(expect_mv>0&&bestd>expect_mv/5)){
-		ShowAdc();
-		err("no pin within 20 % of that voltage");
+		kvp("vbat_kept", VBATPIN);    //unchanged
+		err(expect_mv>0 ? "no pin within 20 % of that voltage" :
+		    inrange ? "several pins look like a battery voltage: give the measured voltage (detect vbat 36.5)"
+		            : "no pin reads 20..45 V: give the measured voltage (detect vbat 36.5)");
 		return;
 	}
 	VBATPIN = best;

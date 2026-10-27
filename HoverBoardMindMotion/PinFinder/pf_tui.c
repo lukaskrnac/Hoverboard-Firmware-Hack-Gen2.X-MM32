@@ -225,7 +225,7 @@ void TuiKey(int c){
 	case '3':
 		heading("battery voltage");
 		ShowAdc();
-		out("Type the battery voltage you measure in mV (e.g. 36500), or just Enter: the pin reading 20..45 V"); nl();
+		out("Type the battery voltage you measure (36.5 or 36500), or just Enter: the pin reading 20..45 V"); nl();
 		lineStart("detect vbat ");
 		break;
 	case '4': heading("power button"); DetectButton(0); after(); break;
