@@ -11,6 +11,7 @@
 #include "hal_conf.h"
 #include "sim_eeprom.h"
 #include "pinout.h"
+#include "bldc.h"
 
 #define M8(adr)  (*((vu8  *) (adr)))
 #define M16(adr) (*((vu16 *) (adr)))
@@ -206,23 +207,39 @@ void SaveConfig(void){
 	EEPROM_Write((u8*)pinstorage, 2 * 64);
 }
 
-uint8_t restorecfg(void){
+//the newest record if its magic is valid (and the extension record before it, if it has one)
+uint8_t ConfigLoad(void){
 	uint16_t tmp[64];
 	if(EEPROM_Read((u8*)tmp, 2 * 64)<0) return 0;
-	if(tmp[MAGICNUM_POS]==MAGIC_NUMBER){    //verify config is valid
-		for(uint8_t i=0;i<64;i++){
-			pinstorage[i]=tmp[i];
-		}
-		u32 a = FLASH_SIM_WriteLocate((u32)BASED_FLASH_SECTOR_ADDRESS, 2 * 64);    //first blank slot
-		u32 last = a==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : a-128;
-		u32 prev = last==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : last-128;
-		if(M16(prev+2*32)==EXT_MAGIC) memcpy(&pinstorage[64], (const void*)prev, 128);
-		if(HALLAPIN<PINCOUNT&&HALLBPIN<PINCOUNT&&HALLCPIN<PINCOUNT&&TXPIN<PINCOUNT&&RXPIN<PINCOUNT){
-			return 1;
-		}else{
-			return 0;
-		}
-	}else{
-		return 0;
+	if(tmp[MAGICNUM_POS]!=MAGIC_NUMBER) return 0;
+	for(uint8_t i=0;i<64;i++){
+		pinstorage[i]=tmp[i];
+	}
+	u32 a = FLASH_SIM_WriteLocate((u32)BASED_FLASH_SECTOR_ADDRESS, 2 * 64);    //first blank slot
+	u32 last = a==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : a-128;
+	u32 prev = last==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : last-128;
+	if(M16(prev+2*32)==EXT_MAGIC) memcpy(&pinstorage[64], (const void*)prev, 128);
+	return 1;
+}
+
+//a valid record with the pins the firmware cannot run without
+uint8_t restorecfg(void){
+	return ConfigLoad()&&HALLAPIN<PINCOUNT&&HALLBPIN<PINCOUNT&&HALLCPIN<PINCOUNT&&TXPIN<PINCOUNT&&RXPIN<PINCOUNT;
+}
+
+//older layouts (CFG_VERSION) to the current one; saved with the next config save
+void ConfigMigrate(void){
+	if(CFG_VERSION<1){    //old drive mode numbers (block 0/1, sine 2/3)
+		if(DRIVEMODE==2) DRIVEMODE=SINE_VOLT;
+		else if(DRIVEMODE==3) DRIVEMODE=SINE_SPEED;
+		CFG_VERSION=1;
+	}
+	if(CFG_VERSION<2){    //baud was stored in baud, now in 100 baud (115200 did not fit the 16 bit word)
+		BAUD = BAUD>=1200 ? BAUD/100 : 1152;
+		CFG_VERSION=2;
+	}
+	if(CFG_VERSION<3){    //input mode words: PinFinder's "reserved" (35, 43 held 0 / 1), now default
+		INPUT_MODE = VEL_RAMP_RATE = INPUT_FILTER_BW = TRAJ_VEL = TRAJ_ACCEL = TRAJ_DECEL = 0xFFFF;
+		CFG_VERSION=3;
 	}
 }

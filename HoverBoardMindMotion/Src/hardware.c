@@ -222,6 +222,10 @@ void pinModeAF(uint8_t io,uint8_t af){
 	if(io<PINCOUNT) gpioAF(ports[pins[io]>>4], pins[io]&15, af);
 }
 
+uint8_t PinPortBit(uint8_t io){    //port (0 = A) << 4 | pin number
+	return io<PINCOUNT ? pins[io] : 0xFF;
+}
+
 uint8_t digitalRead(uint8_t io){
 	if(io>=PINCOUNT) return 0;
 	return (uint8_t)((ports[pins[io]>>4]->IDR>>(pins[io]&15))&1);

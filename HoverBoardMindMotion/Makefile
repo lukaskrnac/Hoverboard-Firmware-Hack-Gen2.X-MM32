@@ -69,8 +69,31 @@ PYTHON ?= python3
 flash: $(TARGET).bin
 	$(PYTHON) ../tools/mm32flash.py $<
 
+# PinFinder: a separate image (the main firmware has no room for it) built from PinFinder/ and the shared
+# hardware, config, uart and startup code. make pinfinder / make flash-pinfinder
+PF       := $(BUILD)/pinfinder
+PF_SRC   := $(wildcard PinFinder/*.c) Src/hardware.c Src/initialize.c Src/sim_eeprom.c Src/uart.c \
+            $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
+            Device/MM32SPIN0x/Source/system_mm32spin05.c Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
+PF_OBJ   := $(addprefix $(BUILD)/,$(PF_SRC:.c=.o) Src/hwdiv.o)
+$(BUILD)/PinFinder/%.o: CFLAGS += $(WARN)
+$(BUILD)/PinFinder/%.o: CFLAGS += -IPinFinder
+
+pinfinder: $(PF).bin
+
+$(PF).elf: $(PF_OBJ) $(LDSCRIPT) Makefile $(FLAGS_STAMP)
+	$(CC) $(subst $(TARGET).map,$(PF).map,$(LDFLAGS)) $(PF_OBJ) -o $@
+	$(SIZE) $@
+
+$(PF).bin: $(PF).elf
+	$(OBJCOPY) -O binary $< $@
+
+flash-pinfinder: $(PF).bin
+	$(PYTHON) ../tools/mm32flash.py $<
+
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all clean flash
+.PHONY: all clean flash pinfinder flash-pinfinder
+-include $(PF_OBJ:.o=.d)
 -include $(DEP)

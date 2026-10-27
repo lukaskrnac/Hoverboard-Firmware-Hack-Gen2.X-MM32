@@ -107,6 +107,7 @@ uint8_t digitalRead(uint8_t io);
 uint16_t analogRead(uint8_t io);
 void digitalWrite(uint8_t io, uint8_t state);
 void pinModeAF(uint8_t io,uint8_t af);
+uint8_t PinPortBit(uint8_t io);    //port (0 = A) << 4 | pin number, 0xFF for io >= PINCOUNT
 void gpioMode(GPIO_TypeDef* gpio, uint8_t pin, uint8_t mode);    //by port and pin number (pins outside the table)
 void gpioAF(GPIO_TypeDef* gpio, uint8_t pin, uint8_t af);
 

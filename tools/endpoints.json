@@ -72,7 +72,7 @@
    "id": 11,
    "type": "uint16",
    "access": "rw",
-   "unit": "charger detect"
+   "unit": "charger detect (chargelevel, chargepull)"
   },
   "hoverboard.config.vbat": {
    "id": 12,
@@ -476,6 +476,30 @@
    "access": "rw",
    "unit": "COM_SPEED D: 0.01 permille duty per rpm/s of the measured speed; 0/65535 = 0 (off)"
   },
+  "hoverboard.config.buzzerpassive": {
+   "id": 79,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "buzzer without its own oscillator, driven with 2.2 kHz: 1 off, 2 on; 0/65535 = off"
+  },
+  "hoverboard.config.chargelevel": {
+   "id": 80,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "charger pin while the charger is connected: 1 low, 2 high; 0/65535 = high"
+  },
+  "hoverboard.config.chargepull": {
+   "id": 81,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "charger pin input: 1 floating, 2 pull-up, 3 pull-down; 0/65535 = floating"
+  },
+  "hoverboard.config.chargelock": {
+   "id": 82,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "no driving while the charger is connected: 1 off, 2 on; 0/65535 = off"
+  },
   "hoverboard.config.extmagic": {
    "id": 96,
    "type": "uint16",
@@ -601,6 +625,12 @@
    "type": "int32",
    "access": "r",
    "unit": "rpm, last hall interval"
+  },
+  "hoverboard.charger_connected": {
+   "id": 276,
+   "type": "uint8",
+   "access": "r",
+   "unit": "1 while the charger is connected (charge pin; also heartbeat byte 7)"
   },
   "axis0.controller.config.vel_limit": {
    "id": 288,

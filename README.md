@@ -22,7 +22,7 @@ register headers, CMSIS) are in `HoverBoardMindMotion/Device/`. A change of the 
 
 Integer division runs on the chip's hardware divider (`Src/hwdiv.S`) and floats on a compact soft
 float (`Src/softfloat.c`, round to nearest even like libgcc, subnormals read as 0); both replace
-libgcc's routines. Size: 26.1 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
+libgcc's routines. Size: 26.4 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
 worst case stack, main loop plus nested interrupts, is ~670 bytes).
 
 Supported by the GCC build: **MM32SPIN05** (tested on hardware). MM32SPIN06 uses the same
@@ -198,9 +198,61 @@ https://youtu.be/hCaIlEKzI3A
 * software and hardware over current protection
 * sine wave mode to drive the motor with more torque and higher effiency
 * FOC with two measured phase currents; pwm, speed, torque and position control for block, sine and FOC; field weakening
-## Autodetect&configuration
+### Buzzer and charger
+* `buzzerpassive=2` for a buzzer without its own oscillator (a plain piezo or magnetic buzzer stays
+  silent on a steady level): it gets a 2.2 kHz square wave (the low battery alarm from the adc
+  interrupt, the melodies by busy waiting). Default: an active buzzer, switched on and off.
+* `charge=<pin>` (+ `chargelevel` 1 low / 2 high while connected, `chargepull` 1 none / 2 up / 3 down;
+  PinFinder's `detect charger` sets all three): the charger state, debounced 50 ms, is reported over
+  CANSimple in heartbeat byte 7 (bit 0; ODrive leaves the byte unused) and as the parameter
+  `hoverboard.charger_connected` (0x114). The v1 reply has no free field, so v1 masters do not see it.
+  `chargelock=2` keeps the gates off while the charger is connected.
 
-https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/wikis/home/%7BHow-to-use-PinFinder-firmware%7D
+## Autodetect&configuration (PinFinder)
+
+PinFinder is a separate firmware that finds the board's pins and writes the configuration the main
+firmware boots from. Build and flash it from this tree, then flash the main firmware again (both keep
+the configuration page):
+```bash
+cd HoverBoardMindMotion
+make pinfinder && make flash-pinfinder   # build/pinfinder.bin
+make flash                               # back to the main firmware
+```
+It talks 115200 8N1 on the configured TX/RX pins. On a board without a configuration the uart pins
+are searched first: connect the board's TX and RX together (loop-back) until it finds them, then
+connect your adapter. It prints `PinFinder 2.0: Enter = menu, @<command> = agent mode` every 2 s.
+
+**TUI** (Enter): the pin map (unsaved changes in yellow), battery and supply voltage and a menu: hall
+sensors, LEDs/buzzer (step through the free pins, the tried one blinks; `t` plays a tone for a buzzer
+without oscillator), battery pin, power button, charger, power latch, slave id, test motor, power off,
+`a` all, `c` command line (the commands below), `s` save. Without an ANSI terminal the same text is
+printed without colours.
+
+**Agent mode** (a line starting with `@`, for scripts and agents; stays on, `tui` goes back): one
+command per line, no prompts or colours. PinFinder echoes `> <command>`, then prints `key=value`
+lines, `# notes`, `warn ...`, `progress n/m`, and ends with `ok` or `err <text>`. Any byte received
+during a long command stops it. `tools/pinfinder.py` wraps this (`--json`, exit status 1 on `err`):
+```bash
+python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
+```
+| command | |
+|---|---|
+| `info` | chip id, uid, master/slave (latch), debugger attached, VDD, battery, uart |
+| `list`, `get <name>`, `set <name> <value\|pin\|none>` | config words, names as `tools/mm32config.py` (`tools/cfgfields.py`) |
+| `save`, `revert`, `defaults` | write to flash / reload / start from the defaults (RAM) |
+| `detect hall [mV]` | turns the field open loop in 12 directions per electrical turn (complementary PWM, 1 V phase amplitude, raised if the rotor does not follow); the pins whose level follows the rotor are the halls, A/B/C is the assignment for which the main firmware's commutation leads the rotor by 60..120 deg everywhere |
+| `detect vbat [mV]` | battery pin: the one closest to the measured voltage (or the only one reading 20..45 V) |
+| `detect button [ms]`, `detect charger [ms]` | the pin that changes while you press the button / connect the charger (pins read with pull-up and pull-down: driven 0/1 or floating) |
+| `detect latch` | releases the free pins one by one, saving each as the latch first: the board switches off at the latch pin, the next start holds it |
+| `adc`, `hall` | voltages of the free adc pins, hall state now |
+| `pin <pin> high\|low\|pullup\|pulldown\|input\|read\|blink\|tone [ms]` | drive a pin (LEDs, buzzer) |
+| `step <1-6\|101-112> [mV] [ms]` | hold a block step or field direction; hall state and the currents (triggered like the main firmware) |
+| `rotate <permille> [ms]` | hall commutation test as the main firmware does it; counts forward/backward hall steps |
+| `gen` | `pinstorage` initializer for a firmware with a fixed configuration |
+| `poweroff` | |
+
+The old PinFinder (Keil, `pin-finder` branch) is described in the
+[wiki](https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/wikis/home/%7BHow-to-use-PinFinder-firmware%7D).
 
 ## todo
 * optimizations

@@ -45,6 +45,11 @@ void io_init(void){
 	if(BUZZERPIN<PINCOUNT){
 		pinMode(BUZZERPIN, OUTPUT);
 	}
+	if(CHARGEPIN<PINCOUNT){
+		static const uint8_t pull[] = { INPUT, INPUT_PULLUP, INPUT_PULLDOWN };
+		uint32_t p = cfgOrDefault(CHARGE_PULL, 1);
+		pinMode(CHARGEPIN, pull[p>=1&&p<=3 ? p-1 : 0]);
+	}
 }
 
 void HALL_Init(void){

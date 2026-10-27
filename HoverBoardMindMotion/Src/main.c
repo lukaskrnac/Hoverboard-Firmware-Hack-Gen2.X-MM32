@@ -35,6 +35,10 @@ volatile int pwm=0;
 volatile int realspeed=0;
 volatile uint8_t  wState = STATE_LED_BATTLEVEL;    //battery LEDs until the remote sends a state
 static uint8_t flicker=0;
+volatile uint8_t buzzTone;    //passive buzzer: the adc isr makes the tone
+volatile uint8_t charging;    //charger connected (CHARGEPIN, debounced)
+static uint8_t chargeRaw;
+static uint32_t chargeT;
 uint8_t uarten=1;
 uint8_t halltimen=1;
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +46,7 @@ uint8_t halltimen=1;
 //  change EEPROMEN to 0
 #define EEPROMEN 1
 //  copy pinstorage initializer from autodetect and replace the default line below
-uint16_t pinstorage[128]={0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xDCAB, 31, 250, 0, 19200, 8192, 1, 30, 0, 10, 300, 1, 1, 42000, 32000, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [64 ... 95] = 0xFFFF, [EXT_MAGIC_POS] = EXT_MAGIC, [97 ... 127] = 0xFFFF};
+uint16_t pinstorage[128]=PINSTORAGE_DEFAULTS;
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -56,6 +60,25 @@ static void DelayFed(uint32_t ms){
 		IWDG_ReloadCounter();
 		ms -= chunk;
 	}
+}
+
+//buzzer on for ms (then off). An active buzzer (own oscillator) is switched on; a passive one (BUZZER_PASSIVE)
+//gets a square wave, here by busy waiting (the adc isr is not running yet at the melodies)
+static void Beep(uint32_t ms){
+	if(cfgBool(BUZZER_PASSIVE, 0)){
+		uint32_t load = SysTick->LOAD+1, last = SysTick->VAL, half = SystemCoreClock/4400, n = half;
+		uint8_t lvl = 0;
+		for(uint32_t t=millis;millis-t<ms;){    //2.2 kHz: toggles every SystemCoreClock/4400 SysTick counts
+			uint32_t v = SysTick->VAL, d = last>=v ? last-v : last+load-v;
+			last = v;
+			if(d>=n){ lvl = !lvl; digitalWrite(BUZZERPIN, lvl); n = half; } else n -= d;
+			IWDG_ReloadCounter();
+		}
+	}else{
+		digitalWrite(BUZZERPIN, 1);
+		DelayFed(ms);
+	}
+	digitalWrite(BUZZERPIN, 0);
 }
 
 static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured pins are ignored)
@@ -87,19 +110,7 @@ s32 main(void){
 		}
 	}
 
-	if(CFG_VERSION<1){    //old drive mode numbers; saved with the next config frame
-		if(DRIVEMODE==2) DRIVEMODE=SINE_VOLT;
-		else if(DRIVEMODE==3) DRIVEMODE=SINE_SPEED;
-		CFG_VERSION=1;
-	}
-	if(CFG_VERSION<2){    //baud was stored in baud, now in 100 baud (115200 did not fit the 16 bit word)
-		BAUD = BAUD>=1200 ? BAUD/100 : 1152;
-		CFG_VERSION=2;
-	}
-	if(CFG_VERSION<3){    //input mode words: PinFinder's "reserved" (35, 43 held 0 / 1), now default
-		INPUT_MODE = VEL_RAMP_RATE = INPUT_FILTER_BW = TRAJ_VEL = TRAJ_ACCEL = TRAJ_DECEL = 0xFFFF;
-		CFG_VERSION=3;
-	}
+	ConfigMigrate();
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
 	//pwm period: not below 8192 (4.39 kHz). The adc isr takes 47-66 us, and the phase current op-amps lag
 	//the shunt by ~5 us and need >= 2.5 us of low side time either side of the sample: at 2048 (17.6
@@ -136,9 +147,7 @@ s32 main(void){
 		digitalWrite(LATCHPIN, 1);
 		while(digitalRead(BUTTONPIN)&&BUTTONPIN<PINCOUNT){    //wait while release button
 			if(BUZZERPIN<PINCOUNT){    //have buzzer
-				digitalWrite(BUZZERPIN, 1);
-				DelayFed(2);
-				digitalWrite(BUZZERPIN, 0);
+				Beep(2);
 				DelayFed(2);
 			}else{
 				__NOP();
@@ -149,9 +158,7 @@ s32 main(void){
 	}
 	if(BUZZERPIN<PINCOUNT){
 		for(int i=0;i<5;i++){    //power on melody
-			digitalWrite(BUZZERPIN, 1);
-			DelayFed(50);
-			digitalWrite(BUZZERPIN, 0);
+			Beep(50);
 			DelayFed(50);
 		}
 	}
@@ -183,12 +190,15 @@ s32 main(void){
 				setRGB(digitalRead(HALLAPIN), digitalRead(HALLBPIN), digitalRead(HALLCPIN));
 			}
 		}
-		if(BUZZERPIN<PINCOUNT){
-			if(lowbatcount>=10||lowbatperm){
-				digitalWrite(BUZZERPIN,flicker);
-			}else{
-				digitalWrite(BUZZERPIN,0);
-			}
+		if(BUZZERPIN<PINCOUNT){    //low battery alarm
+			uint8_t on = (lowbatcount>=10||lowbatperm)&&flicker;
+			if(cfgBool(BUZZER_PASSIVE, 0)) buzzTone = on;    //the adc isr toggles the pin
+			else digitalWrite(BUZZERPIN, on);
+		}
+		if(CHARGEPIN<PINCOUNT){    //charger connected, 50 ms debounce
+			uint8_t c = digitalRead(CHARGEPIN)==(cfgOrDefault(CHARGE_LEVEL, 2)==2);
+			if(c!=chargeRaw){ chargeRaw = c; chargeT = millis; }
+			else if(millis-chargeT>50) charging = c;
 		}
 		if(millis-lastupdate>1){//speed pid loop
 			speedupdate();
@@ -208,9 +218,7 @@ s32 main(void){
 				gatesOutput(0);
 				if(BUZZERPIN<PINCOUNT){
 					for(int i=0;i<3;i++){    //power off melody
-						digitalWrite(BUZZERPIN, 1);
-						DelayFed(150);
-						digitalWrite(BUZZERPIN, 0);
+						Beep(150);
 						DelayFed(150);
 					}
 				}

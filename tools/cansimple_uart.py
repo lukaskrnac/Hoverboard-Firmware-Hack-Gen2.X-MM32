@@ -104,8 +104,9 @@ class Bus:
     def heartbeat(self, node):
         d = self.request(node, "HEARTBEAT")
         if d is None: return None
-        err, state, proc, done = struct.unpack("<IBBB", d[:7])
-        return dict(errors=err, error_names=[v for k, v in ERRORS.items() if err & k], state=state, procedure_result=proc, trajectory_done=done)
+        err, state, proc, done, charger = struct.unpack("<IBBBB", d[:8])
+        return dict(errors=err, error_names=[v for k, v in ERRORS.items() if err & k], state=state, procedure_result=proc,
+                    trajectory_done=done, charger_connected=charger & 1)    # byte 7: hoverboard extension
 
     def get_error(self, node):
         d = self.request(node, "GET_ERROR")

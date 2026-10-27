@@ -5,6 +5,7 @@
 #include "pinout.h"
 #include "remoteUartBus.h"
 #include "bldc.h"
+#include "commutation.h"
 #include "calculation.h"
 #include "hal_tim.h"
 #include "hal_conf.h"
@@ -81,18 +82,7 @@ static int32_t PositionSpeed(int32_t err){
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
-const uint8_t hall_to_pos[8] =
-{
-	// annotation: for example SA=0 means hall sensor pulls SA down to Ground
-  0, // hall position [-] - No function (access from 1-6)
-  3, // hall position [1] (SA=1, SB=0, SC=0) -> PWM-position 3
-  5, // hall position [2] (SA=0, SB=1, SC=0) -> PWM-position 5
-  4, // hall position [3] (SA=1, SB=1, SC=0) -> PWM-position 4
-  1, // hall position [4] (SA=0, SB=0, SC=1) -> PWM-position 1
-  2, // hall position [5] (SA=1, SB=0, SC=1) -> PWM-position 2
-  6, // hall position [6] (SA=0, SB=1, SC=1) -> PWM-position 6
-  0, // hall position [-] - No function (access from 1-6)
-};
+const uint8_t hall_to_pos[8] = HALL_TO_POS_INIT;
 
 
 uint8_t hallpos(uint8_t forward){
@@ -129,17 +119,9 @@ static void tim1Outputs(uint32_t mode, uint32_t en){
 	TIM1->EGR = TIM_EventSource_COM;
 }
 
-//block commutation: per step the output of one channel is enabled (CCxE: its high side), the
-//complementary output of another (CCxNE: its low side), the third channel is off
+//block commutation (commutation.h)
 void commutate(void){//U,V,W(A,B,C)
-	static const uint16_t en[7] = { 0,
-		TIM_CCER_CC3EN|TIM_CCER_CC1NEN,    //1: -1,0,1
-		TIM_CCER_CC3EN|TIM_CCER_CC2NEN,    //2: 0,-1,1
-		TIM_CCER_CC1EN|TIM_CCER_CC2NEN,    //3: 1,-1,0
-		TIM_CCER_CC1EN|TIM_CCER_CC3NEN,    //4: 1,0,-1
-		TIM_CCER_CC2EN|TIM_CCER_CC3NEN,    //5: 0,1,-1
-		TIM_CCER_CC2EN|TIM_CCER_CC1NEN,    //6: -1,1,0
-	};
+	static const uint16_t en[7] = BLOCK_CCER_INIT;
 	tim1Outputs(TIM_OCMode_PWM1, step<7 ? en[step] : 0);    //other steps: 0,0,0
 }
 
@@ -169,7 +151,7 @@ void speedupdate(void){
 		//a disarm by error leaves the axis IDLE (ODrive): Clear_Errors alone switched the gates back on
 		//with the old set point; now the master arms again (Set_Axis_State CLOSED_LOOP_CONTROL)
 		if(axisDisarm) axisState = AXIS_IDLE;
-		gatesoff = lowbatperm || axisDisarm || idle;
+		gatesoff = lowbatperm || axisDisarm || idle || (charging&&cfgBool(CHARGE_LOCK, 0));
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage

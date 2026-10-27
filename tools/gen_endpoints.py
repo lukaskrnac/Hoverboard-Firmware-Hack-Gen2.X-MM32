@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Writes endpoints.json (RxSdo/TxSdo endpoint ids, like ODrive's flat_endpoints.json) from the config
-field table in mm32config.py and the runtime endpoints of Src/cansimple.c. Run after changing either."""
+field table in cfgfields.py and the runtime endpoints of Src/cansimple.c. Run after changing either."""
 import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mm32config import FIELDS
+from cfgfields import FIELDS
 
 FW = "2.0.0"
 RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning  (= the EP_ enum in Src/cansimple.c)
@@ -27,6 +27,7 @@ RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning 
     (0x111, "hoverboard.torque_constant_in_use", "float", "r", "Nm/A"),
     (0x112, "hoverboard.id_setpoint", "int32", "rw", "mA, FOC d current"),
     (0x113, "hoverboard.fast_speed", "int32", "r", "rpm, last hall interval"),
+    (0x114, "hoverboard.charger_connected", "uint8", "r", "1 while the charger is connected (charge pin; also heartbeat byte 7)"),
     (0x120, "axis0.controller.config.vel_limit", "float", "rw", "turns/s, position and velocity modes"),
     (0x121, "axis0.controller.config.pos_gain", "float", "rw", "(turns/s)/turn: position loop; FOC default 20, then the hold within 1.5 hall steps"),
     (0x122, "axis0.controller.config.vel_gain", "float", "rw", "Nm/(turns/s), FOC velocity loop; 0 = default (position mode 3.3x the velocity mode's)"),

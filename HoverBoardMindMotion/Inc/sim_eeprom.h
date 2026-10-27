@@ -39,7 +39,9 @@
 /// @defgroup MM32_Exported_Functions
 /// @{
 s32 EEPROM_Write(u8* ptr, u16 len);
-uint8_t restorecfg(void);
+uint8_t ConfigLoad(void);     //newest record with a valid magic -> pinstorage (+ extension record)
+uint8_t restorecfg(void);     //ConfigLoad() and the hall + uart pins are set
+void ConfigMigrate(void);     //older layouts (CFG_VERSION) to the current one
 void SaveConfig(void);    //extension record, then the main record
 /// @}
 

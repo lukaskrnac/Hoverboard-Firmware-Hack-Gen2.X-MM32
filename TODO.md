@@ -5,33 +5,24 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 
 ## PinFinder and board support (requested 2026-10-27)
 
-Order: P1 is the base for the rest (P2-P7 extend that build, P8 is a protocol on top of P2). PinFinder
+Order: P1 is the base for the rest (P2-P7 extend that build, P4 uses P2's protocol). PinFinder
 stays a separate firmware image (the main firmware has 4.6 KB of flash left), built from this tree so
 it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
-- [ ] **P1 PinFinder on GCC, in this tree.** Port `origin/pin-finder` (`autodetect.c` + its main loop,
-      Keil only) as a second target: `make pinfinder` -> `build/pinfinder.bin`, flashed with the same
-      `mm32flash.py` (keeps the config page; soft start). Needs: `volatile` on the globals the UART ISR
-      writes (its busy-waits hang under GCC, e.g. the ANSI terminal check; the scratch build in
-      `~/.cache/opencode-scratch/mm32-hover/pinfinder/` works around it with -O0), battery voltages in
-      mV with integer printf (no float printf: blank values now), the config written in the current
-      layout (`CFG_VERSION_CURRENT`, the extension record 64-127 left alone), the power latch detection
-      fixed when the MCU is powered from the debugger. Done when: every existing menu item works on the
-      bench board and the result boots the main firmware unchanged.
-- [ ] **P2 Non-interactive mode for agents/scripts.** A line protocol next to the TUI, selected by the
-      first line received (e.g. `@` prefix) or a config bit, no ANSI, no prompts, no confirmations:
-      one command per line (`detect hall`, `detect led`, `detect vbat`, `detect itotal`, `detect iphase`,
-      `detect button`, `detect imu`, `detect charger`, `get <idx|name>`, `set <name> <value>`, `list`,
-      `save`, `erase`, `rotate <duty> <ms>`, `poweroff`, `info`), each answered with `key=value` lines
-      and a final `ok` / `err <code> <text>`, pin names as `PA7`, not table indices. Long detections
-      print `progress <n>/<m>` and accept `abort`. Host side: `tools/pinfinder.py` (pyserial) with
-      `--json` output, used by the web tool and by the bench tests; document it in README.
-- [ ] **P3 TUI.** Today: a numbered menu, raw ANSI, results scroll away. Wanted: one screen with the
-      pin map (each config slot, its pin, how it was found: detected / manual / default), status line
-      (vcc, vbat, chip id + flash size, firmware version), the menu, and a log area; detections update
-      the map in place; `?` help per item; works without ANSI (the existing terminal check falls back to
-      plain lines); confirmation only for erase / save / motor rotation. Keep it inside the flash budget
-      of the PinFinder image (check `size` after each step).
+- [x] **P1 PinFinder on GCC, in this tree** (rewritten, not ported: `PinFinder/`, `make pinfinder`,
+      `make flash-pinfinder`; shares hardware.c, initialize.c, sim_eeprom.c, uart.c, the commutation tables
+      (`Inc/commutation.h`), the default record and the layout migration with the main firmware; 20.6 KB).
+      Verified on the bench board: info, adc, battery pin, hall detection (3/3 runs A=PC14 B=PC13 C=PC15),
+      test rotation, get/set/revert, TUI screens; the main firmware boots unchanged afterwards (config page
+      byte-identical). **Not yet tried on hardware (need a person at the board):** `detect button` (press),
+      `detect charger` (plug in), `detect latch` (switches the board off), the LED screen (watch the LEDs),
+      `poweroff`, the uart loop-back search (needs an erased config), `save` from PinFinder.
+- [x] **P2 Agent mode** (`@` lines, `> cmd` echo, `key=value`, `ok`/`err`) + `tools/pinfinder.py` (`--json`),
+      README "Autodetect&configuration (PinFinder)". Long commands stop on any received byte.
+- [ ] **P3 TUI**: done: one screen with the pin map (unsaved changes yellow), VDD/battery, menu, LED
+      screen, test motor screen, command line = agent commands, plain text without ANSI. Open: per item
+      help (`?` shows the command list only), "how found" per pin (detected/manual/default), a screen
+      for the remaining config words, detect-all ordering when a step fails.
 - [ ] **P4 Web GUI config tool.** A page in the console repo (`remoteuartbus-online`, e.g.
       `pinfinder.html`) over WebSerial using the P2 protocol: pin map table, buttons
       per detection with progress, edit any config word with names/units from the same source as
@@ -56,13 +47,19 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       - **Charger detect pin** (bench: PB10): ask the user to plug/unplug the charger, find the input that
         follows it (pull-up and pull-down tried), store pin + polarity.
       - **Hall angle calibration** (the item below, moved into PinFinder).
-- [ ] **P6 Buzzer without an internal oscillator** (passive piezo/magnetic buzzer): the firmware only
-      sets the pin high (`main.c`), which is silent on a passive buzzer. Config word: buzzer type
+- [x] **P6 Buzzer without an internal oscillator**: `buzzerpassive=2` (word 79): low battery alarm toggled
+      in the adc isr (2.2 kHz), melodies by busy waiting (`Beep()`); PinFinder LED screen `t` tone / `p`
+      passive buzzer, agent `pin <p> tone`. Not tried with a passive buzzer yet (the bench one is active).
+      Original plan: Config word: buzzer type
       (active / passive) + tone. Passive: toggle the pin from the ADC ISR (4.39 kHz -> 2.2 kHz tone, no
       timer needed, works on any pin; a divider in the ISR gives lower tones), or a free timer channel
       if the pin has one (TIM3/TIM14/16/17, check which are free: TIM1 PWM, TIM2/TIM3 are used now).
       PinFinder's LED/buzzer detection asks "did you hear it" for both drive types and stores the type.
-- [ ] **P7 Charger state to the remote.** Read the charger pin (P5) in the main loop, debounced; report
+- [x] **P7 Charger state to the remote**: words 80-82 (`chargelevel`, `chargepull`, `chargelock`), 50 ms
+      debounce in the main loop, CANSimple heartbeat byte 7 + `hoverboard.charger_connected` (0x114),
+      `chargelock`; PinFinder `detect charger` sets pin/level/pull. v1 reply has no free field: not reported
+      there. Open: try with a real charger (bench pin map: PB10), web console display. Original plan:
+      Read the charger pin (P5) in the main loop, debounced; report
       it: CANSimple (a bit in the heartbeat's controller/axis flags or a new SDO endpoint
       `hoverboard.charger_connected`, plus `tools/endpoints.json`), the v1 RemoteUartBus reply (a state
       bit), and the web console. Optional policy: refuse to arm while charging (config switch).
@@ -93,6 +90,11 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       - Temperature: MCU internal sensor (ADC channel) and an NTC pin if fitted; report + derate.
       - Battery cell count from the measured voltage -> suggested `BAT_FULL`/`BAT_EMPTY`.
       - Headlight / brake light outputs on some boards (detect like the LEDs).
+      - Hall inputs inverted / 180 deg off the commutation: PinFinder detects it (no assignment fits, the
+        inverted one does) but the firmware cannot use it; a `hallinvert` config bit (hallpos() 7-state)
+        would make such motors work.
+      - Hall edge positions at 30 deg resolution come out of `detect hall` already (12 directions); the
+        hall angle calibration (P5) can refine them.
 
 ## Next
 
@@ -166,7 +168,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash 26.1 of 30 KB (4.6 KB free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash 26.4 of 30 KB (3.6 KB free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.
@@ -194,8 +196,13 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       at the switch moving the hall switching points (armature reaction); check with a phase current
       probe, or ramp the sine modulation in over a few ms.
 - [ ] Block commutation needs 18.5 % duty before the wheel turns (sine: 1 %); it freewheels and only
-      coasts down. Check the switching pattern (one PWM high side + the complementary output of the
-      low side) against the gate driver's input polarity; complementary switching would also brake.
+      coasts down. **Cause measured (2026-10-27, PinFinder `step`):** the high side and the other phase's
+      low side chop together (CCxNE alone follows OCxREF), so in the off time the current freewheels
+      through both body diodes against the bus voltage and collapses: discontinuous conduction. A held
+      block step at 8 % duty (2 V) gave 0.46 A, at 25 % (6 V) 1.2 A phase current, against V/R = 3-10 A;
+      the same voltage as complementary PWM on all phases gave the expected 2.9 A at 1 V. Fix: keep the
+      low side on for the whole step (forced active CCxN, chop only the high side) or switch the chopped
+      phase complementary (also brakes).
 - [ ] Host unit tests for the pure logic (CRC and frame layout against the web console's test
       vectors, SpeedCtrl() against the measured plant) and a CI build. Needs the logic split from
       the HAL-dependent code first.
@@ -239,6 +246,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 | c434093 | table-driven GPIO, commutation, block brake and LED code (-1.2 KB) |
 | 41bff1f | CANSimple: negative values stored as 0 in config words (they wrapped: -2.5 V undervoltage = 63 V) |
 | 932084a | mm32flash: UART DMA stopped while halted (EN = 0 does not stop it), reprogram on verify failure |
+| (next) | PinFinder 2.0 in this tree (TUI + agent mode, `tools/pinfinder.py`), shared commutation/config code, `tools/cfgfields.py`; passive buzzer; charger state over CANSimple |
 
 Verification for every change: flashed to the bench board and checked with RemoteUartBus telemetry
 (bus replies, speed steps, CPU load by IPSR sampling); refactors also by comparing `objdump -d -r` of
