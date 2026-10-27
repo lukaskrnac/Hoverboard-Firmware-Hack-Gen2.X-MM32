@@ -142,7 +142,7 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 int32_t BusCurrent(void){
 	int32_t amp = fitotal;
 	if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-		amp = blockbrake ? 0 : amp*(int32_t)TIM1->CCR1/(int32_t)PWM_RES;
+		amp = blockbrake ? 0 : amp*(int32_t)TIM1->CCR1/(int32_t)PWM_PERIOD;
 	}
 	return amp;
 }

@@ -32,6 +32,23 @@ volatile uint32_t axisDisarm;     //the error that switched the axis to IDLE, un
 volatile uint8_t posDone;         //position mode: at the target
 static uint8_t posHeld;
 
+//speed for the FOC speed loop: fastspeed (the last hall interval) below 60 rpm, realspeed (6 intervals,
+//one electrical turn: the hall sector widths cancel) above 120, blended between. The sectors differ by
+//up to 5 deg el and the edges jitter with the current: on fastspeed the loop (every 2 ms) turned that
+//into torque steps, broadband 20-250 Hz vibration that grew with speed (480 rpm: 0.78 m/s^2, 0.29 on
+//realspeed, a coasting wheel 0.33). realspeed lags ~3 intervals: below 60 rpm the loop limit-cycled on
+//it (0 -> 20 rpm: 115 % overshoot). With field weakening fastspeed again, faded in over its first 1 A:
+//there the loop swung +-13 rpm on realspeed (1.6 m/s^2 at 570 rpm with 5 A, 1.2 on fastspeed).
+static int32_t FocSpeedMeas(void){
+	int32_t f = fastspeed, a = f<0 ? -f : f, m;
+	if(a<=60) m = f;
+	else if(a>=120) m = realspeed;
+	else m = (f*(120-a)+realspeed*(a-60))/60;
+	int32_t fw = -FocFieldWeakening();
+	if(fw>=1000) return f;
+	return (m*(1000-fw)+f*fw)/1000;
+}
+
 //position mode: hall step error -> speed set point (P, limited)
 static int32_t PositionSpeed(int32_t err){
 	int32_t vmax = cfgOrDefault(POS_RPM, 300);
@@ -202,7 +219,9 @@ void speedupdate(void){
 		//voltage ramp from 1200 rpm (sine field weakening) pumped a bench supply to 46.6 V.
 		uint8_t regen = BAT_FULL>20000&&BAT_FULL<65000&&fvbat*10>(int32_t)BAT_FULL;
 		if(held||ctl==CTRL_PWM||ctl==CTRL_TORQUE) InputTrack(iOdom, realspeed);
-		int32_t spd = ctl==CTRL_SPEED ? InputVel(speed, dtms, regen, realspeed) : speed;    //velocity set point
+		//velocity set point; the command limited first, the ramp would wind up to it
+		int32_t vin = speed>vlim ? vlim : (speed<-vlim ? -vlim : speed);
+		int32_t spd = ctl==CTRL_SPEED ? InputVel(vin, dtms, regen, realspeed) : speed;
 		if(held||ctl!=CTRL_PWM){
 			vRamp = 0;
 		}else{
@@ -241,11 +260,11 @@ void speedupdate(void){
 					if(ctl==CTRL_TORQUE){
 						i = (int32_t)speed*10;    //0.01 A
 					}else if(ctl==CTRL_POSITION){
-						i = FocSpeedCtrl(posSpeed, fastspeed);
+						i = FocSpeedCtrl(posSpeed, FocSpeedMeas());
 					}else{
 						//below 10 rpm the last hall interval is > 65 ms old: the loop limit-cycled +-55
 						//rpm around a 0 rpm set point on it. Read as 0 there, as before the ms timing.
-						int32_t m = fastspeed;
+						int32_t m = FocSpeedMeas();
 						i = FocSpeedCtrl(spd, (m<10&&m>-10) ? 0 : m);
 					}
 					//regeneration limit (see above): no braking current while the bus is above BAT_FULL
@@ -260,7 +279,7 @@ void speedupdate(void){
 			switch(CONTROL(DRIVEMODE)){
 				case CTRL_PWM:    //command 0 coasts (after the ramp)
 					coast = vRamp==0;
-					pwm = blk ? vRamp*PWM_RES/1000 : vRamp*40;    //duty counts / Q15 modulation (+-32000 linear)
+					pwm = blk ? vRamp*(int32_t)PWM_PERIOD/1000 : vRamp*40;    //duty counts / Q15 modulation (+-32000 linear)
 					break;
 				case CTRL_SPEED:    //rpm; command 0 brakes and holds
 					if(spd==0){
@@ -279,8 +298,8 @@ void speedupdate(void){
 					}else{
 						SpeedPlant p;
 						SpeedParams(DRIVEMODE, &p);
-						//permille of full scale: duty (PWM_RES) for block, modulation (32768) for sine
-						pwm = SpeedCtrl(spd,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
+						//permille of full scale: duty (PWM_PERIOD) for block, modulation (32768) for sine
+						pwm = SpeedCtrl(spd,realspeed,&p)*(blk ? (int32_t)PWM_PERIOD : 32768)/1000;
 					}
 					break;
 				case CTRL_TORQUE:    //0.01 A; command 0 coasts
@@ -291,7 +310,7 @@ void speedupdate(void){
 					}else if(blk){
 						//direction from the sign; the shunt current is a magnitude
 						int32_t sgn = speed>0 ? 1 : -1;
-						pwm = sgn*TorqueCtrlBlock((int32_t)speed*10*sgn, fitotal*10, fastspeed*sgn)*(int32_t)PWM_RES/1000;
+						pwm = sgn*TorqueCtrlBlock((int32_t)speed*10*sgn, fitotal*10, fastspeed*sgn)*(int32_t)PWM_PERIOD/1000;
 					}else{
 						//sine, no current sense: V = I*R + back emf (the sine kv), as modulation, plus the
 						//dead band of the sine plant (dead time, diodes: 1 % ~ 140 mV) in the command's direction
@@ -311,7 +330,7 @@ void speedupdate(void){
 					}else{
 						SpeedPlant p;
 						SpeedParams(blk ? COM_SPEED : SINE_SPEED, &p);
-						pwm = SpeedCtrl(posSpeed,realspeed,&p)*(blk ? (int32_t)PWM_RES : 32768)/1000;
+						pwm = SpeedCtrl(posSpeed,realspeed,&p)*(blk ? (int32_t)PWM_PERIOD : 32768)/1000;
 					}
 					break;
 				default:
@@ -337,7 +356,7 @@ void speedupdate(void){
 		}
 		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
 		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_RES*brakeduty/1000) : abspwm;
+			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_PERIOD*brakeduty/1000) : abspwm;
 			TIM1->CCR1=ccr;
 			TIM1->CCR2=ccr;
 			TIM1->CCR3=ccr;
@@ -366,7 +385,7 @@ void BlockBrake(uint8_t on){
 		NVIC_DisableIRQ(ADC_COMP_IRQn);
 		blockbrake = 1;
 		brakeduty = 0;
-		TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_RES;
+		TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD;
 		for(uint8_t ch=0;ch<3;ch++){
 			uint16_t c = ch==0 ? TIM_Channel_1 : (ch==1 ? TIM_Channel_2 : TIM_Channel_3);
 			TIM_SelectOCxM(TIM1, c, TIM_OCMode_PWM1);

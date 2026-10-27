@@ -51,7 +51,7 @@ FIELDS = {
     24: ("ocpref", "pin", "overcurrent comparator reference"),
     32: ("magicnum", "num", "0xDCAB = valid"), 33: ("vbatdivider", "num", "vbat = divider * Vadc"),
     34: ("itotaldivider", "num", "itotal = divider * Vadc (1/shunt ohm); bench board 419"), 36: ("baud", "num", "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200)"),
-    37: ("pwmres", "num", "TIM1 period"), 38: ("slaveid", "num", "RemoteUartBus slave id"),
+    37: ("pwmres", "num", "TIM1 period, 8192..16383 (4.39..2.2 kHz), read at boot"), 38: ("slaveid", "num", "RemoteUartBus slave id"),
     39: ("windings", "num", "motor poles"), 40: ("invlowside", "num", "1 = low side gate drive inverted"),
     41: ("softocp", "num", "A, averaged bus current limit, 0 = off"), 42: ("hardocp", "num", "adc watchdog current limit, adc counts above zero"),
     44: ("drivemode", "num", "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED, 3/7/11 COM/SINE/FOC_POSITION, 8 FOC_VOLT, 9 FOC_SPEED, 10 FOC_TORQUE (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"),

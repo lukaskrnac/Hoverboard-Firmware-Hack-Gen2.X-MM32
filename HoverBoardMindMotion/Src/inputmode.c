@@ -54,16 +54,22 @@ int32_t InputVel(int32_t rpm, int32_t dtms, uint8_t holdDown, int32_t meas){
 	if(InputMode()!=IM_VEL_RAMP){
 		rampRpm = (float)rpm;
 	}else{
-		float step = centi(VEL_RAMP_RATE, 100)*60.0f*(float)dtms/1000.0f;    //rpm in this period
-		float d = (float)rpm-rampRpm;
+		float rate = centi(VEL_RAMP_RATE, 100)*60.0f;    //rpm/s
+		float step = rate*(float)dtms/1000.0f;    //rpm in this period
+		float d = (float)rpm-rampRpm, old = rampRpm, m = (float)meas;
 		if(holdDown&&rampRpm!=0.0f&&(d>0)!=(rampRpm>0)){
 			//slowing down while the bus is high: the ramp pauses, but not above the wheel (it slows by
 			//friction): a set point held above it made the speed loop drive it up again (3 Hz cycles)
 			step = 0;
-			float m = (float)meas;
 			if(rampRpm>0 ? (m<rampRpm&&m>=0) : (m>rampRpm&&m<=0)) rampRpm = m;
 		}
 		rampRpm += d>step ? step : (d<-step ? -step : d);
+		//the set point runs at most a margin (0.25 s of the ramp, >= 30 rpm) ahead of the wheel: towards a
+		//speed the wheel cannot reach it went on to the target, and a lower command then had to ramp down
+		//all that way first (seconds of full drive). It does not go back when the wheel falls behind.
+		float lead = rate*0.25f; if(lead<30.0f) lead = 30.0f;
+		if(d>0&&rampRpm>m+lead&&rampRpm>old) rampRpm = old>m+lead ? old : m+lead;
+		else if(d<0&&rampRpm<m-lead&&rampRpm<old) rampRpm = old<m-lead ? old : m-lead;
 	}
 	inVelSp = rampRpm*(float)StepsPerTurn()/60.0f;
 	return roundF(rampRpm);

@@ -32,9 +32,36 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       halls can measure); the target is int16 (the command field). Sine takes 1.6-2.2 s per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
       same command; block torque depends on the shunt calibration.
-- [ ] FOC field weakening at the very top (13 A d current, ~850 rpm at 24 V): vibration 2.4 m/s^2
-      (1.1-1.2 up to 9 A). Braking from above base speed still raises a bench supply's bus (ramps
-      pause and no braking current above `batfull`; set `batfull` near the supply voltage there).
+- [ ] FOC field weakening with 13 A of d current (~840 rpm at 24 V) shakes and trips (9 A: 0.7-0.9
+      m/s^2, stable). The hall edges move with the stator current (intervals +-9 % within a few
+      edges at 820 rpm, far more than the rotor can change); the tracker follows them, the frame
+      error times |I_d| is torque, which moves the edges again. The tracker gain is already 1/16 per
+      edge at speed. Next: measure the edge shift against I_d / I_q at a fixed speed and correct the
+      measured boundary for it, or cap `fwimax` where it stays stable. A trip there switches the
+      gates off above base speed: the back emf charges the bus through the diodes (a bench supply's
+      overvoltage protection cut out). Braking from above base speed also raises a bench supply's
+      bus (ramps pause and no braking current above `batfull`).
+- [ ] Partial field weakening (target speed just above base speed, the d current between 0 and
+      `fwimax`): the speed swings +-8-12 rpm at 1-10 Hz, 1.1-1.3 m/s^2 at 570-600 rpm with 5 A (the
+      old firmware the same, 1.3); at full field weakening (target beyond reach) 0.4-0.7, without
+      field weakening 0.2-0.5. I_d swings +-0.7 A around the field weakening controller's value. The
+      field weakening integrator (on the demanded voltage incl. the P terms) and the speed loop
+      interact; a feed forward d current from the speed (and the integrator only trimming) is the
+      next thing to try.
+- [ ] **PWM whine** (4.39 kHz, audible at low speed). The adc isr takes 47-66 us (soft division on
+      the M0), so the pwm period cannot shrink with the control running every period. Plan: pwm at
+      2-4x (`pwmres` 4096/2730/2048) with the control every n-th period (the isr returns early in
+      between), so the control period and all its timing stay 227.6 us. Cost: the op-amps need >= 2.5
+      us of low side time either side of the sample (they lag the shunt by ~5 us, measured with all
+      phases at one duty): the modulation limit falls from 90 % to ~85 % at 13 kHz, ~80 % at 17.6 kHz
+      (top speed before field weakening), and 2-4x switching losses. The output lead (10/8) must be
+      measured again then.
+- [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
+      reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
+      (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
+      modulation until now (2.5 A shown); fixed, they are valid to 95.3 %.
+- [ ] FOC modulation limit 90 % could be ~94 %: the op-amps read correctly down to +-2.5 us of low
+      side time (C), +-1.5 us (B); 94 % leaves +-3.4 us. +4 % top speed before field weakening.
 - [ ] At high current and speed (field weakening) the ST-Link and the FTDI drop off USB now and then
       (ground noise through the shared USB ground, the hub resets). Test scripts read over the bus
       there; an isolator on the SWD/UART link would help.
@@ -55,8 +82,11 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 
 - [ ] Speed measurement averages the last 6 hall intervals: it lags during the first electrical turn
       of a fast acceleration (SINE_SPEED steps overshoot up to ~10 %), and one bad sample (178 rpm at
-      150) was seen during an acceleration. FOC_SPEED uses `fastspeed` (last interval); the other
-      speed modes could too.
+      150) was seen during an acceleration. FOC_SPEED uses `fastspeed` (last interval) below 60 rpm
+      and the 6-interval average above 120 rpm (blended between): on the last interval the sector
+      width differences (up to 5 deg el, the same every revolution) became torque steps. With field
+      weakening active it goes back to the last interval (the loop swung +-13 rpm on the average
+      there, 570 rpm with 5 A); why the average is worse there is not understood yet.
 - [ ] After a COM_SPEED -> SINE_SPEED switch at speed, one hall sector takes 10-28 ms instead of
       4.4 ms (150 rpm) and the next ones come faster: the speed reading dips for one electrical turn
       (to 120, once 68 rpm) although the ADC ISR keeps running. Probably the stator current transient

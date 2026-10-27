@@ -26,7 +26,7 @@ void PWM_GEN_init(PWM_GEN_T *u1)
 	u1->CompC	= 0;
 	u1->Mode	= SEVENMODE;
 	u1->Sector	= 0;
-	u1->N_halfPeriod	= PWM_RES;
+	u1->N_halfPeriod	= PWM_PERIOD;
 }
 
 /*************************************

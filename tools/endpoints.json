@@ -228,7 +228,7 @@
    "id": 37,
    "type": "uint16",
    "access": "rw",
-   "unit": "TIM1 period"
+   "unit": "TIM1 period, 8192..16383 (4.39..2.2 kHz), read at boot"
   },
   "hoverboard.config.slaveid": {
    "id": 38,

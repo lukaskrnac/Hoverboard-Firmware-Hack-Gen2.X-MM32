@@ -95,6 +95,10 @@ s32 main(void){
 		CFG_VERSION=3;
 	}
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
+	//pwm period: not below 8192 (4.39 kHz). The adc isr takes 47-66 us, and the phase current op-amps lag
+	//the shunt by ~5 us and need >= 2.5 us of low side time either side of the sample: at 2048 (17.6
+	//kHz, 57 us) neither fits. The RAM value only takes effect here (the code uses the timer's ARR).
+	if(PWM_RES<8192||PWM_RES>16383) PWM_RES = 8192;
 
 	//initialize normal gpio
 	io_init();

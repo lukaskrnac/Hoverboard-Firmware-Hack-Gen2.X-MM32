@@ -93,9 +93,10 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
   - FOC: `fwimax`, the most negative d current, at most 90 % of the current limit. A controller sets
     the d current so the current loops keep 5 % voltage headroom. Each amp of d current saves
     omega*L of voltage (~0.37 V at 600 rpm on the bench motor, L ~0.46 mH). Bench wheel at 24 V with
-    `current_soft_max` 15 A: 520 rpm without, 626 rpm with 5 A, 745 rpm with 9 A, 836 rpm with 13 A
-    (then 12.7 A phase current, 4 A from the supply, unloaded). More speed needs more d current,
-    i.e. a higher current limit.
+    `current_soft_max` 15 A: 524 rpm without, 623 rpm with 5 A, 749 rpm with 9 A (0.7-0.9 m/s^2,
+    unloaded). With 13 A at ~840 rpm it shakes and trips: the hall switching points move with that
+    much stator current (armature reaction) and the angle follows them. Keep `fwimax` at or below
+    ~9 A on this motor for now.
   - Sine: `fwadvance`, phase advance in degrees. Sine field weakening has no current control and is
     expensive; see `Inc/pinout.h`.
   - Above the speed the battery voltage allows, the back EMF is higher than the bus: a coast (gates
@@ -103,6 +104,12 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
     (VEL_RAMP; voltage commands slew at 1 ‰/ms) instead of stopping at once.
 - **Overvoltage:** the board coasts while the bus is 3 V above `batfull`, so braking doesn't pump a
   bench supply.
+- **VEL_RAMP** (`vel_ramp_rate`): the set point runs at most 0.25 s of the ramp (at least 30 rpm)
+  ahead of the wheel, so an unreachable command doesn't wind it up: a lower command takes effect at
+  once. The command is limited to `vel_limit` before the ramp.
+- **PWM frequency:** `pwmres` (TIM1 period, read at boot) must stay at 8192 (4.39 kHz) or above. The
+  control interrupt takes 47-66 us and the phase current op-amps lag the shunt by ~5 us; at 2048
+  (17.6 kHz) neither fits, so lower values are replaced by 8192.
 
 Configs saved before the version field (word 63) used 2/3 for SINE_VOLT/SINE_SPEED; they are
 migrated at boot. FOC needs the two phase current pins (`iphasea`/`iphaseb`, `iphasecfg` selects the

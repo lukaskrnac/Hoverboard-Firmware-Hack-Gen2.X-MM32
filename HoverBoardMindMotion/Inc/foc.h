@@ -28,6 +28,8 @@ int32_t CurrentHardMax(void);        //mA, phase current trip
 extern volatile int32_t focIdRef;     //d current reference, mA (field weakening, tests over SWD)
 extern volatile int16_t focId, focIq; //measured, mA
 extern volatile int16_t focIqF, focIdF;    //I_q, I_d averaged over ~7 ms, mA (telemetry)
+int32_t FocFieldWeakening(void);    //field weakening d current, mA (<= 0)
+extern volatile int32_t focIdNow;    //d current reference applied, mA
 extern volatile uint8_t focTrip;      //phase current above the trip level: gates off until the command is 0
 
 #endif

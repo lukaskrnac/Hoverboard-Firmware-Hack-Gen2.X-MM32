@@ -57,7 +57,9 @@ extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EE
 #define ITOTAL_DIVIDER pinstorage[34]    //itotal = divider * adc voltage: 1/shunt ohm for a direct shunt (250 = 4 mOhm; bench
                                          //board 419, measured against the op-amp phase current)
 #define BAUD pinstorage[36]    //uart baud / 100 (config version 2; 1152 = 115200)
-#define PWM_RES pinstorage[37]
+#define PWM_RES pinstorage[37]    //TIM1 period (centre aligned: 72 MHz / 2 / PWM_RES), read at boot; 8192 .. 16383
+//the period the timer runs at: the code uses this, not PWM_RES (a RAM change applies at the next start)
+#define PWM_PERIOD ((uint16_t)TIM1->ARR)
 #define SLAVE_ID pinstorage[38]
 #define WINDINGS pinstorage[39]
 #define INVERT_LOWSIDE pinstorage[40]

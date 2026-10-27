@@ -21,8 +21,8 @@
 //the bus current come from the filtered d / q, the trip one period later (after the angle). The offset
 //calibration (standing, zero vector) keeps a median of 9 per channel. A trip needs two periods in a row.
 //
-//Loop: every pwm period in the adc isr. Park angle = hall estimator angle minus its 1.5 period lead
-//(that lead is for the pwm output; the currents were sampled now); PI per axis in mV with back emf feed
+//Loop: every pwm period in the adc isr. Park angle = the hall tracker's angle at the sample
+//(hallAngleSample; HALL1.Angle has the output lead); PI per axis in mV with back emf feed
 //forward on q and the dq decoupling (omega*L*i, L 0.46 mH: at 170 Hz electrical omega*L ~ 0.5 Ohm, as
 //large as kp); on the voltage circle d first, q gets the rest, integration stops in saturation.
 #include "foc.h"
@@ -36,8 +36,9 @@
 #include "FOC_Math.h"
 #include "calculation.h"
 
-#define TS_US        228          //pwm period = 2*PWM_RES/72 MHz = 227.6 us
 #define MOD_MAX      29491        //90 % of the linear svpwm range (32768)
+//sine: phase currents valid up to 95.3 % (31211): low side time +-2.7 us at 8192, the op-amps need 2.5
+#define SAMPLE_MAX   31200
 #define INV_SQRT3_Q15 18919
 
 static int32_t cfg(uint16_t v, int32_t def){ return v ? v : def; }
@@ -64,6 +65,7 @@ volatile uint16_t focGlitches;     //samples replaced by the median, diagnostic
 static int32_t ia, ib, ic;         //mA, this period
 static int32_t intD, intQ;         //integrators, uV
 static int32_t fwId;               //field weakening d current, mA (<= 0)
+volatile int32_t focIdNow;         //the d current reference applied, mA (electrical frame)
 
 volatile int32_t focIdRef;
 volatile int16_t focId, focIq;
@@ -77,6 +79,7 @@ static volatile int16_t focVCmd;   //permille, motor frame; voltage mode if nonz
 static volatile uint8_t focVoltMode;
 
 static int32_t lastIdRef, lastIqRef;
+static volatile int8_t qSat;    //q voltage on its limit: +1 towards positive focIqRef (motor frame), -1 negative
 
 //capture for tuning and fault analysis over SWD, per pwm period: id, iq (mA), vd, vq (mV, electrical
 //frame), ia (mA), angle. focTraceN: write 0xFF = one shot from the next reference step of >= 200 mA;
@@ -139,6 +142,10 @@ void FocReset(void){
 	FocSpeedReset();
 }
 
+int32_t FocFieldWeakening(void){    //mA, <= 0
+	return fwId;
+}
+
 uint8_t FocHoldOff(void){
 	return focTrip||(!offValid&&realspeed!=0);    //offsets need the zero vector: it brakes a turning wheel
 }
@@ -190,7 +197,10 @@ void FocMeasure(void){
 		case 2: ia = c1; ic = c2; ib = -ia-ic; break;
 		default: ia = c1; ib = c2; ic = -ia-ib; break;
 	}
-	if(sine&&(pwm>MOD_MAX||pwm<-MOD_MAX)){    //the low side time is too short for a valid sample
+	//sine above that: the low side time is too short for a valid sample. (It was MOD_MAX: at the sine's
+	//top speed (95 %) the bus current and I_d / I_q read the value from the acceleration, 2.5 A / 3.5 A
+	//instead of 0.4 / 0.7.)
+	if(sine&&(pwm>SAMPLE_MAX||pwm<-SAMPLE_MAX)){
 		itotal = itotalPhase;
 		dqOk = 0;
 		return;
@@ -199,11 +209,10 @@ void FocMeasure(void){
 	sampleOk = 1;
 }
 
-//d and q current (electrical frame) of this period's sample, after HALLModuleCalc(): the estimator
-//angle minus its 1.5 period lead (that lead is for the pwm output; the currents were sampled now)
+//d and q current (electrical frame) of this period's sample, after HALLModuleCalc(): the tracker's angle
+//at the sample (the output angle has a lead for the pwm)
 static void park(int32_t* id, int32_t* iq){
-	int16_t th = HALL1.Angle;
-	int16_t thS = fastspeed ? (int16_t)(th-HALL1.MoveDir*(HALL1.IncAngle*3/2)) : th;
+	int16_t thS = hallAngleSample;
 	Trig_Components sc = MCM_Trig_Functions(thS);
 	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
 	int32_t d = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
@@ -235,7 +244,7 @@ static void park(int32_t* id, int32_t* iq){
 		tripN = 0;
 	}
 	//bus current = sum of duty * phase current; the CCRs read back are the ones active in this period
-	int32_t n = PWM_RES;
+	int32_t n = (int32_t)PWM_PERIOD;
 	itotalPhase = ((n-(int32_t)TIM1->CCR1)*ia+(n-(int32_t)TIM1->CCR2)*ib+(n-(int32_t)TIM1->CCR3)*ic)/n/10;
 	focId = (int16_t)*id;
 	focIq = (int16_t)-*iq;
@@ -251,7 +260,7 @@ void FocObserve(void){    //sine: I_d / I_q for telemetry
 }
 
 static void zeroVector(void){
-	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_RES/2;
+	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD/2;
 }
 
 void FocControl(void){
@@ -279,6 +288,7 @@ void FocControl(void){
 	int32_t imax = IMAX();
 	int32_t idRef = hallAngleSure ? focIdRef+fwId : 0, iqRef;
 	if(idRef>imax) idRef = imax; else if(idRef<-imax) idRef = -imax;
+	focIdNow = idRef;
 	int32_t iqmax = fwId ? MCM_Sqrt(imax*imax-idRef*idRef) : imax;    //the total current stays within the limit
 	if(focVoltMode){
 		iqRef = focVCmd>0 ? -iqmax : iqmax;    //the voltage limit below sets the voltage; this the current limit
@@ -293,7 +303,7 @@ void FocControl(void){
 	int32_t ed = idRef-id, eq = iqRef-iq;
 	if(ed>20000) ed = 20000; else if(ed<-20000) ed = -20000;
 	if(eq>20000) eq = 20000; else if(eq<-20000) eq = -20000;
-	int32_t kp = KP(), kiTs = KI()*TS_US;
+	int32_t kp = KP(), kiTs = KI()*(((int32_t)PWM_PERIOD+18)/36);    //Ts in us
 	int32_t kv = cfg(SINE_KV, 242);
 	//back emf feed forward and decoupling from realspeed (6 hall intervals), not fastspeed (the last one):
 	//the hall intervals jitter with the phase current (+-3 % at no load, +-20 % with field weakening at
@@ -327,8 +337,9 @@ void FocControl(void){
 		int32_t vc = -(int32_t)focVCmd*vmax/1000;    //electrical frame: the command is negated
 		if(vc>0){ if(vc<qhi) qhi = vc; }else{ if(vc>qlo) qlo = vc; }
 	}
-	if(vq>qhi){ if(diq>0) intQ -= diq; vq = qhi; }
-	else if(vq<qlo){ if(diq<0) intQ -= diq; vq = qlo; }
+	if(vq>qhi){ if(diq>0) intQ -= diq; vq = qhi; qSat = -1; }    //electrical frame: q = -focIqRef
+	else if(vq<qlo){ if(diq<0) intQ -= diq; vq = qlo; qSat = 1; }
+	else qSat = 0;
 
 	//field weakening: an integrator sets the d current (0 .. -FW_IMAX) so that the voltage the current
 	//loops ask for stays at 95 % of the circle: they keep headroom and stay in control; the negative d
@@ -426,7 +437,10 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas){
 	int32_t kp = cfg(FOC_SPD_KP, 30), ki = cfg(FOC_SPD_KI, 100);    //mA per rpm, mA per rpm*s
 	int32_t di = ki*e*256/1000*dt;
 	int32_t u = kp*e*256+spI+di;
-	if((u<imax||di<0)&&(u>-imax||di>0)){
+	//no integration into a current the voltage cannot drive (q voltage on its limit): at top speed the
+	//integrator ran up to the current limit against an unreachable set point and took ~1.7 s to come
+	//back when the set point dropped
+	if((u<imax||di<0)&&(u>-imax||di>0)&&!(qSat>0&&di>0)&&!(qSat<0&&di<0)){
 		spI += di;
 		if(spI>imax) spI = imax; else if(spI<-imax) spI = -imax;
 	}

@@ -4,6 +4,7 @@
 #include "pinout.h"
 #include "interrupt.h"
 #include "bldc.h"
+#include "foc.h"
 #include "mcu.h"
 
 /*------------------- Private variables ---------------*/
@@ -11,6 +12,7 @@ HALLType HALL1;
 volatile int32_t fastspeed;
 volatile uint8_t hallAngleSure;    //the angle is known: a regular edge, its interpolation not run out
 volatile uint16_t hallInvalid;    //invalid hall readings (diagnostic)
+volatile int16_t hallAngleSample;  //rotor angle at this period's current sample (Angle has the output lead)
 static uint32_t pllTh, pllBnd;     //angle tracker: angle, the boundary of the last edge (2^32 per electrical turn)
 static int32_t pllW;               //its speed, angle per pwm period, signed
 static uint8_t pllOn;
@@ -99,12 +101,23 @@ void HALLModuleCalc(HALLType *u){
 		}else if(d==5){
 			realdir=1;
 		}
-		u->HallTime[i] = tim->CCR1;    //us since the previous edge (the timer is reset by every edge)
+		//the timer captures the interval and restarts at every edge, ~14 us after the pin changes (its
+		//input filter). An edge seen here before that still has the previous interval in CCR1 and the
+		//count running since the previous edge: it was taken as an edge two periods old (the angle
+		//tracker ~2 periods of travel off, at 300 rpm on ~10 % of the edges). A count above 1.5 periods
+		//is that case: the interval is the count, the edge is now.
+		uint32_t per = ((uint32_t)TIM1->ARR+18)/36;    //pwm period, us
+		uint32_t cnt = tim->CNT;
+		if(cnt>per*3/2){
+			u->HallTime[i] = cnt;
+			since = 0;
+		}else{
+			u->HallTime[i] = tim->CCR1;    //us since the previous edge
+			since = cnt+HALL_FILTER_US;    //us since this edge
+		}
 		//an interval below 100 us cannot be real (1000 rpm: 670 us): a spike made two captures (the timer
 		//input filter should stop them); the previous interval stands in
 		if(u->HallTime[i]<100) u->HallTime[i] = u->HallTime[(i+5)%6];
-		since = tim->CNT;              //so this is the time since this edge
-		if(since>456) since = 456;
 		if(tim->SR&TIM_SR_UI){         //16 bit timer overflowed: more than 65 ms, the capture wrapped;
 			tim->SR = ~TIM_SR_UI;      //ms timing instead (it was a fixed 250 ms: below ~10 rpm the speed
 			uint32_t ms = millis-edgeMs;    //read 0 or far too low)
@@ -144,7 +157,7 @@ void HALLModuleCalc(HALLType *u){
 	//at +-30 deg (5461), within 1.5 deg. At an edge the rotor is on the boundary just crossed; between
 	//edges the angle is interpolated at the measured speed, at most one sector. The old code put the
 	//angle on the sector centre at the edge (30 deg ahead) and interpolated as if this ran every 62.5 us
-	//instead of every pwm period (2*PWM_RES/72 MHz = 227.6 us), so the angle lagged and jumped.
+	//instead of every pwm period (2*ARR/72 MHz = 227.6 us), so the angle lagged and jumped.
 	if(!com){
 		if(edge&&u->HallTimeSum>=6*65535){
 			//no speed known (below ~10 rpm, after a reversal): the middle of the sector, error <= 30 deg.
@@ -164,20 +177,33 @@ void HALLModuleCalc(HALLType *u){
 			//with the d current. The rotor (inertia) turns smoothly: the edges correct, they do not set.
 			int32_t s = u->MoveDir;
 			uint32_t ivl = u->HallTime[i];    //us
-			uint32_t k = (uint32_t)PWM_RES*16384/54;    //65536*2*PWM_RES/72/6 / interval: per period, 65536 per turn
+			uint32_t per = ((uint32_t)TIM1->ARR+18)/36;    //pwm period, us
+			uint32_t k = (uint32_t)TIM1->ARR*16384/54;    //65536*2*ARR/72/6 / interval: per period, 65536 per turn
 			uint32_t q = k/ivl, r = k%ivl;    //(k<<16)/ivl in 32 bits: 2^32 per turn
 			int32_t wMeas = s*(int32_t)((q<<16)+(((r<<8)/ivl)<<8));
 			uint32_t bnd = (uint32_t)(uint16_t)(u->CWAngleTab[raw]-s*5461)<<16;
-			uint32_t meas = bnd+(uint32_t)(wMeas/228*(int32_t)since);
-			int32_t e = (int32_t)(meas-pllTh);
+			uint32_t meas = bnd+(uint32_t)(wMeas/(int32_t)per*(int32_t)since);
+			//compared with this period's prediction. It was compared with the last period's angle (the
+			//advance below runs only between edges): every error one period of travel too large (6 deg
+			//at 300 rpm, 15 at 750), the speed 1/(intervals - 1) too high, the angle a sawtooth of a
+			//period's travel per sector, and with the capture race above ~10 % of the edges past the
+			//15 deg snap. Measured at 300 rpm: mean error -5.6 deg = one period, sd 6.6 deg.
+			uint32_t pred = pllTh+(uint32_t)pllW;
+			int32_t e = (int32_t)(meas-pred);
 			if(!pllOn||(pllW>0)!=(s>0)||e>(2731<<16)||e<-(2731<<16)){    //start, reversal, > 15 deg off
 				//(a half correction at speed instead left the error in fast accelerations: braking
 				//current that grew with speed, a 15 A trip at 13 A field weakening)
 				pllTh = meas; pllW = wMeas; pllOn = 1;
 			}else{
-				int32_t n = (int32_t)(ivl/228);
-				pllTh += (uint32_t)(e/8);
-				pllW += e/64/(n<1 ? 1 : n);
+				int32_t n = (int32_t)(ivl/per);
+				//gain per edge 1/8 (speed 1/64); 1/16 (1/256) with 6 A of d current or more: the edges move
+				//with the stator current (armature reaction: intervals +-9 % at 820 rpm with 13 A of d
+				//current, far more than the rotor can change), the tracker passed that into the frame, and
+				//with a large d current a frame error is torque. 749 rpm, 9 A of field weakening: 0.46-0.53
+				//instead of 0.70 m/s^2; with 5 A 1/8 shook less (1.2 against 1.4).
+				int32_t gk = (focIdNow<=-6000||focIdNow>=6000) ? 4 : 3;
+				pllTh = pred+(uint32_t)(e/(1<<gk));
+				pllW += e/(1<<(2*gk))/(n<1 ? 1 : n);
 			}
 			pllBnd = bnd;
 			hallAngleSure = 1;
@@ -198,11 +224,17 @@ void HALLModuleCalc(HALLType *u){
 			if(travel<=(aw>(600<<16) ? (21845<<16) : (10922<<16))+aw) pllTh = next; else hallAngleSure = 0;
 		}
 		if(pllOn){
-			//output lead 9/8 periods (the centre of the next pwm period): measured with FOC at 300 and
-			//510 rpm, where the d voltage the loops settle at (no d current) is 0 (frame on the rotor)
+			//output lead 10/8 periods: measured with FOC at 300 and 480 rpm, where the d voltage the loops
+			//settle at (no d current) is 0 (frame on the rotor). (It was 9/8 with the tracker that ran
+			//a period ahead at the edges.)
 			int32_t aw = pllW<0 ? -pllW : pllW;
 			u->IncAngle = (int16_t)(aw>>16);
-			u->Angle = (int16_t)((pllTh+(uint32_t)(pllW/8*9))>>16)+u->MoveDir*CWShift;
+			u->Angle = (int16_t)((pllTh+(uint32_t)(pllW/8*10))>>16)+u->MoveDir*CWShift;
+			//the tracker angle is the one when the hall timer is read here, ~25 us (1/8 period) after the
+			//counter zero, the current sample's time
+			hallAngleSample = (int16_t)((pllTh-(uint32_t)(pllW/8))>>16);
+		}else{
+			hallAngleSample = u->Angle;
 		}
 	}
 	//block commutation: evaluated every time, so a direction change or a mode switch takes effect at
@@ -234,3 +266,4 @@ void HALLModuleCalc(HALLType *u){
 	//85 deg: a 21 A trip with field weakening at 600 rpm.
 	if(hall_to_pos[raw]) u->PreRaw = raw; else hallInvalid++;
 }
+
