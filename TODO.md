@@ -14,16 +14,17 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       (`Inc/commutation.h`), the default record and the layout migration with the main firmware; 20.6 KB).
       Verified on the bench board: info, adc, battery pin, hall detection (3/3 runs A=PC14 B=PC13 C=PC15),
       test rotation, get/set/revert, TUI screens; the main firmware boots unchanged afterwards (config page
-      byte-identical). **Not yet tried on hardware (need a person at the board):** `detect button` (press),
-      `detect charger` (plug in), `detect latch` (switches the board off), the LED screen (watch the LEDs),
-      `poweroff`, the uart loop-back search (needs an erased config), `save` from PinFinder.
+      byte-identical). The detections that need a person at the board (button, charger, latch, LEDs,
+      `poweroff`, `save`) were tried by the user on 2026-10-28: working.
 - [x] **P2 Agent mode** (`@` lines, `> cmd` echo, `key=value`, `ok`/`err`) + `tools/pinfinder.py` (`--json`),
       README "Autodetect&configuration (PinFinder)". Long commands stop on any received byte.
 - [x] **Web setup wizard (2026-10-28)**: pinfinder.html Setup tab (13 steps), Advanced = the direct controls;
       E2E `uitest/wiztest.mjs` walks every step on the bench board (no save at the end). Fixed on the way:
       a UART receive error (adapter dropping off at a USB hub reset) stopped the rx DMA in both firmwares
       until cleared (uart.c clears it now); PinFinder drops line noise before an '@'; `pin blink` toggles
-      the pulls instead of driving the pin.
+      the pulls instead of driving the pin. Battery step (console 419699c): battery monitoring on/off, Li-ion
+      cell count fills full / empty (4.2 / 3.2 V per cell), limits checked against the firmware's
+      "<= 20 V = off"; off sets `batempty` 0, `batfull` stays (regeneration limit). Tested in headless Chrome.
 - [ ] **P3 TUI**: done: one screen with the pin map (unsaved changes yellow), VDD/battery, menu, LED
       screen, test motor screen, command line = agent commands, plain text without ANSI. Open: per item
       help (`?` shows the command list only), "how found" per pin (detected/manual/default), a screen
@@ -60,9 +61,8 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         other free pin pairs with pull-ups; probe 0x68/0x69 (MPU-6050/6500/9250, ICM-20xxx: WHO_AM_I
         0x75), 0x6A/0x6B (LSM6DS*: 0x0F), BMI160 (0x68, CHIP_ID 0x00 = 0xD1); report bus pins, address,
         chip. Store pins + type in new config words (extension record).
-      - **Charger detect pin** (bench: PB10): ask the user to plug/unplug the charger, find the input that
-        follows it (pull-up and pull-down tried), store pin + polarity.
-      - **Hall angle calibration** (the item below, moved into PinFinder).
+      - **Done:** charger detect pin (`detect charger`, tried by the user) and the hall angle calibration
+        (`calibrate hall`, see Calibrations).
 - [x] **P6 Buzzer without an internal oscillator**: `buzzerpassive=2` (word 79): low battery alarm toggled
       in the adc isr (2.2 kHz), melodies by busy waiting (`Beep()`); PinFinder LED screen `t` tone / `p`
       passive buzzer, agent `pin <p> tone`. Not tried with a passive buzzer yet (the bench one is active).
@@ -88,7 +88,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       initialize.c (identical register dump, -204 B main firmware). PinFinder 30.1 / 30 KB: little room left.
       Settled 2026-10-28: the bench shunt is R003 (3 mOhm): `detect current 1000 3` -> iphasegain 524-549
       (saved: mean 535), itotaldivider 333, itotalzero 438; blockcal.py's 419 / 145 was 25 % off. Open:
-      `calibrate poles` with a person, inverted halls.
+      inverted halls (P9).
 - [ ] **P8 More targets.** One source tree, `make MCU=...`:
       - MM32SPIN06: same library as SPIN05, untested with GCC; check the pin table, flash/RAM size,
         linker script, the op-amps (if any) and the hardware divider.
@@ -98,23 +98,23 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       - MM32F030 / MM32F031 (and the `origin/pinfinder-spin280` branch's MM32SPIN0280): general-purpose
         M0 parts on some boards; vendor headers, clock tree (maximum clock to check: PWM_RES and every
         timing assume 72 MHz), no gate driver/op-amps.
+        **Next (2026-10-28): the user has an MM32F031 board.** Order: back up its flash over SWD (the
+        stock firmware may be read-protected: check before anything is erased), identify the chip
+        (IDCODE, flash/RAM size), vendor pack/headers, then PinFinder for it first (finds the pin map and
+        runs the motor without the full firmware), then the main firmware's block/sine modes (no op-amps
+        expected: bus shunt only, so no FOC unless the board has phase shunts).
       Runtime: PinFinder reports the chip (DBGMCU IDCODE, flash size register) and refuses a firmware
       built for another MCU; the flasher checks the same before programming.
 - [ ] **P9 Still not detected / features to consider** (review, then promote to items):
       - E-stop input (bench PB0) and WS2812 header (PB12): detect + support (E-stop = disarm like the
         CANSimple Estop; WS2812 status LED like the RGB LED).
-      - Pole pairs (`WINDINGS`): count hall edges per wheel turn (the user turns the wheel one turn, or
-        the motor turns slowly with a mark/camera).
-      - Motor R and L (`MOTOR_R`, `PHASE_L`): ODrive-style motor calibration (dc step for R, ac/step
-        response for L) with the phase currents; torque constant / kv (`TORQUE_CONST`, `SINE_KV`) from a
-        free run at a known modulation.
-      - Battery voltage divider (`VBAT_DIVIDER`): the user enters the measured voltage once.
+      - (Done since: pole count, motor R / L, kv, battery divider, battery cell count -> full / empty: see
+        Calibrations and the wizard's Battery step.)
       - Low-side polarity (`INVERT_LOWSIDE`) and the over-current comparator pins (`OCPPIN`/`OCPREFPIN`):
         detect safely (gate driver input states with the bridge unpowered?) or keep manual with a warning.
       - Master/slave UART (the second board link) and the remote UART pins: `finduartloop` exists for
         the debug port; extend to both.
       - Temperature: MCU internal sensor (ADC channel) and an NTC pin if fitted; report + derate.
-      - Battery cell count from the measured voltage -> suggested `BAT_FULL`/`BAT_EMPTY`.
       - Headlight / brake light outputs on some boards (detect like the LEDs).
       - Hall inputs inverted / 180 deg off the commutation: PinFinder detects it (no assignment fits, the
         inverted one does) but the firmware cannot use it; a `hallinvert` config bit (hallpos() 7-state)
@@ -124,20 +124,6 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
 ## Next
 
-- [ ] **Hall angle calibration in PinFinder** (see P5). The sine angle estimator uses `CWAngleTab` (hall state
-      centres) and assumes the sector boundaries at ±30° (`hallhandle.c`). That was measured on one
-      bench motor; other motors or hall placements can differ. Add a PinFinder menu item that:
-      1. puts TIM1 in sine output mode, applies a small d-axis vector (Ds only, ~5 % of 32768) at a
-         known angle θ with the firmware's SVPWM (`PWM_GEN_calc`), so the rotor aligns to θ,
-      2. sweeps θ slowly over 2 electrical turns forward and back (256 per step, ~12 ms per step),
-      3. logs θ at every hall state change, averages the forward/backward edge (hysteresis ~23° from
-         cogging and friction),
-      4. stores the 6 sector centres (or one offset) in the config and the firmware uses them instead of
-         the hardcoded table. Also reports the direction (hall sequence 2,6,4,5,1,3 for rising θ here).
-
-      Reference: the host-side version that produced the numbers (core halted, SWD):
-      `~/.cache/opencode-scratch/mm32-hover/hallcal.py`. Measured boundaries: 29.9, 90.7, 149.0,
-      211.0, 269.6, 329.8° (±1.5°). Keep the vector small: the bus current spikes to ~11 A raw.
 - [ ] Bus current in sine mode on boards **without** phase current pins: the shunt is sampled at the
       zero vector and reads ~0 (noise); they need a second sample inside an active vector. (With the
       pins, sine now uses the phase currents like FOC, up to 90 % modulation.)
@@ -180,21 +166,16 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] At high current and speed (field weakening) the ST-Link and the FTDI drop off USB now and then
       (ground noise through the shared USB ground, the hub resets). Test scripts read over the bus
       there; an isolator on the SWD/UART link would help.
-- [ ] **Low-battery cut-off** is disabled on the bench (`batempty` 19.0 V). Set real limits for a
-      battery (e.g. 42.0 / 32.0 V for 10S) with the web console or `mm32config.py`.
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
       `main` deploys GitLab Pages). Try the console once in Firefox (WebSerial add-on, over http).
 
-- [ ] FOC position hold with a real load (a weight): the load current handling (speed loop integral
-      at entry, +4.4 A/s while the hall state shows >= 1 deg of sag, back to the speed loop at exit) is
-      only tested on the free wheel. Check that a hanging weight neither drops nor oscillates.
 - [ ] FOC position hold costs current all the time it holds (`hold_current`, default 4 A, ~7 W): drop it
       after a while at the target (like a stepper's idle current) as far as the load allows. Sine/block
       position still work on whole steps.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash 26.4 of 30 KB (3.6 KB free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash 26.5 of 30 KB (4.2 KB free; PinFinder 30.36 of 30 KB, 360 B free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.
