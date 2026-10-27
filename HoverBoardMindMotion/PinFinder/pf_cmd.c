@@ -35,6 +35,7 @@ static void help(void){
 		"save | revert | defaults  write to flash / reload from flash / start over (RAM)",
 		"detect hall [mV]          hall pins, the motor steps slowly (default 2000 mV)",
 		"detect vbat [mV]          battery pin (closest to the measured voltage)",
+		"detect current [mV]       phase current pins, bus current pin + calibration",
 		"detect button [ms]        press the power button within ms",
 		"detect charger [ms]       plug/unplug the charger within ms",
 		"detect latch              power latch (the board switches off when found)",
@@ -128,9 +129,10 @@ void Command(char* line){
 	else if(!strcmp(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
 	else if(!strcmp(c, "defaults")){ CfgDefaults(); note("defaults in RAM: save to keep them"); ok(); }
 	else if(!strcmp(c, "detect")){
-		if(!a1) err("detect what? hall vbat button charger latch");
+		if(!a1) err("detect what? hall vbat current button charger latch");
 		else if(!strcmp(a1, "hall")) DetectHall((int32_t)optnum(a2));
 		else if(!strcmp(a1, "vbat")) DetectVbat((int32_t)optnum(a2));
+		else if(!strcmp(a1, "current")) DetectCurrent((int32_t)optnum(a2));
 		else if(!strcmp(a1, "button")) DetectButton(optnum(a2));
 		else if(!strcmp(a1, "charger")) DetectCharger(optnum(a2));
 		else if(!strcmp(a1, "latch")) LatchFind();
@@ -143,6 +145,7 @@ void Command(char* line){
 		ok();
 	}
 	else if(!strcmp(c, "pin")) pinCmd(a1, a2, a3);
+	else if(!strcmp(c, "scan")) ScanWindow((uint8_t)optnum(a1), (int32_t)optnum(a2), a3 ? PinByName(a3) : PIN_NONE);
 	else if(!strcmp(c, "step")) StepHold((uint8_t)optnum(a1), (int32_t)optnum(a2), optnum(a3));
 	else if(!strcmp(c, "rotate")){
 		uint8_t g;

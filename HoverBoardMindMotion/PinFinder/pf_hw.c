@@ -44,7 +44,16 @@ void AdcScan(uint32_t chmask){
 //one scan triggered by TIM1 CC4 (counter at 1: the middle of the low side time, where the main firmware
 //samples the shunt and the phase current op-amps), short sample time
 void AdcScanTriggered(uint32_t chmask){
+	AdcScanAt(chmask, 1);
+}
+
+//the same at another counter value (CCR4; AdcScanTriggered() sets the main firmware's 1 again)
+void AdcScanAt(uint32_t chmask, uint16_t cnt){
 	uint32_t cfg = ADC1->ADCFG;
+	if(TIM1->CCR4!=cnt){    //preloaded: the new value counts from the next update event, the old one may fire first
+		TIM1->CCR4 = cnt;
+		Wait(2);
+	}
 	ADC1->ADCFG = (cfg&~ADC_CFGR_SAMCTL)|ADC_CFGR_SAMCTL_7_5;
 	ADC1->ADCHS = chmask;
 	ADC1->ADSTA = ADC_SR_ADIF;
@@ -121,6 +130,8 @@ void BlockStep(uint8_t s, uint16_t duty){
 //PWM2: the low sides conduct around the counter's zero, where the adc samples), so the phase current is
 //continuous: phase X duty 1/2 + mv/vbat x cos(theta - 120 X), theta = 210 + 30 k deg. mv is the phase
 //voltage amplitude; even k is the direction of block step k/2+1.
+uint16_t fieldCcr[3];    //the last FieldVector()'s compare values (phases A, B, C)
+
 void FieldVector(uint8_t k, int32_t mv){
 	static const int16_t cos12[12] = { 1000, 866, 500, 0, -500, -866, -1000, -866, -500, 0, 500, 866 };
 	int32_t vb = VbatMv(), arr = PWM_PERIOD;
@@ -129,7 +140,8 @@ void FieldVector(uint8_t k, int32_t mv){
 	volatile u32* ccr[3] = { &TIM1->CCR1, &TIM1->CCR2, &TIM1->CCR3 };
 	for(uint8_t x=0;x<3;x++){
 		int32_t c = cos12[(7+k+12-4*x)%12];
-		*ccr[x] = (uint32_t)(arr/2-arr*mv/vb*c/1000);
+		fieldCcr[x] = (uint16_t)(arr/2-arr*mv/vb*c/1000);
+		*ccr[x] = fieldCcr[x];
 	}
 	const uint32_t all = TIM_CCER_CC1EN|TIM_CCER_CC1NEN|TIM_CCER_CC2EN|TIM_CCER_CC2NEN|TIM_CCER_CC3EN|TIM_CCER_CC3NEN;
 	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|TIM_OCMode_PWM2|TIM_OCMode_PWM2<<8;

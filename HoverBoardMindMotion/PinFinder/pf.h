@@ -43,6 +43,7 @@ void Wait(uint32_t ms);
 void AdcInit(void);
 void AdcScan(uint32_t chmask);          //one conversion of each channel in the mask (bit = channel)
 void AdcScanTriggered(uint32_t chmask);    //the same, started by TIM1 CC4 (low sides on)
+void AdcScanAt(uint32_t chmask, uint16_t cnt);    //started at TIM1 counter cnt
 uint16_t AdcValue(uint8_t ch);          //the last conversion of a channel
 int8_t AdcChannel(uint16_t pin);        //-1: the pin has no adc channel
 int32_t VddMv(void);                    //MCU supply from the internal 1.2 V reference
@@ -51,6 +52,7 @@ int32_t VbatMv(void);                   //battery: VBATPIN x VBAT_DIVIDER, -1 wi
 void MotorInit(void);
 void GatesOff(void);
 void BlockStep(uint8_t step, uint16_t duty);    //block commutation step 1..6 (bldc.c's table) at duty / PWM_PERIOD
+extern uint16_t fieldCcr[3];
 void FieldVector(uint8_t k, int32_t mv);    //k = 0..11: field at k x 30 deg el (even k: step k/2+1), complementary
 uint16_t DutyForMv(int32_t mv);         //duty for this average phase voltage at the measured (or assumed 42 V) battery
 uint8_t PinFree(uint16_t pin);          //not SWD, not configured for anything (pins in words 0-17, 23, 24)
@@ -72,6 +74,8 @@ void CfgDefaults(void);
 //pf_detect.c: the detections; each prints results and ends with ok() / err()
 void DetectHall(int32_t mv);
 void DetectVbat(int32_t expect_mv);
+void DetectCurrent(int32_t mv);
+void ScanWindow(uint8_t k, int32_t mv, uint16_t pin);        //phase current pins, then the bus current pin and its calibration
 void ShowAdc(void);
 void DetectButton(uint32_t ms);
 void DetectCharger(uint32_t ms);

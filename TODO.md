@@ -40,6 +40,14 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       - **DC (bus) current pin** (`ITOTALPIN`): existing item 4 only finds a pin that moves; add the zero
         offset (`ITOTAL_ZERO`, below adc 0 on the bench board) and the divider (`ITOTAL_DIVIDER`) from a
         locked-rotor block step against the phase currents (or against a known load if there are none).
+      - **Done (`detect current`, 2026-10-27):** phase current pins + phase + sign (correlation over 12 static
+        field directions, complementary PWM): bench PA2 = B, PA6 = C, falling, iphasecfg 1, 4/4 runs; gain
+        from motorr shown for information (529-537 vs 515 calibrated). Bus pin (PA7) and its zero/divider from
+        the active vector (one phase high) sampled in its middle, one channel per conversion, against
+        I_x = -(I_a + I_b): 8 linear points, 2.35 counts/A, zero -3.5..-4.6 counts -> **itotaldivider ~330,
+        itotalzero ~400, while blockcal.py gave 419 / 145**. Both use the op-amps (gain 515) as the
+        reference; check which is right against the PSU display (webcam) before trusting either. Boards
+        without phase current pins: the bus pin is not searched yet (needs a reference: motorr).
       - **IMU**: scan I2C on the hardware I2C pin pairs (PD0/PD1 on the bench board) and bit-banged on
         other free pin pairs with pull-ups; probe 0x68/0x69 (MPU-6050/6500/9250, ICM-20xxx: WHO_AM_I
         0x75), 0x6A/0x6B (LSM6DS*: 0x0F), BMI160 (0x68, CHIP_ID 0x00 = 0xD1); report bus pins, address,

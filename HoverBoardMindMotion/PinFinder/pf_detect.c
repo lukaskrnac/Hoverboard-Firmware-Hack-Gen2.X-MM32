@@ -497,3 +497,180 @@ void Info(void){
 	kvi("baud", PF_BAUD);
 	kvi("config_changed", CfgChanged());
 }
+
+//---------------------------------------------------------------- current sensing
+//Phase currents: a static field (complementary PWM) in 12 directions; every free adc pin is sampled where
+//the main firmware samples (low sides on). A phase current pin follows cos(theta - 120 X) of its phase X
+//(theta = 210 + 30 k, FieldVector), rising or falling with current into the motor (iphasecfg bit 2).
+//Bus current: one phase high, two low (the active vector) carries that phase's current through the shunt;
+//sampled in the middle of the active vector at several amplitudes against the phase current pins.
+static const int16_t cos12[12] = { 1000, 866, 500, 0, -500, -866, -1000, -866, -500, 0, 500, 866 };
+
+static uint32_t freeAdcMask(void){
+	uint32_t m = 0;
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint16_t p = adcs[i].io;
+		if(PinFree(p)||p==ITOTALPIN||p==IPHASEAPIN||p==IPHASEBPIN){
+			pinMode((uint8_t)p, INPUT_ADC);
+			m |= 1u<<adcs[i].channel;
+		}
+	}
+	return m;
+}
+
+static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint8_t n){    //avg per channel (x n)
+	for(uint8_t c=0;c<16;c++) avg[c] = 0;
+	for(uint8_t i=0;i<n;i++){
+		AdcScanAt(mask, at);
+		for(uint8_t c=0;c<16;c++) if(mask>>c&1) avg[c] += AdcValue(c);
+	}
+}
+
+void DetectCurrent(int32_t mv){
+	if(mv<=0) mv = 1000;
+	uint32_t mask = freeAdcMask();
+	int32_t zero[16], v[16];
+	static int16_t d[12][16];
+	note("static currents of a few A in the motor; the wheel may move a little");
+	FieldVector(0, 0);    //all phases at 50 %: no current, low sides on at the sample
+	Wait(50);
+	sampleAvg(mask, 1, zero, 16);
+	for(uint8_t k=0;k<12;k++){
+		FieldVector(k, mv);
+		Wait(60);
+		sampleAvg(mask, 1, v, 16);
+		for(uint8_t c=0;c<16;c++) d[k][c] = (int16_t)((v[c]-zero[c])/16);
+		progress(k+1, 12);
+	}
+	FieldVector(0, 0);
+	progressEnd();
+	//per pin: the phase and sign with the largest correlation; amplitude = corr / 6000 counts
+	uint16_t pin[3] = { PIN_NONE, PIN_NONE, PIN_NONE };
+	int32_t amp[3] = { 0, 0, 0 };
+	int8_t sign[3] = { 0, 0, 0 };
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint8_t c = (uint8_t)adcs[i].channel;
+		if(!(mask>>c&1)) continue;
+		int32_t best = 0, bx = 0, total = 0;
+		for(uint8_t k=0;k<12;k++) total += (int32_t)d[k][c]*d[k][c];
+		for(uint8_t x=0;x<3;x++){
+			int32_t corr = 0;
+			for(uint8_t k=0;k<12;k++) corr += d[k][c]*cos12[(7+k+12-4*x)%12];
+			if((corr<0 ? -corr : corr)>(best<0 ? -best : best)){ best = corr; bx = x; }
+		}
+		int32_t a = (best<0 ? -best : best)/6000;
+		//fit quality: the sinusoid's energy (6 a^2) against the total
+		if(a<8||6*a*a*10<total*7) continue;
+		kv("phase_current"); outpin(adcs[i].io); out(agent ? " phase=" : " phase "); outc((char)('A'+bx));
+		out(agent ? " amplitude=" : " amplitude "); outi(a); out(best>0 ? " rises" : " falls"); nl();
+		if(a>amp[bx]){ amp[bx] = a; pin[bx] = adcs[i].io; sign[bx] = (int8_t)(best>0 ? 1 : -1); }
+	}
+	uint8_t n = (pin[0]!=PIN_NONE)+(pin[1]!=PIN_NONE)+(pin[2]!=PIN_NONE);
+	if(n<2){
+		IPHASEAPIN = IPHASEBPIN = PIN_NONE;
+		note("no phase current pins: FOC is not available, sine uses the bus current");
+	}else{
+		uint8_t a = pin[0]!=PIN_NONE ? 0 : 1, b = pin[2]!=PIN_NONE ? 2 : 1;    //pairs A,B / B,C / A,C
+		if(a==0&&pin[1]!=PIN_NONE&&b==2&&amp[1]>amp[2]) b = 1;
+		if(sign[a]!=sign[b]){ err("the two phase current pins have opposite signs (one polarity bit)"); return; }
+		IPHASEAPIN = pin[a];
+		IPHASEBPIN = pin[b];
+		IPHASE_CFG = (uint16_t)((a==0&&b==1 ? 0 : a==1 ? 1 : 2)|(sign[a]>0 ? 4 : 0));
+		kvp("iphasea", IPHASEAPIN);
+		kvp("iphaseb", IPHASEBPIN);
+		kvi("iphasecfg", IPHASE_CFG);
+		//current amplitude = mv / phase resistance: the gain with motorr (default 300 mOhm), information only
+		int32_t r = (int32_t)cfgOrDefault(MOTOR_R, 300);
+		kvi("iphasegain_from_motorr", mv*10000/r/((amp[a]+amp[b])/2));    //0.1 mA per count
+	}
+	//bus current pin: phase X high, the others low (k = 4X-7: cos = 1 for X), sampled in the active vector
+	if(IPHASEAPIN>=PINCOUNT){ ok(); return; }
+	int32_t gain = (int32_t)cfgOrDefault(IPHASE_GAIN, 515);    //0.1 mA per count
+	uint8_t pa = (uint8_t)(IPHASE_CFG&3), ph[2] = { (uint8_t)(pa==1 ? 1 : 0), (uint8_t)(pa==0 ? 1 : 2) };
+	int8_t ca = AdcChannel(IPHASEAPIN), cb = AdcChannel(IPHASEBPIN);
+	int8_t sg = (IPHASE_CFG&4) ? 1 : -1;
+	uint8_t x = (uint8_t)(3-ph[0]-ph[1]);    //the phase without a pin is high: I = -(Ia + Ib)
+	uint8_t kx = (uint8_t)((4*x+12-7)%12);
+	//phase x's current from the phase current pins (I_x = -(I_a + I_b)), mA
+	#define PHASE_X_MA() (-(((v[ca]-zero[ca])/16)*sg+((v[cb]-zero[cb])/16)*sg)*gain/10)
+	//1: the pin: the largest increase from 0.67 to 2 x mv, one channel per conversion (a scan converts its
+	//channels ~1.7 us apart, the active vector is ~+-7 us)
+	int32_t lo[16], hi[16], curLo = 0, curHi = 0;
+	for(uint8_t s=0;s<2;s++){
+		FieldVector(kx, s ? mv*2 : mv*2/3);
+		Wait(60);
+		uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
+		for(uint8_t c=0;c<16;c++){
+			int32_t one[16];
+			if(!(mask>>c&1)) continue;
+			sampleAvg(1u<<c, at, one, 32);
+			if(s) hi[c] = one[c]/32; else lo[c] = one[c]/32;
+		}
+		sampleAvg(mask, 1, v, 16);
+		if(s) curHi = PHASE_X_MA(); else curLo = PHASE_X_MA();
+		progress(s+1, 10);
+	}
+	FieldVector(0, 0);
+	uint16_t best = PIN_NONE;
+	int32_t bestDelta = 0;
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint8_t c = (uint8_t)adcs[i].channel;
+		uint16_t p = adcs[i].io;
+		if(!(mask>>c&1)||p==IPHASEAPIN||p==IPHASEBPIN) continue;
+		if(hi[c]-lo[c]>bestDelta){ bestDelta = hi[c]-lo[c]; best = p; }
+	}
+	kvi("bus_test_current_ma", curHi);
+	if(best==PIN_NONE||bestDelta<4||curHi-curLo<1000){ GatesOff(); progressEnd(); err("no bus current pin found"); return; }
+	ITOTALPIN = best;
+	kvp("itotal", best);
+	//2: calibration on that pin: 8 levels, 128 samples each; least squares counts = slope * A + zero over
+	//the points above the adc's zero (the bench board's shunt zero is below it)
+	int8_t c = AdcChannel(best);
+	float sx = 0, sy = 0, sxx = 0, sxy = 0;
+	uint8_t np = 0;
+	for(uint8_t s=0;s<8;s++){
+		FieldVector(kx, mv*(s+3)/4);    //0.75 .. 2.5 x mv
+		Wait(60);
+		int32_t one[16];
+		sampleAvg(1u<<c, (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2), one, 128);
+		sampleAvg(mask, 1, v, 16);
+		float y = (float)one[c]/128.0f, xx = (float)PHASE_X_MA()/1000.0f;
+		kv("point"); outi(PHASE_X_MA()); out(agent ? " ma " : " mA "); outfix(one[c]*100/128, 2); nl();
+		if(y>=3.0f){ sx += xx; sy += y; sxx += xx*xx; sxy += xx*y; np++; }
+		progress(s+3, 10);
+	}
+	FieldVector(0, 0);
+	GatesOff();
+	progressEnd();
+	float den = (float)np*sxx-sx*sx;
+	if(np<3||den<0.01f){ warn("too few points above the adc zero: divider not calibrated"); ok(); return; }
+	float slope = ((float)np*sxy-sx*sy)/den;    //counts per A
+	float z = (sy-slope*sx)/(float)np;          //counts at 0 A
+	//itotal = divider x Vpin: divider = A / V = 1 / (counts per A x VDD / 4096)
+	int32_t div = slope>0.0f ? (int32_t)(4096000.0f/(slope*(float)VddMv())) : 0;
+	kvi("counts_per_a_x100", (int32_t)(slope*100.0f));
+	kvi("zero_counts_x100", (int32_t)(z*100.0f));
+	kvi("points", np);
+	if(div>0&&div<65535){ ITOTAL_DIVIDER = (uint16_t)div; kvi("itotaldivider", div); }
+	ITOTAL_ZERO = (uint16_t)(z<0.0f ? (int32_t)(-z*100.0f) : 0);
+	kvi("itotalzero", ITOTAL_ZERO);
+	ok();
+}
+
+//diagnostics: hold field direction k and sample a pin at counter values 0 .. period (32 steps)
+void ScanWindow(uint8_t k, int32_t mv, uint16_t pin){
+	int8_t ch = AdcChannel(pin);
+	if(ch<0||k>11){ err("scan <k 0-11> <mV> <adc pin>"); return; }
+	pinMode((uint8_t)pin, INPUT_ADC);
+	FieldVector(k, mv);
+	Wait(50);
+	kvi("ccr_a", fieldCcr[0]); kvi("ccr_b", fieldCcr[1]); kvi("ccr_c", fieldCcr[2]);
+	for(uint16_t at=1;at<PWM_PERIOD;at=(uint16_t)(at+PWM_PERIOD/32)){
+		int32_t sum = 0;
+		for(uint8_t i=0;i<8;i++){ AdcScanAt(1u<<ch, at); sum += AdcValue((uint8_t)ch); }
+		kv("at"); outi(at); outc(' '); outi(sum/8); nl();
+	}
+	AdcScanTriggered(0);
+	GatesOff();
+	ok();
+}
