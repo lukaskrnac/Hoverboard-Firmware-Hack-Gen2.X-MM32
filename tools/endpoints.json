@@ -504,7 +504,7 @@
    "id": 83,
    "type": "uint16",
    "access": "rw",
-   "unit": "IMU I2C SDA (PinFinder detect imu; not used by the firmware yet)"
+   "unit": "IMU I2C SDA (PinFinder detect imu); read by the firmware at 0x68/0x69 (InvenSense register map), after a restart"
   },
   "hoverboard.config.imuscl": {
    "id": 84,
@@ -925,6 +925,54 @@
    "type": "float",
    "access": "rw",
    "unit": "rad/s: sets the current loop gains kp = L*bw, ki = R*bw (reads back kp / L); default gains ~870"
+  },
+  "hoverboard.imu.state": {
+   "id": 336,
+   "type": "uint8",
+   "access": "r",
+   "unit": "0 no IMU configured (imusda/imuscl/imuaddr 0x68/0x69), 1 running, 2 no answer"
+  },
+  "hoverboard.imu.accel_x": {
+   "id": 337,
+   "type": "float",
+   "access": "r",
+   "unit": "m/s^2 (+-4 g; chip axes), 100 Hz; NaN unless running"
+  },
+  "hoverboard.imu.accel_y": {
+   "id": 338,
+   "type": "float",
+   "access": "r",
+   "unit": "m/s^2"
+  },
+  "hoverboard.imu.accel_z": {
+   "id": 339,
+   "type": "float",
+   "access": "r",
+   "unit": "m/s^2"
+  },
+  "hoverboard.imu.gyro_x": {
+   "id": 340,
+   "type": "float",
+   "access": "r",
+   "unit": "deg/s (+-1000; chip axes)"
+  },
+  "hoverboard.imu.gyro_y": {
+   "id": 341,
+   "type": "float",
+   "access": "r",
+   "unit": "deg/s"
+  },
+  "hoverboard.imu.gyro_z": {
+   "id": 342,
+   "type": "float",
+   "access": "r",
+   "unit": "deg/s"
+  },
+  "hoverboard.imu.temperature": {
+   "id": 343,
+   "type": "float",
+   "access": "r",
+   "unit": "C (MPU-6050 scale)"
   },
   "save_configuration": {
    "id": 512,

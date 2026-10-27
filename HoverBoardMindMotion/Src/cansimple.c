@@ -27,6 +27,7 @@
 #include "remoteUartBus.h"
 #include "interrupt.h"
 #include "inputmode.h"
+#include "imu.h"
 
 #define START 0xA5
 #define BROADCAST 0x3F
@@ -64,6 +65,9 @@ enum{
 	EP_HOLD_CURRENT = 0x138, EP_HOLD_WINDOW, EP_POS_ACCEL, EP_TORQUE_RAMP_RATE, EP_INERTIA, EP_VEL_LIMIT_TOL,
 	EP_PHASE_L, EP_HOLD_ENABLE, EP_OVERSPEED_ERROR, EP_TORQUE_VEL_LIMIT, EP_CURRENT_BW,
 	EP_POS_INTEGRATOR_GAIN, EP_POS_DERIVATIVE_GAIN, EP_VEL_DERIVATIVE_GAIN,
+	//IMU (imu.c): state uint8, then float: accel m/s^2, gyro deg/s, temperature C
+	EP_IMU_STATE = 0x150, EP_IMU_ACCEL_X, EP_IMU_ACCEL_Y, EP_IMU_ACCEL_Z, EP_IMU_GYRO_X, EP_IMU_GYRO_Y, EP_IMU_GYRO_Z,
+	EP_IMU_TEMPERATURE,
 	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
 };
 
@@ -448,9 +452,12 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_ID_SETPOINT: if(write) focIdRef = (int32_t)v; r = (uint32_t)focIdRef; break;
 			case EP_FAST_SPEED: r = (uint32_t)fastspeed; break;
 			case EP_CHARGER: r = charging; break;
+			case EP_IMU_STATE: r = imuState; break;
 			case EP_SAVE_CONFIGURATION: if(!write) return 0; RemoteSaveConfig(); break;
 			case EP_CLEAR_ERRORS: if(!write) return 0; axisDisarm = 0; FocClearTrip(); break;
-			default: return 0;
+			default:
+				if(ep<EP_IMU_ACCEL_X||ep>EP_IMU_TEMPERATURE) return 0;
+				wrF((uint8_t*)&r, ImuValue((uint8_t)(ep-EP_IMU_ACCEL_X)));
 		}
 	}
 	frame[0] = 0; frame[1] = (uint8_t)ep; frame[2] = (uint8_t)(ep>>8); frame[3] = 0;

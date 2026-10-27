@@ -19,6 +19,7 @@
 #include "pwm_gen.h"
 #include "hallhandle.h"
 #include "foc.h"
+#include "imu.h"
 
 volatile uint8_t step=1;//very importatnt to set to 1 or it will not work
 volatile uint32_t millis;
@@ -168,8 +169,10 @@ s32 main(void){
 	PWM_GEN_init(&pwm_gen);
 	HALLModuleInit(&HALL1);
 	FocInit();
+	ImuInit();    //configured IMU pins: the chip set up, read in the main loop
   while(1) {
 		RemotePoll();    //received frames and replies, as soon as they arrive
+		ImuPoll();
 		uint8_t state = wState;
 		digitalWrite(LEDUPIN, (state&STATE_LED_UP)!=0);    //unconfigured pins are ignored
 		digitalWrite(LEDDPIN, (state&STATE_LED_DOWN)!=0);

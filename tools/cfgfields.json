@@ -537,7 +537,7 @@
    "index": 83,
    "name": "imusda",
    "kind": "pin",
-   "meaning": "IMU I2C SDA (PinFinder detect imu; not used by the firmware yet)"
+   "meaning": "IMU I2C SDA (PinFinder detect imu); read by the firmware at 0x68/0x69 (InvenSense register map), after a restart"
   },
   {
    "index": 84,

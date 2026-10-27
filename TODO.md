@@ -61,6 +61,11 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         other free pin pairs with pull-ups; probe 0x68/0x69 (MPU-6050/6500/9250, ICM-20xxx: WHO_AM_I
         0x75), 0x6A/0x6B (LSM6DS*: 0x0F), BMI160 (0x68, CHIP_ID 0x00 = 0xD1); report bus pins, address,
         chip. Store pins + type in new config words (extension record).
+        **Main firmware (2026-10-28):** `Src/imu.c` + `Src/i2c.c` (shared with PinFinder): the bench chip is an
+        MPU-6050 clone (register map read over SWD: accel offsets 0x06, self test 0x0D-0x10, WHO_AM_I
+        0x2E); 100 Hz, one byte per main loop pass (a whole burst blocked ~2 ms, then ~1 ms); CANSimple
+        0x150-0x157. Open: a tilt / angle estimate (needs the mounting axes as config), other register
+        maps (ICM-426xx, BMI160/270, LSM6DS*, QMI8658), the web console display.
       - **Done:** charger detect pin (`detect charger`, tried by the user) and the hall angle calibration
         (`calibrate hall`, see Calibrations).
 - [x] **P6 Buzzer without an internal oscillator**: `buzzerpassive=2` (word 79): low battery alarm toggled
@@ -176,7 +181,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash 26.5 of 30 KB (4.2 KB free; PinFinder 30.36 of 30 KB, 360 B free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash 27.9 of 30 KB (2.8 KB free; PinFinder 30.5 of 30 KB, 140 B free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.

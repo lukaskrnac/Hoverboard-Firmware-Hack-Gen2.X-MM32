@@ -37,7 +37,7 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define CHARGE_LEVEL pinstorage[80]      //charger pin level while the charger is connected: 1 low, 2 high, default high
 #define CHARGE_PULL pinstorage[81]       //charger pin input: 1 floating, 2 pull-up, 3 pull-down, default floating
 #define CHARGE_LOCK pinstorage[82]       //no driving while the charger is connected: 1 off, 2 on, default off
-#define IMU_SDA pinstorage[83]          //IMU I2C pins, address and id (PinFinder detect imu; not used yet)
+#define IMU_SDA pinstorage[83]          //IMU I2C pins, address and id (PinFinder detect imu; imu.c reads it)
 #define IMU_SCL pinstorage[84]
 #define IMU_ADDR pinstorage[85]
 #define IMU_ID pinstorage[86]
