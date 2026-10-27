@@ -130,6 +130,18 @@ Configs saved before the version field (word 63) used 2/3 for SINE_VOLT/SINE_SPE
 migrated at boot. FOC needs the two phase current pins (`iphasea`/`iphaseb`, `iphasecfg` selects the
 phases and polarity).
 
+### Settings (ODrive names)
+All settings are CANSimple endpoints with ODrive's names and units where ODrive has the setting
+(`tools/endpoints.json`, the web console's parameter table). Besides those that existed: `torque_ramp_rate`
+(input mode 6 TORQUE_RAMP), `inertia` (torque feed forward of the TRAP_TRAJ / POS_FILTER acceleration),
+`enable_overspeed_error` / `vel_limit_tolerance` (VELOCITY_LIMIT_VIOLATION), `enable_torque_mode_vel_limit`
+(default on as in ODrive: torque control stops accelerating at `vel_limit`), `phase_inductance`,
+`current_control_bandwidth` (sets the current loop gains kp = L*bw, ki = R*bw), and for the FOC position
+hold `hoverboard.position.hold_current` (stiffness), `hold_enable`, `hold_window`, `accel_limit`.
+They are stored in an extension config record (words 64-127) that is saved in the slot before the main
+record: PinFinder keeps reading and writing the main record; a record it appends leaves the extension at
+the defaults. `tools/mm32config.py show/set` handles both.
+
 ### Phase currents on the MM32SPIN05PFOP
 The PFOP variant has two internal op-amps that MindMotion does not document for the SPIN05. They work
 without any register setup. On the bench board they amplify the low-side current of phases B and C:

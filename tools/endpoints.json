@@ -174,7 +174,7 @@
    "id": 28,
    "type": "uint16",
    "access": "rw",
-   "unit": "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ; 0/65535 = 1"
+   "unit": "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP; 0/65535 = 1"
   },
   "hoverboard.config.velramprate": {
    "id": 29,
@@ -386,6 +386,72 @@
    "access": "r",
    "unit": "config layout version, migrated at boot: 1 drive mode numbers, 2 baud/100, 3 input mode words reset"
   },
+  "hoverboard.config.holdcurrent": {
+   "id": 64,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position hold current (stiffness) 0.1 A, <= 90 % of focimax; 0/65535 = 40"
+  },
+  "hoverboard.config.holdenable": {
+   "id": 65,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position hold: 1 off, 2 on; 0/65535 = on"
+  },
+  "hoverboard.config.holdwindow": {
+   "id": 66,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position: hold within 0.01 hall step of the target; 0/65535 = 150"
+  },
+  "hoverboard.config.posaccel": {
+   "id": 67,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position approach acceleration / braking 0.01 turns/s^2; 0/65535 = 2000"
+  },
+  "hoverboard.config.torqueramp": {
+   "id": 68,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TORQUE_RAMP 0.01 Nm/s; 0/65535 = 1"
+  },
+  "hoverboard.config.inertia": {
+   "id": 69,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "torque feed forward of the trajectory acceleration 0.0001 Nm/(turn/s^2); 0/65535 = 0"
+  },
+  "hoverboard.config.vellimittol": {
+   "id": 70,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "overspeed error above vel_limit times this, 0.01; 0/65535 = 120"
+  },
+  "hoverboard.config.overspeederr": {
+   "id": 71,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "enable_overspeed_error: 1 off, 2 on; 0/65535 = off"
+  },
+  "hoverboard.config.torquevellim": {
+   "id": 72,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "enable_torque_mode_vel_limit: 1 off, 2 on; 0/65535 = on"
+  },
+  "hoverboard.config.phasel": {
+   "id": 73,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase inductance uH; 0/65535 = 460"
+  },
+  "hoverboard.config.extmagic": {
+   "id": 96,
+   "type": "uint16",
+   "access": "r",
+   "unit": "0xDCAD = extension record valid"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",
@@ -456,7 +522,7 @@
    "id": 267,
    "type": "uint8",
    "access": "rw",
-   "unit": "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ"
+   "unit": "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP"
   },
   "hoverboard.commutation": {
    "id": 268,
@@ -649,6 +715,72 @@
    "type": "float",
    "access": "r",
    "unit": "A, d current (FOC, sine on phase current pins), ~7 ms average"
+  },
+  "hoverboard.position.hold_current": {
+   "id": 312,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, FOC position hold stiffness (d current at the target angle); default 4, at most 90 % of current_soft_max"
+  },
+  "hoverboard.position.hold_window": {
+   "id": 313,
+   "type": "float",
+   "access": "rw",
+   "unit": "hall steps: the hold takes over within this of the target (and below 25 rpm); default 1.5"
+  },
+  "hoverboard.position.accel_limit": {
+   "id": 314,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, FOC position approach acceleration and braking curve; default 20"
+  },
+  "axis0.controller.config.torque_ramp_rate": {
+   "id": 315,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/s, TORQUE_RAMP input mode; default 0.01"
+  },
+  "axis0.controller.config.inertia": {
+   "id": 316,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/(turn/s^2): torque feed forward of the TRAP_TRAJ / POS_FILTER acceleration (FOC); default 0"
+  },
+  "axis0.controller.config.vel_limit_tolerance": {
+   "id": 317,
+   "type": "float",
+   "access": "rw",
+   "unit": "overspeed error above vel_limit times this; default 1.2"
+  },
+  "axis0.config.motor.phase_inductance": {
+   "id": 318,
+   "type": "float",
+   "access": "rw",
+   "unit": "H, FOC decoupling and current_control_bandwidth; default 0.00046"
+  },
+  "hoverboard.position.hold_enable": {
+   "id": 319,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 = hold at the target's electrical angle (FOC position), 0 = position loop only; default 1"
+  },
+  "axis0.controller.config.enable_overspeed_error": {
+   "id": 320,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 = VELOCITY_LIMIT_VIOLATION (disarm) above vel_limit * vel_limit_tolerance; default 0"
+  },
+  "axis0.controller.config.enable_torque_mode_vel_limit": {
+   "id": 321,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 = torque control limits the speed to vel_limit (torque falls with vel_gain); default 1"
+  },
+  "axis0.config.motor.current_control_bandwidth": {
+   "id": 322,
+   "type": "float",
+   "access": "rw",
+   "unit": "rad/s: sets the current loop gains kp = L*bw, ki = R*bw (reads back kp / L); default gains ~870"
   },
   "save_configuration": {
    "id": 512,

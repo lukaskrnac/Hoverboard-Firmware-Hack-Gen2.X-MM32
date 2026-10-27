@@ -40,6 +40,7 @@
 /// @{
 s32 EEPROM_Write(u8* ptr, u16 len);
 uint8_t restorecfg(void);
+void SaveConfig(void);    //extension record, then the main record
 /// @}
 
 

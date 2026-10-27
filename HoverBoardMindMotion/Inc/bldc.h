@@ -25,6 +25,7 @@ extern const uint8_t hall_to_pos[8];
 #define ERR_DC_BUS_UNDER_VOLTAGE     0x200u
 #define ERR_DC_BUS_OVER_CURRENT      0x400u
 #define ERR_CURRENT_LIMIT_VIOLATION  0x1000u
+#define ERR_VELOCITY_LIMIT_VIOLATION 0x8000u
 #define ERR_WATCHDOG_TIMER_EXPIRED   0x1000000u
 #define ERR_ESTOP_REQUESTED          0x2000000u
 #define POS_FINE 256    //position set points and estimate: 1/256 hall step (90 steps per turn: 0.016 deg)

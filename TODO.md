@@ -73,14 +73,17 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] FOC position hold with a real load (a weight): the load current handling (speed loop integral
       at entry, +4.4 A/s while the hall state shows >= 1 deg of sag, back to the speed loop at exit) is
       only tested on the free wheel. Check that a hanging weight neither drops nor oscillates.
-- [ ] FOC position hold costs current all the time it holds (up to 4 A of d current, ~7 W): drop it
-      after a while at the target (like a stepper's idle current) as far as the load allows; make the
-      hold current a parameter (no config word left). Sine/block position still work on whole steps.
+- [ ] FOC position hold costs current all the time it holds (`hold_current`, default 4 A, ~7 W): drop it
+      after a while at the target (like a stepper's idle current) as far as the load allows. Sine/block
+      position still work on whole steps.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] TORQUE_RAMP input mode (no config word left; words 28-31, 35, 43 hold the other input modes).
-- [ ] Flash: 27.3 of 30 KB with LTO (-flto saved 3 KB). Check before adding more.
+- [ ] Flash: 29.9 of 30 KB (LTO saved 3 KB, float subtraction via the addition 1.1 KB). Next room: the
+      remaining soft float (~2.5 KB: add, mul, div, compares) is mostly the CANSimple float conversions.
+- [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
+      measured, see hallhandle.c), calibration_current / motor calibration, dc_max_positive/negative_current
+      (bus current limits; the regeneration limit is by voltage, `batfull`), spinout detection.
 - [ ] Bus line above 230400 baud: the open-drain TX needs a stronger pull-up (or push-pull for a
       single board: config option).
 

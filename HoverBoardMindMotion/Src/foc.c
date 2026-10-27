@@ -82,7 +82,7 @@ static int32_t lastIdRef, lastIqRef;
 static volatile int8_t qSat;    //q voltage on its limit: +1 towards positive focIqRef (motor frame), -1 negative
 
 //Position hold (FOC position mode, near the target): the frame is not the hall angle but the target's
-//electrical angle, with a d current (40 % of the current limit, at most 4 A): the rotor is pulled there like a stepper,
+//electrical angle, with a d current (hold_current, default 4 A, at most 90 % of the current limit): the rotor is pulled there like a stepper,
 //to a fraction of a hall step (1 deg mechanical = 15 deg electrical; the hall sensors cannot tell where
 //the rotor is between two edges). The q axis is voltage driven (R * load current, below): a short
 //circuit for the back emf, it damps the rotor (with the q current regulated the rotor rang on the
@@ -343,7 +343,7 @@ void FocControl(void){
 		int32_t imax = IMAX();
 		if(dr>8192&&holdIq<imax) holdIq++;    //rotor behind (lower angle): + q turns the angle up; 4.4 A/s
 		else if(dr<-8192&&holdIq>-imax) holdIq--;
-		int32_t ih = IMAX()*4/10; if(ih>4000) ih = 4000;
+		int32_t ih = cfg(HOLD_CURRENT, 40)*100, ihm = IMAX()*9/10; if(ih>ihm) ih = ihm;    //hold_current
 		int32_t kp = KP(), ed = ih-id;
 		intD += KI()*(((int32_t)PWM_PERIOD+18)/36)*ed/1000;
 		int32_t vd = kp*ed/1000+intD/1000;
@@ -395,7 +395,7 @@ void FocControl(void){
 	int32_t vff = -spdFF*5774/kv;    //back emf amplitude, mV: rpm/(sqrt(3)*kv/10)
 	//omega*L in mOhm, signed like fastspeed (the electrical frame turns the other way): rpm * pole pairs
 	//* 2 pi / 60 * 0.46 mH
-	int32_t wL = spdFF*(int32_t)WINDINGS/2*4817/100000;
+	int32_t wL = spdFF*(int32_t)WINDINGS/2*(cfg(PHASE_L, 460)*10472/10000)/10000;    //phase_inductance, uH
 	int32_t vdDec = wL*iqRef/1000, vqDec = -wL*idRef/1000;    //mV
 
 	int32_t di = kiTs*ed/1000, diq = kiTs*eq/1000;

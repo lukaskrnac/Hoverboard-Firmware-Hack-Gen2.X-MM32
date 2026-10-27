@@ -12,6 +12,7 @@
 #include "hallhandle.h"
 #include "foc.h"
 #include "inputmode.h"
+#include "cansimple.h"
 #include "FOC_Math.h"
 
 static volatile uint16_t abspwm;
@@ -238,6 +239,12 @@ void speedupdate(void){
 			vRamp += d>st ? st : (d<-st ? -st : d);
 		}
 		if(spd>vlim) spd = vlim; else if(spd<-vlim) spd = -vlim;
+		int32_t tq = ctl==CTRL_TORQUE ? InputTorque(speed, dtms, held) : speed;    //torque set point, 0.01 A
+		//enable_overspeed_error: disarm above vel_limit * vel_limit_tolerance (ODrive)
+		if(cfgBool(OVERSPEED_ERROR, 0)&&!gatesoff){
+			int32_t lim = vlim*cfgOrDefault(VEL_LIMIT_TOL, 120)/100;
+			if(realspeed>lim||realspeed<-lim) axisDisarm |= ERR_VELOCITY_LIMIT_VIOLATION;
+		}
 		uint8_t focPos = ctl==CTRL_POSITION&&COMMUTATION(DRIVEMODE)==COMMUT_FOC&&!held;
 		if(!focPos){ FocHoldStop(); posSp = realspeed; }
 		if(ctl==CTRL_POSITION){
@@ -257,11 +264,13 @@ void speedupdate(void){
 				//target's electrical angle. (It was P with a +-1 step dead band at 2 rpm per step: a 1 step
 				//command did nothing, it stopped up to 4 deg off, ~1.2 s for half a turn.)
 				int32_t af = fastspeed<0 ? -fastspeed : fastspeed;
+				uint8_t holdOn = (uint8_t)cfgBool(HOLD_ENABLE, 1);
+				int32_t hw = cfgOrDefault(HOLD_WINDOW, 150)*POS_FINE/100, ac = cfgOrDefault(POS_ACCEL, 2000);    //0.01 turns/s^2
 				if(focHold){
 					int32_t dh = target-focHoldPos;
 					if(focHoldSlip||dh>3*POS_FINE||dh<-3*POS_FINE){ FocHoldStop(); FocSpeedReset(); }
 					else FocHoldTarget(target);
-				}else if(errF<=3*POS_FINE/2&&errF>=-3*POS_FINE/2&&af<=25&&ff<=25&&ff>=-25){
+				}else if(holdOn&&errF<=hw&&errF>=-hw&&af<=25&&ff<=25&&ff>=-25){
 					FocHoldStart(target);
 				}
 				int32_t dh = target-focHoldPos;
@@ -271,11 +280,12 @@ void speedupdate(void){
 				//sqrt(14 errF) * 2/3 rpm. With P alone half a turn overshot by 7 steps (still ~110 rpm 3 steps
 				//before the target).
 				int32_t ae = errF<0 ? -errF : errF; if(ae>1000000) ae = 1000000;
-				int32_t pl = (int32_t)MCM_Sqrt(ae*14)*2/3;
+				int32_t pl = (int32_t)MCM_Sqrt(ae/16*(ac*9/80))*2/3;    //accel_limit (default 20 turns/s^2)
 				if(p>pl) p = pl; else if(p<-pl) p = -pl;
+				if(!holdOn&&ae<=POS_FINE/2) p = 0;    //without the hold: no hunting inside the step
 				//and it accelerates at that rate too (1200 rpm/s): from a standing start the full current
 				//limit (10 A, ~3700 rpm/s here) outran the hall angle tracker, it snapped, a 32 A trip
-				int32_t sl = 1200*dtms/1000+1;
+				int32_t sl = ac*3*dtms/5000+1;
 				if(focHold) posSp = fastspeed;
 				posSp += p+ff-posSp>sl ? sl : (p+ff-posSp<-sl ? -sl : p+ff-posSp);
 				posSpeed = posSp;
@@ -300,11 +310,18 @@ void speedupdate(void){
 				default:{
 					int32_t i;    //mA
 					if(ctl==CTRL_TORQUE){
-						i = (int32_t)speed*10;    //0.01 A
+						i = tq*10;    //0.01 A
+						//enable_torque_mode_vel_limit (ODrive): the torque falls to 0 at vel_limit (vel_gain slope)
+						if(cfgBool(TORQUE_VEL_LIMIT, 1)){
+							int32_t kv = cfgOrDefault(FOC_SPD_KP, 30), hi = kv*(vlim-realspeed), lo = kv*(-vlim-realspeed);
+							if(i>hi) i = hi; else if(i<lo) i = lo;
+						}
 					}else if(ctl==CTRL_POSITION){
 						//fastspeed: the 6 interval average lags in the reversals and hard stops of position
 						//moves (143 rpm read against 21 in a reversal: the loop drove 10 A the wrong way, trip)
 						i = focHold ? 0 : FocSpeedCtrl(posSpeed, fastspeed, 0);
+						//inertia (ODrive): torque feed forward of the trajectory's acceleration
+						if(!focHold&&INERTIA&&INERTIA!=0xFFFF) i += (int32_t)((float)INERTIA*0.1f*InputAccel()/TorqueConstant());
 					}else{
 						//below 10 rpm the last hall interval is > 65 ms old: the loop limit-cycled +-55
 						//rpm around a 0 rpm set point on it. Read as 0 there, as before the ms timing.
@@ -347,22 +364,22 @@ void speedupdate(void){
 					}
 					break;
 				case CTRL_TORQUE:    //0.01 A; command 0 coasts
-					if(speed==0){
+					if(tq==0){
 						coast = 1;
 						pwm = 0;
 						TorqueCtrlReset();
 					}else if(blk){
 						//direction from the sign; the shunt current is a magnitude
-						int32_t sgn = speed>0 ? 1 : -1;
-						pwm = sgn*TorqueCtrlBlock((int32_t)speed*10*sgn, fitotal*10, fastspeed*sgn)*(int32_t)PWM_PERIOD/1000;
+						int32_t sgn = tq>0 ? 1 : -1;
+						pwm = sgn*TorqueCtrlBlock(tq*10*sgn, fitotal*10, fastspeed*sgn)*(int32_t)PWM_PERIOD/1000;
 					}else{
 						//sine, no current sense: V = I*R + back emf (the sine kv), as modulation, plus the
 						//dead band of the sine plant (dead time, diodes: 1 % ~ 140 mV) in the command's direction
 						int32_t v = vbat>1000 ? vbat : 2400;
 						SpeedPlant p;
 						SpeedParams(SINE_SPEED, &p);
-						int32_t mv = (int32_t)speed*10*cfgOrDefault(MOTOR_R, 300)/1000+fastspeed*5774/p.kv;
-						pwm = mv*5676/v+(speed>0 ? 1 : -1)*p.d0*32768/1000;
+						int32_t mv = tq*10*cfgOrDefault(MOTOR_R, 300)/1000+fastspeed*5774/p.kv;
+						pwm = mv*5676/v+(tq>0 ? 1 : -1)*p.d0*32768/1000;
 						if(pwm>32000) pwm = 32000; else if(pwm<-32000) pwm = -32000;
 					}
 					break;

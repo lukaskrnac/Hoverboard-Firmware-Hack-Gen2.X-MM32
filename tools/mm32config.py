@@ -22,6 +22,7 @@ from pyocd.core.helpers import ConnectHelper                          # noqa: E4
 
 CONFIG, SLOT, SLOTS = 0x08007800, 128, 16
 MAGIC = 0xDCAB
+EXT_MAGIC = 0xDCAD    # extension record (words 64-127, magic at its word 32 = index 96): the slot before the main one
 PINS = ("PA0 PA1 PA2 PA3 PA4 PA5 PA6 PA7 PA11 PA12 PA13 PA14 PA15 PB0 PB1 PB2 PB3 PB4 PB5 PB6 PB7 "
         "PB8 PB9 PB10 PB11 PB12 PC13 PC14 PC15 PD0 PD1 PD2 PD3").split()       # hardware.c, MM32SPIN05
 # index: (name, kind, meaning); kind 'pin' shows/accepts pin names, 65535 = not used
@@ -39,7 +40,7 @@ FIELDS = {
     21: ("fwimax", "num", "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"),
     22: ("fwadvance", "num", "sine field weakening: max phase advance, degrees electrical; 0/65535 = off"),
     23: ("ocp", "pin", "TIM1 break input (hardware overcurrent)"),
-    28: ("inputmode", "num", "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ; 0/65535 = 1"),
+    28: ("inputmode", "num", "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP; 0/65535 = 1"),
     29: ("velramprate", "num", "VEL_RAMP 0.01 turns/s^2; 0/65535 = 100"),
     30: ("filterbw", "num", "POS_FILTER bandwidth 0.01 /s; 0/65535 = 200"),
     31: ("trajvel", "num", "TRAP_TRAJ velocity limit 0.01 turns/s; 0/65535 = 200"),
@@ -73,6 +74,18 @@ FIELDS = {
     61: ("focspdkp", "num", "FOC_SPEED: mA per rpm, 0 = default 30"),
     62: ("focspdki", "num", "FOC_SPEED: mA per rpm*s, 0 = default 100"),
     63: ("cfgversion", "num", "config layout version, migrated at boot: 1 drive mode numbers, 2 baud/100, 3 input mode words reset"),
+    # extension record; 0/65535 = default, bools: 1 false, 2 true
+    64: ("holdcurrent", "num", "FOC position hold current (stiffness) 0.1 A, <= 90 % of focimax; 0/65535 = 40"),
+    65: ("holdenable", "num", "FOC position hold: 1 off, 2 on; 0/65535 = on"),
+    66: ("holdwindow", "num", "FOC position: hold within 0.01 hall step of the target; 0/65535 = 150"),
+    67: ("posaccel", "num", "FOC position approach acceleration / braking 0.01 turns/s^2; 0/65535 = 2000"),
+    68: ("torqueramp", "num", "TORQUE_RAMP 0.01 Nm/s; 0/65535 = 1"),
+    69: ("inertia", "num", "torque feed forward of the trajectory acceleration 0.0001 Nm/(turn/s^2); 0/65535 = 0"),
+    70: ("vellimittol", "num", "overspeed error above vel_limit times this, 0.01; 0/65535 = 120"),
+    71: ("overspeederr", "num", "enable_overspeed_error: 1 off, 2 on; 0/65535 = off"),
+    72: ("torquevellim", "num", "enable_torque_mode_vel_limit: 1 off, 2 on; 0/65535 = on"),
+    73: ("phasel", "num", "phase inductance uH; 0/65535 = 460"),
+    96: ("extmagic", "num", "0xDCAD = extension record valid"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}
 
@@ -91,13 +104,26 @@ def active_slot(page):
     return (first_blank - 1) % SLOTS, first_blank
 
 
+def records(page):
+    """(slot, 128 words): the active main record and the extension record before it (or defaults)"""
+    slot, _ = active_slot(page)
+    if slot is None:
+        return None, None
+    base = list(struct.unpack("<64H", page[slot * SLOT:(slot + 1) * SLOT]))
+    p = (slot - 1) % SLOTS
+    ext = list(struct.unpack("<64H", page[p * SLOT:(p + 1) * SLOT]))
+    if ext[32] != EXT_MAGIC:
+        ext = [0xFFFF] * 64; ext[32] = EXT_MAGIC
+    return slot, base + ext
+
+
 def show(words):
     for i, (name, kind, meaning) in sorted(FIELDS.items()):
         v = words[i]
         if kind == "pin":
             txt = "-" if v == 0xFFFF else (PINS[v] if v < len(PINS) else "invalid %d" % v)
         else:
-            txt = "0x%04X" % v if i == 32 else str(v)
+            txt = "0x%04X" % v if i in (32, 96) else str(v)
         print("  [%2d] %-14s %-8s %s" % (i, name, txt, meaning))
 
 
@@ -153,10 +179,9 @@ def main():
     mcu = Mm32(session.target)
     try:
         page = read_page(mcu.t)
-        slot, _ = active_slot(page)
+        slot, words = records(page)
         if slot is None:
             raise SystemExit("no configuration stored (run PinFinder first)")
-        words = list(struct.unpack("<64H", page[slot * SLOT:(slot + 1) * SLOT]))
         if words[32] != MAGIC:
             print("warning: active record (slot %d) has no valid magic number" % slot)
         if a.cmd == "show":
@@ -173,8 +198,9 @@ def main():
             print("no change")
             return
         mcu.halt()
-        slot = write_slot(mcu, page, new)
-        print("written to slot %d" % slot)
+        write_slot(mcu, page, new[64:])                      # the extension first, as the firmware does
+        slot = write_slot(mcu, read_page(mcu.t), new[:64])
+        print("written to slots %d (extension) and %d" % ((slot - 1) % SLOTS, slot))
         if a.restart:
             mcu.soft_start()
             print("firmware restarted")

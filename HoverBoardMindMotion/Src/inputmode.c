@@ -3,6 +3,7 @@
 //  VEL_RAMP    2  velocity control: the set point moves to input_vel at vel_ramp_rate
 //  POS_FILTER  3  position control: ODrive's critically damped second order filter of input_pos
 //                 (input_filter_bandwidth); its velocity is the speed loop's feed forward
+//  TORQUE_RAMP 6  torque control: the set point moves to input_torque at torque_ramp_rate
 //  TRAP_TRAJ   5  position control: ODrive's trapezoidal planner (trap_traj vel_limit, accel_limit,
 //                 decel_limit) from the current set point and velocity to input_pos, planned again
 //                 when input_pos changes; velocity feed forward as POS_FILTER
@@ -37,8 +38,23 @@ static float sqrtF(float x){    //Newton from the exponent halved (soft float: n
 }
 
 uint8_t InputModeSupported(uint32_t m){
-	return m==IM_PASSTHROUGH||m==IM_VEL_RAMP||m==IM_POS_FILTER||m==IM_TRAP_TRAJ;
+	return m==IM_PASSTHROUGH||m==IM_VEL_RAMP||m==IM_POS_FILTER||m==IM_TRAP_TRAJ||m==IM_TORQUE_RAMP;
 }
+
+static float trqSp, accSp;    //TORQUE_RAMP set point, 0.01 A; position set point accel, 1/POS_FINE step/s^2
+
+int32_t InputTorque(int32_t cmd, int32_t dtms, uint8_t held){
+	if(held) trqSp = 0.0f;    //armed again: from 0
+	else if(InputMode()!=IM_TORQUE_RAMP) trqSp = (float)cmd;
+	else{
+		float st = (float)cfgOrDefault(TORQUE_RAMP_RATE, 1)*(float)dtms/(TorqueConstant()*1000.0f);    //0.01 Nm/s -> 0.01 A
+		float d = (float)cmd-trqSp;
+		trqSp += d>st ? st : (d<-st ? -st : d);
+	}
+	return roundF(trqSp);
+}
+
+float InputAccel(void){ return accSp/sptF(); }
 
 uint8_t InputMode(void){
 	uint16_t m = INPUT_MODE;
@@ -106,14 +122,14 @@ static void plan(float spt){    //ODrive TrapezoidalTrajectory::planTrapezoidal,
 
 static void eval(void){    //ODrive TrapezoidalTrajectory::eval
 	if(t<Ta){
-		rel = Xi+Vi*t+0.5f*Ar*t*t; inVelSp = Vi+Ar*t;
+		rel = Xi+Vi*t+0.5f*Ar*t*t; inVelSp = Vi+Ar*t; accSp = Ar;
 	}else if(t<Ta+Tv){
-		rel = yAcc+Vr*(t-Ta); inVelSp = Vr;
+		rel = yAcc+Vr*(t-Ta); inVelSp = Vr; accSp = 0;
 	}else if(t<Tf){
 		float td = t-Tf;
-		rel = Xf+0.5f*Dr*td*td; inVelSp = Dr*td;
+		rel = Xf+0.5f*Dr*td*td; inVelSp = Dr*td; accSp = Dr;
 	}else{
-		rel = Xf; inVelSp = 0;
+		rel = Xf; inVelSp = 0; accSp = 0;
 	}
 }
 
@@ -135,10 +151,11 @@ int32_t InputPos(int32_t target, int32_t ffRpm, int32_t dtms, int32_t* velFf){
 		if(m==IM_POS_FILTER){    //ODrive: ki = 2 * bandwidth, kp = ki^2 / 4 (critically damped)
 			float ki = 2.0f*centi(INPUT_FILTER_BW, 200), kp = 0.25f*ki*ki;
 			float acc = -kp*rel-ki*inVelSp;
+			accSp = acc;
 			inVelSp += dt*acc;
 			rel += dt*inVelSp;
 		}else{
-			rel = 0;
+			rel = 0; accSp = 0;
 			inVelSp = (float)ffRpm*spt/60.0f;
 		}
 	}

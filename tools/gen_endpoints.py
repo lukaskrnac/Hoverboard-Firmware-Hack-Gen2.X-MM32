@@ -18,7 +18,7 @@ RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning 
     (0x108, "axis0.disarm_reason", "uint32", "r", "ODrive Error bits"),
     (0x109, "hoverboard.odometer", "int32", "r", "hall steps since boot"),
     (0x10A, "axis0.controller.config.control_mode", "uint8", "rw", "0 VOLTAGE, 1 TORQUE, 2 VELOCITY, 3 POSITION"),
-    (0x10B, "axis0.controller.config.input_mode", "uint8", "rw", "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ"),
+    (0x10B, "axis0.controller.config.input_mode", "uint8", "rw", "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP"),
     (0x10C, "hoverboard.commutation", "uint8", "rw", "0 block, 1 sine, 2 FOC"),
     (0x10D, "axis0.controller.input_pos", "float", "rw", "turns"),
     (0x10E, "axis0.controller.input_vel", "float", "rw", "turns/s"),
@@ -51,13 +51,24 @@ RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning 
     (0x135, "axis0.controller.pos_setpoint", "float", "r", "turns, after the input mode"),
     (0x136, "axis0.controller.vel_setpoint", "float", "r", "turns/s, after the input mode (position: feed forward)"),
     (0x137, "hoverboard.foc.Id_measured", "float", "r", "A, d current (FOC, sine on phase current pins), ~7 ms average"),
+    (0x138, "hoverboard.position.hold_current", "float", "rw", "A, FOC position hold stiffness (d current at the target angle); default 4, at most 90 % of current_soft_max"),
+    (0x139, "hoverboard.position.hold_window", "float", "rw", "hall steps: the hold takes over within this of the target (and below 25 rpm); default 1.5"),
+    (0x13A, "hoverboard.position.accel_limit", "float", "rw", "turns/s^2, FOC position approach acceleration and braking curve; default 20"),
+    (0x13B, "axis0.controller.config.torque_ramp_rate", "float", "rw", "Nm/s, TORQUE_RAMP input mode; default 0.01"),
+    (0x13C, "axis0.controller.config.inertia", "float", "rw", "Nm/(turn/s^2): torque feed forward of the TRAP_TRAJ / POS_FILTER acceleration (FOC); default 0"),
+    (0x13D, "axis0.controller.config.vel_limit_tolerance", "float", "rw", "overspeed error above vel_limit times this; default 1.2"),
+    (0x13E, "axis0.config.motor.phase_inductance", "float", "rw", "H, FOC decoupling and current_control_bandwidth; default 0.00046"),
+    (0x13F, "hoverboard.position.hold_enable", "uint8", "rw", "1 = hold at the target's electrical angle (FOC position), 0 = position loop only; default 1"),
+    (0x140, "axis0.controller.config.enable_overspeed_error", "uint8", "rw", "1 = VELOCITY_LIMIT_VIOLATION (disarm) above vel_limit * vel_limit_tolerance; default 0"),
+    (0x141, "axis0.controller.config.enable_torque_mode_vel_limit", "uint8", "rw", "1 = torque control limits the speed to vel_limit (torque falls with vel_gain); default 1"),
+    (0x142, "axis0.config.motor.current_control_bandwidth", "float", "rw", "rad/s: sets the current loop gains kp = L*bw, ki = R*bw (reads back kp / L); default gains ~870"),
     (0x200, "save_configuration", "function", "w", "store everything (when the wheel stands still)"),
     (0x201, "clear_errors", "function", "w", ""),
 ]
 
 eps = {}
 for i, (name, kind, meaning) in sorted(FIELDS.items()):
-    eps["hoverboard.config." + name] = dict(id=i, type="uint16", access="r" if i in (32, 63) else "rw", unit=meaning)
+    eps["hoverboard.config." + name] = dict(id=i, type="uint16", access="r" if i in (32, 63, 96) else "rw", unit=meaning)
 for i, name, typ, acc, unit in RUNTIME:
     eps[name] = dict(id=i, type=typ, access=acc, unit=unit)
 out = dict(fw_version=FW, protocol=2, endpoints=eps)

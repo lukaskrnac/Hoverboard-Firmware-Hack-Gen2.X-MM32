@@ -12,7 +12,22 @@
 #define PINOUT_H
 
 #include "hardware.h"
-extern uint16_t pinstorage[64];    //board configuration, loaded from the sim-EEPROM (main.c)
+extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-EEPROM (main.c)
+//words 0-63: the record PinFinder writes; 64-127: the extension record (its own magic at 96, saved in the
+//slot before the main record; missing: all 0xFFFF = defaults). 0/65535 = default unless noted.
+#define EXT_MAGIC_POS 96
+#define EXT_MAGIC 0xDCAD
+#define HOLD_CURRENT pinstorage[64]      //FOC position hold current (stiffness), 0.1 A, default 40; <= 90 % of the limit
+#define HOLD_ENABLE pinstorage[65]       //FOC position hold: 1 off, 2 on, default on
+#define HOLD_WINDOW pinstorage[66]       //hold within this of the target, 0.01 hall step, default 150
+#define POS_ACCEL pinstorage[67]         //FOC position approach accel / braking, 0.01 turns/s^2, default 2000
+#define TORQUE_RAMP_RATE pinstorage[68]  //TORQUE_RAMP input mode, 0.01 Nm/s, default 1 (ODrive 0.01)
+#define INERTIA pinstorage[69]           //torque feed forward of the trajectory accel, 0.0001 Nm/(turn/s^2), default 0
+#define VEL_LIMIT_TOL pinstorage[70]     //overspeed error above vel_limit times this, 0.01, default 120
+#define OVERSPEED_ERROR pinstorage[71]   //enable_overspeed_error: 1 off, 2 on, default off
+#define TORQUE_VEL_LIMIT pinstorage[72]  //enable_torque_mode_vel_limit: 1 off, 2 on, default on
+#define PHASE_L pinstorage[73]           //phase inductance, uH, default 460
+static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : def); }
 
 
 #define HALLAPIN pinstorage[0]

@@ -198,13 +198,25 @@ s32 EEPROM_Write(u8* ptr, u16 len)
 }
 
 
+//the extension record (words 64-127, its magic at word 32 of the record) is written first, the main record
+//(PinFinder's format) last: the newest slot is always one PinFinder reads, the extension is the slot
+//before it. A record PinFinder appended has an older main record there: the extension stays default.
+void SaveConfig(void){
+	EEPROM_Write((u8*)&pinstorage[64], 2 * 64);
+	EEPROM_Write((u8*)pinstorage, 2 * 64);
+}
+
 uint8_t restorecfg(void){
 	uint16_t tmp[64];
-	EEPROM_Read((u8*)tmp, 2 * 64);
+	if(EEPROM_Read((u8*)tmp, 2 * 64)<0) return 0;
 	if(tmp[MAGICNUM_POS]==MAGIC_NUMBER){    //verify config is valid
 		for(uint8_t i=0;i<64;i++){
 			pinstorage[i]=tmp[i];
 		}
+		u32 a = FLASH_SIM_WriteLocate((u32)BASED_FLASH_SECTOR_ADDRESS, 2 * 64);    //first blank slot
+		u32 last = a==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : a-128;
+		u32 prev = last==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : last-128;
+		if(M16(prev+2*32)==EXT_MAGIC) memcpy(&pinstorage[64], (const void*)prev, 128);
 		if(HALLAPIN<PINCOUNT&&HALLBPIN<PINCOUNT&&HALLCPIN<PINCOUNT&&TXPIN<PINCOUNT&&RXPIN<PINCOUNT){
 			return 1;
 		}else{

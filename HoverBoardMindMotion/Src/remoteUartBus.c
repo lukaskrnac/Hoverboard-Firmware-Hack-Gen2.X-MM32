@@ -166,7 +166,7 @@ void RemoteUpdate(void){
 	}
 	if (bConfigSave && speed == 0 && realspeed == 0)    //save only with the wheel stopped
 	{
-		EEPROM_Write((u8*)pinstorage, 2 * 64);
+		SaveConfig();
 		bConfigSave = 0;
 	}
 }

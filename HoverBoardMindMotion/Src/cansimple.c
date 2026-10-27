@@ -46,7 +46,7 @@ enum{ CM_VOLTAGE = 0, CM_TORQUE = 1, CM_VELOCITY = 2, CM_POSITION = 3 };    //OD
 //RxSdo / TxSdo: parameter access by endpoint id (the names, types and units are in tools/endpoints.json,
 //as ODrive's flat_endpoints.json). Request: opcode u8 (0 read, 1 write), endpoint u16, reserved u8,
 //value (4 bytes). Answer: 0, endpoint u16, 0, value (read); a write is confirmed without a value.
-//  0x000..0x03F  config words (pinstorage, u16 in a u32); in RAM, save_configuration stores them
+//  0x000..0x07F  config words (pinstorage, u16 in a u32; 64.. the extension record); save_configuration stores them
 //  0x100..       runtime values, float32 unless noted
 //  0x200..       functions (write, no value)
 enum{
@@ -60,6 +60,9 @@ enum{
 	EP_UNDERVOLTAGE, EP_OVERVOLTAGE, EP_NODE_ID, EP_UART_BAUDRATE,
 	EP_VEL_RAMP_RATE, EP_INPUT_FILTER_BW, EP_TRAJ_VEL_LIMIT, EP_TRAJ_ACCEL_LIMIT, EP_TRAJ_DECEL_LIMIT,
 	EP_FW_CURRENT, EP_FW_ADVANCE, EP_POS_SETPOINT, EP_VEL_SETPOINT, EP_ID_MEASURED,
+	//extension record (config words 64..): scaled like VEL_RAMP_RATE.., then bools (uint8), bandwidth
+	EP_HOLD_CURRENT = 0x138, EP_HOLD_WINDOW, EP_POS_ACCEL, EP_TORQUE_RAMP_RATE, EP_INERTIA, EP_VEL_LIMIT_TOL,
+	EP_PHASE_L, EP_HOLD_ENABLE, EP_OVERSPEED_ERROR, EP_TORQUE_VEL_LIMIT, EP_CURRENT_BW,
 	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
 };
 
@@ -290,21 +293,38 @@ static uint8_t controlModeOdrive(void){
 
 static uint16_t toWord(float f){ return (uint16_t)clampF(f, 65534); }
 
-//config words of EP_VEL_RAMP_RATE.. in ODrive units: value = word / scale, 0/65535 = def / scale
-static const struct{ uint8_t w, scale; uint16_t def; } scaled[] = {
-	{29, 100, 100}, {30, 100, 200}, {31, 100, 200}, {35, 100, 50}, {43, 100, 50},    //input modes
-	{21, 10, 0}, {22, 1, 0},    //field weakening: FW_IMAX 0.1 A, FW_ADVANCE degrees; 0 = off
+//config words of EP_VEL_RAMP_RATE..EP_FW_ADVANCE and EP_HOLD_CURRENT..EP_PHASE_L in ODrive units:
+//value = word / 10^e, 0/65535 = def / 10^e
+static const float p10[] = { 1.0f, 10.0f, 100.0f, 1000.0f, 10000.0f, 100000.0f, 1000000.0f };
+static const struct{ uint8_t w, e; uint16_t def; } scaled[] = {
+	{29, 2, 100}, {30, 2, 200}, {31, 2, 200}, {35, 2, 50}, {43, 2, 50},    //input modes
+	{21, 1, 0}, {22, 0, 0},    //field weakening: FW_IMAX 0.1 A, FW_ADVANCE degrees; 0 = off
+	{64, 1, 40}, {66, 2, 150}, {67, 2, 2000},    //hold_current A, hold_window steps, accel_limit turns/s^2
+	{68, 2, 1}, {69, 4, 0}, {70, 2, 120}, {73, 6, 460},    //torque_ramp_rate, inertia, vel_limit_tolerance, phase_inductance H
 };
 
 //ODrive parameter <-> config word, value in ODrive units; returns 0 if ep is not one of them
 static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 	float kt = TorqueConstant(), spt = (float)StepsPerTurn();
-	if(ep>=EP_VEL_RAMP_RATE&&ep<=EP_FW_ADVANCE){
-		const uint8_t w = scaled[ep-EP_VEL_RAMP_RATE].w, sc = scaled[ep-EP_VEL_RAMP_RATE].scale;
-		if(write) pinstorage[w] = toWord(f*(float)sc);
-		*val = (float)cfgOrDefault(pinstorage[w], scaled[ep-EP_VEL_RAMP_RATE].def)/(float)sc; return 1;
+	int8_t k = ep>=EP_VEL_RAMP_RATE&&ep<=EP_FW_ADVANCE ? (int8_t)(ep-EP_VEL_RAMP_RATE) :
+	           (ep>=EP_HOLD_CURRENT&&ep<=EP_PHASE_L ? (int8_t)(ep-EP_HOLD_CURRENT+7) : -1);
+	if(k>=0){
+		const uint8_t w = scaled[k].w; float sc = p10[scaled[k].e];
+		if(write) pinstorage[w] = toWord(f*sc);
+		*val = (float)cfgOrDefault(pinstorage[w], scaled[k].def)/sc; return 1;
+	}
+	if(ep>=EP_HOLD_ENABLE&&ep<=EP_TORQUE_VEL_LIMIT){    //bools: word 1 false, 2 true, 0/65535 default
+		static const uint8_t bw[3] = { 65, 71, 72 }, bd[3] = { 1, 0, 1 };
+		const uint8_t w = bw[ep-EP_HOLD_ENABLE];
+		if(write) pinstorage[w] = f>0.5f ? 2 : 1;
+		*val = (float)cfgBool(pinstorage[w], bd[ep-EP_HOLD_ENABLE]); return 1;
 	}
 	switch(ep){
+		case EP_CURRENT_BW:{    //rad/s: current loop kp = L * bw (mV/A), ki = R * bw (V/(A s)), as ODrive
+			float l = (float)cfgOrDefault(PHASE_L, 460);    //uH
+			if(write){ CUR_KP = toWord(f*l/1000.0f); CUR_KI = toWord(f*(float)cfgOrDefault(MOTOR_R, 300)/1000.0f); }
+			*val = (float)cfgOrDefault(CUR_KP, 400)*1000.0f/l; return 1;
+		}
 		case EP_VEL_LIMIT:    //turns/s <- rpm
 			if(write) POS_RPM = toWord(f*60.0f);
 			*val = (float)cfgOrDefault(POS_RPM, 300)/60.0f; return 1;
@@ -360,11 +380,12 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 	uint32_t r = 0;
 	if(write&&len<8&&ep<EP_SAVE_CONFIGURATION) return 0;
 	float pv;
-	if(odriveParam(ep, write, ep==EP_POLE_PAIRS||ep==EP_NODE_ID||ep==EP_UART_BAUDRATE ? (float)v : f, &pv)){
-		if(ep==EP_POLE_PAIRS||ep==EP_NODE_ID||ep==EP_UART_BAUDRATE) r = (uint32_t)pv; else wrF((uint8_t*)&r, pv);
-	}else if(ep<64){
+	uint8_t isInt = ep==EP_POLE_PAIRS||ep==EP_NODE_ID||ep==EP_UART_BAUDRATE||(ep>=EP_HOLD_ENABLE&&ep<=EP_TORQUE_VEL_LIMIT);
+	if(odriveParam(ep, write, isInt ? (float)v : f, &pv)){
+		if(isInt) r = (uint32_t)pv; else wrF((uint8_t*)&r, pv);
+	}else if(ep<128){
 		if(write){
-			if(ep==MAGICNUM_POS||ep==63) return 0;
+			if(ep==MAGICNUM_POS||ep==63||ep==EXT_MAGIC_POS) return 0;
 			if(ep==44) SetDriveMode((uint8_t)v); else pinstorage[ep] = (uint16_t)v;
 		}
 		r = pinstorage[ep];
