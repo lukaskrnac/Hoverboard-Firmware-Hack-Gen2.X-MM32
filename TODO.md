@@ -19,6 +19,11 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       `poweroff`, the uart loop-back search (needs an erased config), `save` from PinFinder.
 - [x] **P2 Agent mode** (`@` lines, `> cmd` echo, `key=value`, `ok`/`err`) + `tools/pinfinder.py` (`--json`),
       README "Autodetect&configuration (PinFinder)". Long commands stop on any received byte.
+- [x] **Web setup wizard (2026-10-28)**: pinfinder.html Setup tab (13 steps), Advanced = the direct controls;
+      E2E `uitest/wiztest.mjs` walks every step on the bench board (no save at the end). Fixed on the way:
+      a UART receive error (adapter dropping off at a USB hub reset) stopped the rx DMA in both firmwares
+      until cleared (uart.c clears it now); PinFinder drops line noise before an '@'; `pin blink` toggles
+      the pulls instead of driving the pin.
 - [ ] **P3 TUI**: done: one screen with the pin map (unsaved changes yellow), VDD/battery, menu, LED
       screen, test motor screen, command line = agent commands, plain text without ANSI. Open: per item
       help (`?` shows the command list only), "how found" per pin (detected/manual/default), a screen

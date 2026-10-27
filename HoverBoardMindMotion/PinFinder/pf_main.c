@@ -16,6 +16,7 @@ static char line[64];
 static uint8_t len;
 
 static void agentByte(int c){
+	if(c=='@'){ len = 0; return; }    //a command starts here: line noise before it (a reconnect, a break) is dropped
 	if(c=='\r'||c=='\n'){
 		line[len] = 0;
 		char* s = line;

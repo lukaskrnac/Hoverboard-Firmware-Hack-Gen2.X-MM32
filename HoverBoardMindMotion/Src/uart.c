@@ -14,6 +14,7 @@ static uint16_t rxPos;
 static uint8_t txBuf[32];
 static DMA_Channel_TypeDef* dmaRx;
 static DMA_Channel_TypeDef* dmaTx;
+static UART_TypeDef* uartReg;
 
 #define DMA_CCR_EN_   (1u<<0)
 #define DMA_CCR_DIR_  (1u<<4)    //memory to peripheral
@@ -22,6 +23,7 @@ static DMA_Channel_TypeDef* dmaTx;
 
 void SerialInit(void){
 	UART_TypeDef* u = uarten==1 ? UART1 : UART2;
+	uartReg = u;
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 	dmaRx = uarten==1 ? DMA1_Channel3 : DMA1_Channel5;
 	dmaTx = uarten==1 ? DMA1_Channel2 : DMA1_Channel4;
@@ -36,7 +38,11 @@ void SerialInit(void){
 	u->GCR |= UART_GCR_DMA;
 }
 
+#define RX_ERRORS (UART_ISR_RXOERR|UART_ISR_RXPERR|UART_ISR_RXFERR|UART_ISR_RXBRK)
 int SerialGetByte(void){
+	//a receive error (break or frame error while the adapter drops off USB, an overrun) stops the rx DMA
+	//requests until it is cleared: the board stayed deaf after a USB hub reset (measured)
+	if(uartReg->ISR&RX_ERRORS) uartReg->ICR = RX_ERRORS;
 	uint16_t w = (uint16_t)(RX_RING-dmaRx->CNDTR);    //next index the DMA writes
 	if(w>=RX_RING) w = 0;
 	if(rxPos==w) return -1;

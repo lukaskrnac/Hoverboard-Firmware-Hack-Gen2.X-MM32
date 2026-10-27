@@ -105,12 +105,11 @@ static void pinCmd(const char* name, const char* mode, const char* arg){
 	else if(!strcmp(mode, "pulldown")) pinMode((uint8_t)p, INPUT_PULLDOWN);
 	else if(!strcmp(mode, "input")) pinMode((uint8_t)p, INPUT);
 	else if(!strcmp(mode, "tone")) Tone(p, ms ? ms : 500, 2000);
-	else if(!strcmp(mode, "blink")){
-		pinMode((uint8_t)p, OUTPUT);
+	else if(!strcmp(mode, "blink")){    //pull-up / pull-down, not driven: safe on a pin of unknown purpose
 		for(uint32_t t=millis;millis-t<(ms ? ms : 2000)&&!aborted();){
-			digitalWrite((uint8_t)p, (millis/150)&1);
+			pinMode((uint8_t)p, (millis/150)&1 ? INPUT_PULLUP : INPUT_PULLDOWN);
 		}
-		digitalWrite((uint8_t)p, 0);
+		pinMode((uint8_t)p, INPUT);
 	}
 	else{ err("mode: high low pullup pulldown input read blink tone"); return; }
 	ok();
