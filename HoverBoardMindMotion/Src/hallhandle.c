@@ -10,6 +10,7 @@
 HALLType HALL1;
 volatile int32_t fastspeed;
 volatile uint8_t hallAngleSure;    //the angle is known: a regular edge, its interpolation not run out
+volatile uint16_t hallInvalid;    //invalid hall readings (diagnostic)
 static uint32_t pllTh, pllBnd;     //angle tracker: angle, the boundary of the last edge (2^32 per electrical turn)
 static int32_t pllW;               //its speed, angle per pwm period, signed
 static uint8_t pllOn;
@@ -99,6 +100,9 @@ void HALLModuleCalc(HALLType *u){
 			realdir=1;
 		}
 		u->HallTime[i] = tim->CCR1;    //us since the previous edge (the timer is reset by every edge)
+		//an interval below 100 us cannot be real (1000 rpm: 670 us): a spike made two captures (the timer
+		//input filter should stop them); the previous interval stands in
+		if(u->HallTime[i]<100) u->HallTime[i] = u->HallTime[(i+5)%6];
 		since = tim->CNT;              //so this is the time since this edge
 		if(since>456) since = 456;
 		if(tim->SR&TIM_SR_UI){         //16 bit timer overflowed: more than 65 ms, the capture wrapped;
@@ -167,6 +171,8 @@ void HALLModuleCalc(HALLType *u){
 			uint32_t meas = bnd+(uint32_t)(wMeas/228*(int32_t)since);
 			int32_t e = (int32_t)(meas-pllTh);
 			if(!pllOn||(pllW>0)!=(s>0)||e>(2731<<16)||e<-(2731<<16)){    //start, reversal, > 15 deg off
+				//(a half correction at speed instead left the error in fast accelerations: braking
+				//current that grew with speed, a 15 A trip at 13 A field weakening)
 				pllTh = meas; pllW = wMeas; pllOn = 1;
 			}else{
 				int32_t n = (int32_t)(ivl/228);
@@ -183,11 +189,13 @@ void HALLModuleCalc(HALLType *u){
 		}else if(pllOn){
 			//at most one sector (and a period) past the last edge: no edge where one was due means the
 			//rotor is slower; the angle waits there and the d current is off until the next edge (a
-			//negative d current in a frame ahead of the rotor brakes it, it stalled and rocked)
+			//negative d current in a frame ahead of the rotor brakes it, it stalled and rocked). Above
+			//~160 rpm (600 per period) two sectors: the rotor cannot slow much within one, and an angle
+			//held there at 600 rpm fell 12 deg behind per period (late edges at one hall boundary)
 			uint32_t next = pllTh+(uint32_t)pllW;
 			int32_t travel = (int32_t)(next-pllBnd), aw = pllW<0 ? -pllW : pllW;
 			if(u->MoveDir<0) travel = -travel;
-			if(travel<=(10922<<16)+aw) pllTh = next; else hallAngleSure = 0;
+			if(travel<=(aw>(600<<16) ? (21845<<16) : (10922<<16))+aw) pllTh = next; else hallAngleSure = 0;
 		}
 		if(pllOn){
 			//output lead 9/8 periods (the centre of the next pwm period): measured with FOC at 300 and
@@ -220,5 +228,9 @@ void HALLModuleCalc(HALLType *u){
 		fastspeed = realdir ? f : -f;
 	}
 	u->PreHallValue = u->RunHallValue;
-	u->PreRaw = raw;
+	//the previous state is the last valid one: an invalid reading (0 or 7: two sensors switching at once,
+	//noise at high current) for one poll made the next edge compare against it and not count. The
+	//edge was lost (the odometer step too), the angle tracker waited a sector for it and then jumped
+	//85 deg: a 21 A trip with field weakening at 600 rpm.
+	if(hall_to_pos[raw]) u->PreRaw = raw; else hallInvalid++;
 }

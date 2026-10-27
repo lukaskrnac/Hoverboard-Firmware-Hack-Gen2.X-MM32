@@ -24,7 +24,7 @@
 //Loop: every pwm period in the adc isr. Park angle = hall estimator angle minus its 1.5 period lead
 //(that lead is for the pwm output; the currents were sampled now); PI per axis in mV with back emf feed
 //forward on q and the dq decoupling (omega*L*i, L 0.46 mH: at 170 Hz electrical omega*L ~ 0.5 Ohm, as
-//large as kp); on the voltage circle the vector is scaled onto it and the integrators hold.
+//large as kp); on the voltage circle d first, q gets the rest, integration stops in saturation.
 #include "foc.h"
 #include "main.h"
 #include "pinout.h"
@@ -311,35 +311,24 @@ void FocControl(void){
 	intD += di; intQ += diq;
 	int32_t vd = kp*ed/1000+intD/1000+vdDec;
 	int32_t vq = kp*eq/1000+intQ/1000+vff+vqDec;
-	int32_t vmag;    //magnitude the current loops ask for, mV (field weakening)
-	//on the voltage circle (current control) the vector is scaled onto it, its direction kept. With d
-	//first and q getting the rest, every d disturbance (the back emf on d from a few degrees of hall
-	//angle error at speed) took its voltage from q: with a large d current (field weakening) the q
-	//current swung +-10 A at ~60 Hz and the wheel shook (5-8 m/s^2 on the bench, ~1 m/s^2 scaled).
-	//A voltage command keeps d first and its own limit on q.
-	if(!focVoltMode){
-		if(vd>30000) vd = 30000; else if(vd<-30000) vd = -30000;
-		if(vq>30000) vq = 30000; else if(vq<-30000) vq = -30000;
-		vmag = MCM_Sqrt(vd*vd+vq*vq);
-		if(vmag>vmax){
-			vd = vd*vmax/vmag; vq = vq*vmax/vmag;
-			//on the circle the integrators only unwind (towards 0), they do not wind up further. Both
-			//held froze a d integrator of the wrong sign (the field weakening current never built
-			//up); a free d integrator took the voltage from q again and shook (2-7 m/s^2)
-			if((di>0)==(intD-di>0)) intD -= di;
-			if((diq>0)==(intQ-diq>0)) intQ -= diq;
-		}
-	}else{
-		if(vd>vmax){ if(di>0) intD -= di; vd = vmax; }
-		else if(vd<-vmax){ if(di<0) intD -= di; vd = -vmax; }
-		int32_t vqmax = MCM_Sqrt(vmax*vmax-vd*vd);
-		int32_t qhi = vqmax, qlo = -vqmax;
+	//magnitude the current loops ask for, before the limit (field weakening below); not in voltage mode
+	if(vd>30000) vd = 30000; else if(vd<-30000) vd = -30000;
+	if(vq>30000) vq = 30000; else if(vq<-30000) vq = -30000;
+	int32_t vmag = focVoltMode ? 0 : MCM_Sqrt(vd*vd+vq*vq);
+	//voltage circle: d first, q gets the rest, integration stops in saturation (classic field weakening:
+	//the d current must get its voltage). It shook from 4 A of d current until the hall angle lead
+	//(9/8 periods), the stale current samples (glitch filter) and the noisy back emf feed forward were
+	//fixed; a scaled vector (tried meanwhile) starved d: the d current stayed at -6 of -9 A.
+	if(vd>vmax){ if(di>0) intD -= di; vd = vmax; }
+	else if(vd<-vmax){ if(di<0) intD -= di; vd = -vmax; }
+	int32_t vqmax = MCM_Sqrt(vmax*vmax-vd*vd);
+	int32_t qhi = vqmax, qlo = -vqmax;
+	if(focVoltMode){
 		int32_t vc = -(int32_t)focVCmd*vmax/1000;    //electrical frame: the command is negated
 		if(vc>0){ if(vc<qhi) qhi = vc; }else{ if(vc>qlo) qlo = vc; }
-		if(vq>qhi){ if(diq>0) intQ -= diq; vq = qhi; }
-		else if(vq<qlo){ if(diq<0) intQ -= diq; vq = qlo; }
-		vmag = 0;    //a voltage command: no field weakening (it limits the voltage itself)
 	}
+	if(vq>qhi){ if(diq>0) intQ -= diq; vq = qhi; }
+	else if(vq<qlo){ if(diq<0) intQ -= diq; vq = qlo; }
 
 	//field weakening: an integrator sets the d current (0 .. -FW_IMAX) so that the voltage the current
 	//loops ask for stays at 95 % of the circle: they keep headroom and stay in control; the negative d
@@ -348,12 +337,12 @@ void FocControl(void){
 	//that needed the loops saturated to work and kept them there; with a large d current the wheel
 	//shook and the speed swung +-100 rpm.
 	int32_t fwmax = cfgOrDefault(FW_IMAX, 0)*100;
-	//at most 60 % of the current limit: on the circle the q current is not regulated, with 7 of 10 A the
-	//total ran past the limit (12.7 A) and tripped. Bench (24 V, omega*L ~0.37 V per A at 600 rpm):
-	//520 rpm without, ~600 rpm with 5-6 A, ~680 rpm with 9 A (current_soft_max 15 A), ~1.1 m/s^2.
-	//(Earlier "815 rpm" came from the median glitch filter feeding stale currents: the real d current
-	//was larger and uncontrolled, ~180 W from the supply unloaded.)
-	if(fwmax>imax*6/10) fwmax = imax*6/10;
+	//at most 90 % of the current limit (the q current keeps >= 44 %). Bench, 24 V, current_soft_max
+	//15 A, measured d current = reference: 520 rpm without, 626 rpm with 5 A, 745 with 9 A, 836 with
+	//13 A (12.7 A in total, 4 A from the supply), 0.9-1.2 m/s^2 throughout. Each A of d current saves
+	//omega*L (~0.37 V at 600 rpm). (An earlier "815 rpm with 6 A" was the median glitch filter feeding
+	//stale currents: the real d current was larger and uncontrolled, ~180 W from the supply.)
+	if(fwmax>imax*9/10) fwmax = imax*9/10;
 	if(fwmax&&vmag){
 		fwId -= (vmag-vmax*95/100)/64;
 		if(fwId<-fwmax) fwId = -fwmax; else if(fwId>0) fwId = 0;

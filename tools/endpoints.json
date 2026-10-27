@@ -624,7 +624,7 @@
    "id": 307,
    "type": "float",
    "access": "rw",
-   "unit": "A, max negative d current at the voltage limit (FOC); 0 = off, at most 60 % of current_soft_max"
+   "unit": "A, max negative d current at the voltage limit (FOC); 0 = off, at most 90 % of current_soft_max"
   },
   "hoverboard.sine.field_weakening_advance": {
    "id": 308,

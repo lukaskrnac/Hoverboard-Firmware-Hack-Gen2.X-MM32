@@ -46,7 +46,7 @@ RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning 
     (0x130, "axis0.trap_traj.config.vel_limit", "float", "rw", "turns/s, TRAP_TRAJ; 0 = default 2"),
     (0x131, "axis0.trap_traj.config.accel_limit", "float", "rw", "turns/s^2, TRAP_TRAJ; 0 = default 0.5"),
     (0x132, "axis0.trap_traj.config.decel_limit", "float", "rw", "turns/s^2, TRAP_TRAJ; 0 = default 0.5"),
-    (0x133, "hoverboard.foc.field_weakening_current", "float", "rw", "A, max negative d current at the voltage limit (FOC); 0 = off, at most 60 % of current_soft_max"),
+    (0x133, "hoverboard.foc.field_weakening_current", "float", "rw", "A, max negative d current at the voltage limit (FOC); 0 = off, at most 90 % of current_soft_max"),
     (0x134, "hoverboard.sine.field_weakening_advance", "float", "rw", "degrees electrical, max phase advance beyond 100 % modulation (sine); 0 = off"),
     (0x135, "axis0.controller.pos_setpoint", "float", "r", "turns, after the input mode"),
     (0x136, "axis0.controller.vel_setpoint", "float", "r", "turns/s, after the input mode (position: feed forward)"),

@@ -70,7 +70,8 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
 	TIM_TimeBaseStruct.TIM_Period = arr;
 	TIM_TimeBaseStruct.TIM_Prescaler = psc;
 	//Setting Clock Segmentation
-	TIM_TimeBaseStruct.TIM_ClockDivision = TIM_CKD_DIV1;
+	//input filter clock 18 MHz: with the filter below a spike shorter than ~14 us is ignored
+	TIM_TimeBaseStruct.TIM_ClockDivision = TIM_CKD_DIV4;
 	TIM_TimeBaseStruct.TIM_RepetitionCounter = 0;
 	///TIM Upward Counting Mode
 	TIM_TimeBaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
@@ -81,7 +82,10 @@ uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
 	TIM_ICInitStruct.TIM_ICPolarity = TIM_ICPolarity_Rising;
 	TIM_ICInitStruct.TIM_ICSelection = TIM_ICSelection_TRC;
 	TIM_ICInitStruct.TIM_ICPrescaler = TIM_ICPSC_DIV1;
-	TIM_ICInitStruct.TIM_ICFilter = 0x0;
+	//fDTS/32, 8 samples (~14 us): a switching spike on a hall line made two captures within a
+	//microsecond, the edge was measured as 0 us (speed 0 in the angle tracker: a freeze, then an
+	//80 deg jump, a 20 A trip with field weakening at 600 rpm)
+	TIM_ICInitStruct.TIM_ICFilter = 0xF;
 	TIM_ICInit(tim2 ? TIM2 : TIM3, &TIM_ICInitStruct);
 	TIM_ITConfig(tim2 ? TIM2 : TIM3, TIM_IT_CC1, ENABLE);
 
