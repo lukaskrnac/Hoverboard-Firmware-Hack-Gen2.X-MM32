@@ -78,6 +78,10 @@ static void wrF(uint8_t* p, float f){ memcpy(p, &f, 4); }
 static void wrU32(uint8_t* p, uint32_t v){ p[0] = (uint8_t)v; p[1] = (uint8_t)(v>>8); p[2] = (uint8_t)(v>>16); p[3] = (uint8_t)(v>>24); }
 static int32_t clampF(float f, int32_t lim){ return f>lim ? lim : (f<-lim ? -lim : (int32_t)(f<0 ? f-0.5f : f+0.5f)); }
 
+//a config word from a float: 0..65534, rounded. Negative and NaN give 0: the cast wrapped them (-2.5 V
+//written as the undervoltage level became 63.0 V, a low battery cut-off above the bus voltage)
+static uint16_t toWord(float f){ return !(f>0) ? 0 : (uint16_t)clampF(f, 65534); }
+
 int32_t StepsPerTurn(void){ return 3*(int32_t)WINDINGS; }    //hall edges per turn: 6 per pole pair
 float TorqueConstant(void){    //Nm per A (amplitude of the phase current)
 	int32_t kt = cfgOrDefault(TORQUE_CONST, 0);
@@ -256,13 +260,13 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			}
 			break;
 		case CMD_SET_POS_GAIN:    //(turns/s) per turn -> 0.1 rpm per hall step
-			if(len>=4) POS_KP = (uint16_t)clampF(rdF(d)*600.0f/(float)StepsPerTurn(), 65534);
+			if(len>=4) POS_KP = toWord(rdF(d)*600.0f/(float)StepsPerTurn());
 			break;
 		case CMD_SET_VEL_GAINS:{    //Nm/(turns/s), (Nm/s)/(turns/s) -> FOC speed loop mA/rpm, mA/(rpm*s)
 			if(len>=8){
 				float k = 1000.0f/60.0f/TorqueConstant();
-				FOC_SPD_KP = (uint16_t)clampF(rdF(d)*k, 65534);
-				FOC_SPD_KI = (uint16_t)clampF(rdF(d+4)*k, 65534);
+				FOC_SPD_KP = toWord(rdF(d)*k);
+				FOC_SPD_KI = toWord(rdF(d+4)*k);
 			}
 			break;
 		}
@@ -295,7 +299,6 @@ static uint8_t controlModeOdrive(void){
 	return map[CONTROL(DRIVEMODE)];
 }
 
-static uint16_t toWord(float f){ return (uint16_t)clampF(f, 65534); }
 
 //config words of EP_VEL_RAMP_RATE..EP_FW_ADVANCE and EP_HOLD_CURRENT..EP_PHASE_L in ODrive units:
 //value = word / 10^e, 0/65535 = def / 10^e
