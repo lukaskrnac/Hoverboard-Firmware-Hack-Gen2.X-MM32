@@ -23,12 +23,13 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       screen, test motor screen, command line = agent commands, plain text without ANSI. Open: per item
       help (`?` shows the command list only), "how found" per pin (detected/manual/default), a screen
       for the remaining config words, detect-all ordering when a step fails.
-- [ ] **P4 Web GUI config tool.** A page in the console repo (`remoteuartbus-online`, e.g.
-      `pinfinder.html`) over WebSerial using the P2 protocol: pin map table, buttons
-      per detection with progress, edit any config word with names/units from the same source as
-      `tools/endpoints.json` / `pinout.h`, save, export/import the config as JSON, "flash main firmware"
-      hint. Also usable against the main firmware's CANSimple config endpoints for the words both
-      share. UI test like `uitest/` (headless chrome, WS bridge).
+- [x] **P4 Web GUI config tool**: `pinfinder.html` in the console repo (remoteuartbus-online 'console'
+      branch): detections with progress/Stop, pin map + all words (`tools/cfgfields.json`, copied there),
+      RAM edits marked until Save, Revert, test motor, pin actions, export/import JSON, command line.
+      E2E in headless Chrome against the bench board (`uitest/pfuitest.mjs`: connect, edit/revert, pin
+      set, hall, IMU, rotate, Stop; no page errors). Open: rows are marked against the RAM state at
+      connect (an earlier unsaved PinFinder session only shows as the "unsaved" pill; PinFinder has no
+      command to read the flash record); the console's main-firmware Settings could use cfgfields.json too.
 - [ ] **P5 New detections.**
       - **Phase current pins** (`IPHASEAPIN`/`IPHASEBPIN`/`IPHASE_CFG`/`IPHASE_GAIN`): with the gates on and
         a small static SVPWM vector swept over 360 deg (as `opaprobe.py`), sample every free ADC pin at the

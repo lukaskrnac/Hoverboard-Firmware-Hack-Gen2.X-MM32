@@ -254,6 +254,10 @@ python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
 | `gen` | `pinstorage` initializer for a firmware with a fixed configuration |
 | `poweroff` | |
 
+A browser page for the same, over Web Serial: `pinfinder.html` in the
+[web console](https://gitlab.com/ailife8881/remoteuartbus-online) (needs `tools/cfgfields.json`, written by
+`tools/gen_cfgnames.py`, next to it).
+
 The old PinFinder (Keil, `pin-finder` branch) is described in the
 [wiki](https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/wikis/home/%7BHow-to-use-PinFinder-firmware%7D).
 

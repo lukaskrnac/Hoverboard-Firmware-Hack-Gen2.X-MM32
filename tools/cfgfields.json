@@ -1,0 +1,567 @@
+{
+ "pins": [
+  "PA0",
+  "PA1",
+  "PA2",
+  "PA3",
+  "PA4",
+  "PA5",
+  "PA6",
+  "PA7",
+  "PA11",
+  "PA12",
+  "PA13",
+  "PA14",
+  "PA15",
+  "PB0",
+  "PB1",
+  "PB2",
+  "PB3",
+  "PB4",
+  "PB5",
+  "PB6",
+  "PB7",
+  "PB8",
+  "PB9",
+  "PB10",
+  "PB11",
+  "PB12",
+  "PC13",
+  "PC14",
+  "PC15",
+  "PD0",
+  "PD1",
+  "PD2",
+  "PD3"
+ ],
+ "fields": [
+  {
+   "index": 0,
+   "name": "halla",
+   "kind": "pin",
+   "meaning": "hall sensor A"
+  },
+  {
+   "index": 1,
+   "name": "hallb",
+   "kind": "pin",
+   "meaning": "hall sensor B"
+  },
+  {
+   "index": 2,
+   "name": "hallc",
+   "kind": "pin",
+   "meaning": "hall sensor C"
+  },
+  {
+   "index": 3,
+   "name": "ledr",
+   "kind": "pin",
+   "meaning": "red LED"
+  },
+  {
+   "index": 4,
+   "name": "ledg",
+   "kind": "pin",
+   "meaning": "green LED"
+  },
+  {
+   "index": 5,
+   "name": "ledb",
+   "kind": "pin",
+   "meaning": "blue / orange LED"
+  },
+  {
+   "index": 6,
+   "name": "ledu",
+   "kind": "pin",
+   "meaning": "upper LED"
+  },
+  {
+   "index": 7,
+   "name": "ledd",
+   "kind": "pin",
+   "meaning": "lower LED"
+  },
+  {
+   "index": 8,
+   "name": "buzzer",
+   "kind": "pin",
+   "meaning": "buzzer"
+  },
+  {
+   "index": 9,
+   "name": "button",
+   "kind": "pin",
+   "meaning": "power button sense"
+  },
+  {
+   "index": 10,
+   "name": "latch",
+   "kind": "pin",
+   "meaning": "power self-hold"
+  },
+  {
+   "index": 11,
+   "name": "charge",
+   "kind": "pin",
+   "meaning": "charger detect (chargelevel, chargepull)"
+  },
+  {
+   "index": 12,
+   "name": "vbat",
+   "kind": "pin",
+   "meaning": "battery voltage adc"
+  },
+  {
+   "index": 13,
+   "name": "itotal",
+   "kind": "pin",
+   "meaning": "bus current adc"
+  },
+  {
+   "index": 14,
+   "name": "tx",
+   "kind": "pin",
+   "meaning": "uart tx"
+  },
+  {
+   "index": 15,
+   "name": "rx",
+   "kind": "pin",
+   "meaning": "uart rx"
+  },
+  {
+   "index": 16,
+   "name": "iphasea",
+   "kind": "pin",
+   "meaning": "phase current adc 1 (phase: iphasecfg)"
+  },
+  {
+   "index": 17,
+   "name": "iphaseb",
+   "kind": "pin",
+   "meaning": "phase current adc 2 (phase: iphasecfg)"
+  },
+  {
+   "index": 18,
+   "name": "poskp",
+   "kind": "num",
+   "meaning": "position: 0.1 rpm per hall step of error; 0/65535 = default 20"
+  },
+  {
+   "index": 19,
+   "name": "posrpm",
+   "kind": "num",
+   "meaning": "velocity limit (vel_limit) in position and velocity modes, rpm; 0/65535 = default 300"
+  },
+  {
+   "index": 20,
+   "name": "motorr",
+   "kind": "num",
+   "meaning": "phase resistance incl. mosfets, mOhm; 0/65535 = default 300"
+  },
+  {
+   "index": 21,
+   "name": "fwimax",
+   "kind": "num",
+   "meaning": "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"
+  },
+  {
+   "index": 22,
+   "name": "fwadvance",
+   "kind": "num",
+   "meaning": "sine field weakening: max phase advance, degrees electrical; 0/65535 = off"
+  },
+  {
+   "index": 23,
+   "name": "ocp",
+   "kind": "pin",
+   "meaning": "TIM1 break input (hardware overcurrent)"
+  },
+  {
+   "index": 24,
+   "name": "ocpref",
+   "kind": "pin",
+   "meaning": "overcurrent comparator reference"
+  },
+  {
+   "index": 25,
+   "name": "itotalzero",
+   "kind": "num",
+   "meaning": "shunt zero below adc 0 (the adc clips), 0.01 counts; 0/65535 = 0"
+  },
+  {
+   "index": 26,
+   "name": "torqueconst",
+   "kind": "num",
+   "meaning": "torque constant mNm/A (CANSimple torque units); 0/65535 = 8270 / sine kv"
+  },
+  {
+   "index": 27,
+   "name": "curtrip",
+   "kind": "num",
+   "meaning": "phase current trip (current_hard_max) 0.1 A; 0/65535 = 2 x focimax, at least 15 A"
+  },
+  {
+   "index": 28,
+   "name": "inputmode",
+   "kind": "num",
+   "meaning": "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP; 0/65535 = 1"
+  },
+  {
+   "index": 29,
+   "name": "velramprate",
+   "kind": "num",
+   "meaning": "VEL_RAMP 0.01 turns/s^2; 0/65535 = 100"
+  },
+  {
+   "index": 30,
+   "name": "filterbw",
+   "kind": "num",
+   "meaning": "POS_FILTER bandwidth 0.01 /s; 0/65535 = 200"
+  },
+  {
+   "index": 31,
+   "name": "trajvel",
+   "kind": "num",
+   "meaning": "TRAP_TRAJ velocity limit 0.01 turns/s; 0/65535 = 200"
+  },
+  {
+   "index": 32,
+   "name": "magicnum",
+   "kind": "num",
+   "meaning": "0xDCAB = valid"
+  },
+  {
+   "index": 33,
+   "name": "vbatdivider",
+   "kind": "num",
+   "meaning": "vbat = divider * Vadc"
+  },
+  {
+   "index": 34,
+   "name": "itotaldivider",
+   "kind": "num",
+   "meaning": "itotal = divider * Vadc (1/shunt ohm); bench board 419"
+  },
+  {
+   "index": 35,
+   "name": "trajaccel",
+   "kind": "num",
+   "meaning": "TRAP_TRAJ acceleration 0.01 turns/s^2; 0/65535 = 50"
+  },
+  {
+   "index": 36,
+   "name": "baud",
+   "kind": "num",
+   "meaning": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200)"
+  },
+  {
+   "index": 37,
+   "name": "pwmres",
+   "kind": "num",
+   "meaning": "TIM1 period, 8192..16383 (4.39..2.2 kHz), read at boot"
+  },
+  {
+   "index": 38,
+   "name": "slaveid",
+   "kind": "num",
+   "meaning": "RemoteUartBus slave id"
+  },
+  {
+   "index": 39,
+   "name": "windings",
+   "kind": "num",
+   "meaning": "motor poles"
+  },
+  {
+   "index": 40,
+   "name": "invlowside",
+   "kind": "num",
+   "meaning": "1 = low side gate drive inverted"
+  },
+  {
+   "index": 41,
+   "name": "softocp",
+   "kind": "num",
+   "meaning": "A, averaged bus current limit, 0 = off"
+  },
+  {
+   "index": 42,
+   "name": "hardocp",
+   "kind": "num",
+   "meaning": "adc watchdog current limit, adc counts above zero"
+  },
+  {
+   "index": 43,
+   "name": "trajdecel",
+   "kind": "num",
+   "meaning": "TRAP_TRAJ deceleration 0.01 turns/s^2; 0/65535 = 50"
+  },
+  {
+   "index": 44,
+   "name": "drivemode",
+   "kind": "num",
+   "meaning": "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED, 3/7/11 COM/SINE/FOC_POSITION, 8 FOC_VOLT, 9 FOC_SPEED, 10 FOC_TORQUE (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"
+  },
+  {
+   "index": 45,
+   "name": "batfull",
+   "kind": "num",
+   "meaning": "mV"
+  },
+  {
+   "index": 46,
+   "name": "batempty",
+   "kind": "num",
+   "meaning": "mV, <= 20000 disables the low battery cut-off"
+  },
+  {
+   "index": 47,
+   "name": "timeout",
+   "kind": "num",
+   "meaning": "ms without a command until speed = 0"
+  },
+  {
+   "index": 48,
+   "name": "speedkp",
+   "kind": "num",
+   "meaning": "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"
+  },
+  {
+   "index": 49,
+   "name": "speedki",
+   "kind": "num",
+   "meaning": "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"
+  },
+  {
+   "index": 50,
+   "name": "speedkv",
+   "kind": "num",
+   "meaning": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 395"
+  },
+  {
+   "index": 51,
+   "name": "speedd0",
+   "kind": "num",
+   "meaning": "COM_SPEED feed forward: dead band permille duty, 0 = default 185"
+  },
+  {
+   "index": 52,
+   "name": "sinekp",
+   "kind": "num",
+   "meaning": "SINE_SPEED: 0.1 permille modulation per rpm, 0 = default 5"
+  },
+  {
+   "index": 53,
+   "name": "sineki",
+   "kind": "num",
+   "meaning": "SINE_SPEED: 0.1 permille per rpm*s, 0 = default 85"
+  },
+  {
+   "index": 54,
+   "name": "sinekv",
+   "kind": "num",
+   "meaning": "SINE_SPEED feed forward: 0.1 rpm/V at 100% modulation, 0 = default 242"
+  },
+  {
+   "index": 55,
+   "name": "sined0",
+   "kind": "num",
+   "meaning": "SINE_SPEED feed forward: dead band permille, 0 = default 10"
+  },
+  {
+   "index": 56,
+   "name": "iphasegain",
+   "kind": "num",
+   "meaning": "FOC: 0.1 mA per adc count, 0 = default 515"
+  },
+  {
+   "index": 57,
+   "name": "iphasecfg",
+   "kind": "num",
+   "meaning": "FOC: phases on iphasea/b 0 = A,B 1 = B,C 2 = A,C; +4: adc rises with current into the motor"
+  },
+  {
+   "index": 58,
+   "name": "focimax",
+   "kind": "num",
+   "meaning": "FOC: phase current limit 0.1 A, 0 = default 100; trips at twice that"
+  },
+  {
+   "index": 59,
+   "name": "curkp",
+   "kind": "num",
+   "meaning": "FOC current loop: mV per A, 0 = default 400"
+  },
+  {
+   "index": 60,
+   "name": "curki",
+   "kind": "num",
+   "meaning": "FOC current loop: V per A*s, 0 = default 300"
+  },
+  {
+   "index": 61,
+   "name": "focspdkp",
+   "kind": "num",
+   "meaning": "FOC_SPEED: mA per rpm, 0 = default 30"
+  },
+  {
+   "index": 62,
+   "name": "focspdki",
+   "kind": "num",
+   "meaning": "FOC_SPEED: mA per rpm*s, 0 = default 100"
+  },
+  {
+   "index": 63,
+   "name": "cfgversion",
+   "kind": "num",
+   "meaning": "config layout version, migrated at boot: 1 drive mode numbers, 2 baud/100, 3 input mode words reset"
+  },
+  {
+   "index": 64,
+   "name": "holdcurrent",
+   "kind": "num",
+   "meaning": "FOC position hold current (stiffness) 0.1 A, <= 90 % of focimax; 0/65535 = 40"
+  },
+  {
+   "index": 65,
+   "name": "holdenable",
+   "kind": "num",
+   "meaning": "FOC position hold: 1 off, 2 on; 0/65535 = on"
+  },
+  {
+   "index": 66,
+   "name": "holdwindow",
+   "kind": "num",
+   "meaning": "FOC position: hold within 0.01 hall step of the target; 0/65535 = 150"
+  },
+  {
+   "index": 67,
+   "name": "posaccel",
+   "kind": "num",
+   "meaning": "FOC position approach acceleration / braking 0.01 turns/s^2; 0/65535 = 2000"
+  },
+  {
+   "index": 68,
+   "name": "torqueramp",
+   "kind": "num",
+   "meaning": "TORQUE_RAMP 0.01 Nm/s; 0/65535 = 1"
+  },
+  {
+   "index": 69,
+   "name": "inertia",
+   "kind": "num",
+   "meaning": "torque feed forward of the trajectory acceleration 0.0001 Nm/(turn/s^2); 0/65535 = 0"
+  },
+  {
+   "index": 70,
+   "name": "vellimittol",
+   "kind": "num",
+   "meaning": "overspeed error above vel_limit times this, 0.01; 0/65535 = 120"
+  },
+  {
+   "index": 71,
+   "name": "overspeederr",
+   "kind": "num",
+   "meaning": "enable_overspeed_error: 1 off, 2 on; 0/65535 = off"
+  },
+  {
+   "index": 72,
+   "name": "torquevellim",
+   "kind": "num",
+   "meaning": "enable_torque_mode_vel_limit: 1 off, 2 on; 0/65535 = on"
+  },
+  {
+   "index": 73,
+   "name": "phasel",
+   "kind": "num",
+   "meaning": "phase inductance uH; 0/65535 = 460"
+  },
+  {
+   "index": 74,
+   "name": "poski",
+   "kind": "num",
+   "meaning": "position I: 0.1 rpm per (hall step * s), within 4 steps of the target; 0/65535 = 0 (off)"
+  },
+  {
+   "index": 75,
+   "name": "poskd",
+   "kind": "num",
+   "meaning": "position D: 0.01 rpm per rpm of speed error (trajectory - wheel); 0/65535 = 0 (off)"
+  },
+  {
+   "index": 76,
+   "name": "focspdkd",
+   "kind": "num",
+   "meaning": "FOC velocity D: 0.01 mA per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  {
+   "index": 77,
+   "name": "sinekd",
+   "kind": "num",
+   "meaning": "SINE_SPEED D: 0.01 permille modulation per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  {
+   "index": 78,
+   "name": "speedkd",
+   "kind": "num",
+   "meaning": "COM_SPEED D: 0.01 permille duty per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  {
+   "index": 79,
+   "name": "buzzerpassive",
+   "kind": "num",
+   "meaning": "buzzer without its own oscillator, driven with 2.2 kHz: 1 off, 2 on; 0/65535 = off"
+  },
+  {
+   "index": 80,
+   "name": "chargelevel",
+   "kind": "num",
+   "meaning": "charger pin while the charger is connected: 1 low, 2 high; 0/65535 = high"
+  },
+  {
+   "index": 81,
+   "name": "chargepull",
+   "kind": "num",
+   "meaning": "charger pin input: 1 floating, 2 pull-up, 3 pull-down; 0/65535 = floating"
+  },
+  {
+   "index": 82,
+   "name": "chargelock",
+   "kind": "num",
+   "meaning": "no driving while the charger is connected: 1 off, 2 on; 0/65535 = off"
+  },
+  {
+   "index": 83,
+   "name": "imusda",
+   "kind": "pin",
+   "meaning": "IMU I2C SDA (PinFinder detect imu; not used by the firmware yet)"
+  },
+  {
+   "index": 84,
+   "name": "imuscl",
+   "kind": "pin",
+   "meaning": "IMU I2C SCL"
+  },
+  {
+   "index": 85,
+   "name": "imuaddr",
+   "kind": "num",
+   "meaning": "IMU 7 bit I2C address"
+  },
+  {
+   "index": 86,
+   "name": "imuid",
+   "kind": "num",
+   "meaning": "IMU id register value (WHO_AM_I / CHIP_ID)"
+  },
+  {
+   "index": 96,
+   "name": "extmagic",
+   "kind": "num",
+   "meaning": "0xDCAD = extension record valid"
+  }
+ ]
+}
