@@ -19,6 +19,7 @@ are reset (GPIO is on AHB and keeps the latch), interrupts are silenced, any act
 left through an exception return, and the core jumps to the reset vector.
 """
 import argparse
+import os
 import struct
 import time
 
@@ -176,6 +177,8 @@ def main():
     ap.add_argument("--start", choices=("soft", "reset", "none"), default="soft",
                     help="how to start the new firmware (default: soft, keeps the board powered)")
     ap.add_argument("--frequency", type=int, default=1000000, help="SWD clock in Hz")
+    ap.add_argument("--probe", default=os.environ.get("MM32_PROBE"), metavar="UID",
+                    help="probe unique id when more than one is connected (or MM32_PROBE); pyocd list shows them")
     a = ap.parse_args()
 
     image = open(a.image, "rb").read()
@@ -184,7 +187,7 @@ def main():
         raise SystemExit("image is %d bytes and would overwrite the config pages at 0x%08x" % (len(image), CONFIG))
 
     session = ConnectHelper.session_with_chosen_probe(
-        target_override="cortex_m", frequency=a.frequency,
+        unique_id=a.probe, target_override="cortex_m", frequency=a.frequency,
         options={"connect_mode": "attach", "resume_on_disconnect": True})
     session.open()
     mcu = Mm32(session.target)

@@ -157,6 +157,13 @@ moves (32 steps on 2 turns) was the regeneration limit, not the gains: braking p
 step); 20 is fine on a battery. `pos_gain` 10 overshot fewer steps than 20 (0-3 vs 4-7 of 12, all <= 1
 step) at 0.1 s more for 5 steps; lower velocity integrator gains hunted. With the hold on the same moves
 settle in 0.03-0.3 s without overshoot.
+Tuned with the hold on (passthrough, bench supply): the gains hardly matter (pos_gain 20..60, hold_window
+1..2.5, vel_gain x0.75..1.5 all within 0.02 s); the approach `accel_limit` sets the pace: 7 turns/s^2
+is the fastest below the regeneration limit (1 step 0.04 s, 5 steps 0.16 s, half a turn 0.51 s, 2 turns
+1.00 s, no overshoot). `hold_current` 4 A holds within 0.25-0.62 deg at 6.7 W from the supply, 6 A within
+0.12-0.38 deg at 15.3 W. POS_FILTER is slower and overshoots long moves at every bandwidth (2: 2 turns
+not there in 3.5 s; 4: 2.1 s, 4 steps; 12: 1.2 s, 5 steps): passthrough or TRAP_TRAJ for discrete
+targets, POS_FILTER for streamed set points.
 They are stored in an extension config record (words 64-127) that is saved in the slot before the main
 record: PinFinder keeps reading and writing the main record; a record it appends leaves the extension at
 the defaults. `tools/mm32config.py show/set` handles both.

@@ -168,6 +168,8 @@ def main():
     ap.add_argument("cmd", choices=("show", "set"))
     ap.add_argument("assign", nargs="*", help="name=value, e.g. itotal=PA7 softocp=10")
     ap.add_argument("--restart", action="store_true", help="soft start the firmware after writing")
+    ap.add_argument("--probe", default=os.environ.get("MM32_PROBE"), metavar="UID",
+                    help="probe unique id when more than one is connected (or MM32_PROBE); pyocd list shows them")
     a = ap.parse_args()
 
     changes = {}
@@ -179,7 +181,7 @@ def main():
         changes[i] = v
 
     session = ConnectHelper.session_with_chosen_probe(
-        target_override="cortex_m", options={"connect_mode": "attach", "resume_on_disconnect": True})
+        unique_id=a.probe, target_override="cortex_m", options={"connect_mode": "attach", "resume_on_disconnect": True})
     session.open()
     mcu = Mm32(session.target)
     try:
