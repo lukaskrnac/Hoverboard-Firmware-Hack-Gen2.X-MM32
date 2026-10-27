@@ -40,6 +40,7 @@ void err(const char* s);
 
 //pf_hw.c
 void Wait(uint32_t ms);
+void WaitUs(uint32_t us);
 void AdcInit(void);
 void AdcScan(uint32_t chmask);          //one conversion of each channel in the mask (bit = channel)
 void AdcScanTriggered(uint32_t chmask);    //the same, started by TIM1 CC4 (low sides on)
@@ -79,6 +80,7 @@ void ScanWindow(uint8_t k, int32_t mv, uint16_t pin);        //phase current pin
 void ShowAdc(void);
 void DetectButton(uint32_t ms);
 void DetectCharger(uint32_t ms);
+void DetectImu(void);                   //pf_imu.c
 void StepHold(uint8_t s, int32_t mv, uint32_t ms);
 void Rotate(int32_t permille, uint32_t ms);
 void RotateRun(int32_t permille);       //one main loop pass of the TUI's test rotation

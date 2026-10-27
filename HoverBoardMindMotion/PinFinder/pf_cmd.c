@@ -36,6 +36,7 @@ static void help(void){
 		"detect hall [mV]          hall pins, the motor steps slowly (default 2000 mV)",
 		"detect vbat [mV]          battery pin (closest to the measured voltage)",
 		"detect current [mV]       phase current pins, bus current pin + calibration",
+		"detect imu                I2C IMU on free pins with pull-ups",
 		"detect button [ms]        press the power button within ms",
 		"detect charger [ms]       plug/unplug the charger within ms",
 		"detect latch              power latch (the board switches off when found)",
@@ -129,10 +130,11 @@ void Command(char* line){
 	else if(!strcmp(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
 	else if(!strcmp(c, "defaults")){ CfgDefaults(); note("defaults in RAM: save to keep them"); ok(); }
 	else if(!strcmp(c, "detect")){
-		if(!a1) err("detect what? hall vbat current button charger latch");
+		if(!a1) err("detect what? hall vbat current imu button charger latch");
 		else if(!strcmp(a1, "hall")) DetectHall((int32_t)optnum(a2));
 		else if(!strcmp(a1, "vbat")) DetectVbat((int32_t)optnum(a2));
 		else if(!strcmp(a1, "current")) DetectCurrent((int32_t)optnum(a2));
+		else if(!strcmp(a1, "imu")) DetectImu();
 		else if(!strcmp(a1, "button")) DetectButton(optnum(a2));
 		else if(!strcmp(a1, "charger")) DetectCharger(optnum(a2));
 		else if(!strcmp(a1, "latch")) LatchFind();

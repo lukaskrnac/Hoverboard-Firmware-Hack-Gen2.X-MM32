@@ -22,6 +22,16 @@ void Wait(uint32_t ms){
 	while(millis-t<ms);
 }
 
+void WaitUs(uint32_t us){    //SysTick counts down from SystemCoreClock/1000 - 1
+	uint32_t load = SysTick->LOAD+1, last = SysTick->VAL, n = us*(SystemCoreClock/1000000);
+	while(n){
+		uint32_t v = SysTick->VAL;
+		uint32_t d = last>=v ? last-v : last+load-v;
+		last = v;
+		n = d>=n ? 0 : n-d;
+	}
+}
+
 //single period scan of the selected channels, started by software; 239.5 cycles sample time (the battery
 //divider and the 1.2 V reference are high impedance): ~21 us per channel
 void AdcInit(void){
@@ -160,10 +170,10 @@ uint16_t DutyForMv(int32_t mv){
 
 uint8_t PinFree(uint16_t pin){
 	if(pin>=PINCOUNT||pin==PA13||pin==PA14) return 0;    //SWD
-	for(uint8_t i=0;i<=17;i++){
+	for(uint8_t i=0;i<=17;i++){    //pins 0-17 (11 = charger), 23, 24, 83, 84
 		if(pinstorage[i]==pin) return 0;
 	}
-	return OCPPIN!=pin&&OCPREFPIN!=pin;
+	return OCPPIN!=pin&&OCPREFPIN!=pin&&IMU_SDA!=pin&&IMU_SCL!=pin;
 }
 
 uint8_t HallState(void){

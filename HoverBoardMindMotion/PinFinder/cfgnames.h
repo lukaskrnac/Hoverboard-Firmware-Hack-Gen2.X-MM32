@@ -84,6 +84,10 @@
 	F(80, 0, "chargelevel") \
 	F(81, 0, "chargepull") \
 	F(82, 0, "chargelock") \
+	F(83, 1, "imusda") \
+	F(84, 1, "imuscl") \
+	F(85, 0, "imuaddr") \
+	F(86, 0, "imuid") \
 	F(96, 0, "extmagic") \
 
-#define CFG_FIELD_COUNT 84
+#define CFG_FIELD_COUNT 88

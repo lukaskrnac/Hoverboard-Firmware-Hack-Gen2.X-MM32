@@ -48,7 +48,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         itotalzero ~400, while blockcal.py gave 419 / 145**. Both use the op-amps (gain 515) as the
         reference; check which is right against the PSU display (webcam) before trusting either. Boards
         without phase current pins: the bus pin is not searched yet (needs a reference: motorr).
-      - **IMU**: scan I2C on the hardware I2C pin pairs (PD0/PD1 on the bench board) and bit-banged on
+      - **Done (`detect imu`):** pull-up pins -> I2C pairs (a pair where > 8 addresses acknowledge is not I2C:
+        bench PB3), id registers. Bench: unknown chip at 0x69 on SDA PD0 / SCL PD1, WHO_AM_I (0x75) = 0x2E,
+        reg 0x0F = 0x7D, reg 0x00 = 0 (a clone? identify, then read it in the main firmware). Words 83-86.
+        Original plan: scan I2C on the hardware I2C pin pairs (PD0/PD1 on the bench board) and bit-banged on
         other free pin pairs with pull-ups; probe 0x68/0x69 (MPU-6050/6500/9250, ICM-20xxx: WHO_AM_I
         0x75), 0x6A/0x6B (LSM6DS*: 0x0F), BMI160 (0x68, CHIP_ID 0x00 = 0xD1); report bus pins, address,
         chip. Store pins + type in new config words (extension record).

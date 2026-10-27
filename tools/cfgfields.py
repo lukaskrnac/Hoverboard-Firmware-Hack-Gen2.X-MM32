@@ -75,6 +75,10 @@ FIELDS = {
     80: ("chargelevel", "num", "charger pin while the charger is connected: 1 low, 2 high; 0/65535 = high"),
     81: ("chargepull", "num", "charger pin input: 1 floating, 2 pull-up, 3 pull-down; 0/65535 = floating"),
     82: ("chargelock", "num", "no driving while the charger is connected: 1 off, 2 on; 0/65535 = off"),
+    83: ("imusda", "pin", "IMU I2C SDA (PinFinder detect imu; not used by the firmware yet)"),
+    84: ("imuscl", "pin", "IMU I2C SCL"),
+    85: ("imuaddr", "num", "IMU 7 bit I2C address"),
+    86: ("imuid", "num", "IMU id register value (WHO_AM_I / CHIP_ID)"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}

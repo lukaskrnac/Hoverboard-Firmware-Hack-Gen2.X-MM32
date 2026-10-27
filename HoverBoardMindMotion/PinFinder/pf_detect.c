@@ -16,25 +16,15 @@ static void releasePins(void){
 	}
 }
 
-static void waitUs(uint32_t us){    //SysTick counts down from SystemCoreClock/1000 - 1
-	uint32_t load = SysTick->LOAD+1, last = SysTick->VAL, n = us*(SystemCoreClock/1000000);
-	while(n){
-		uint32_t v = SysTick->VAL;
-		uint32_t d = last>=v ? last-v : last+load-v;
-		last = v;
-		n = d>=n ? 0 : n-d;
-	}
-}
-
 void Tone(uint16_t pin, uint32_t ms, uint32_t hz){    //square wave on a pin (passive buzzer)
 	if(pin>=PINCOUNT) return;
 	pinMode((uint8_t)pin, OUTPUT);
 	uint32_t half = 500000/hz;
 	for(uint32_t t=millis;millis-t<ms;){
 		digitalWrite((uint8_t)pin, 1);
-		waitUs(half);
+		WaitUs(half);
 		digitalWrite((uint8_t)pin, 0);
-		waitUs(half);
+		WaitUs(half);
 	}
 }
 
@@ -223,10 +213,10 @@ void DetectVbat(int32_t expect_mv){
 //A pin's state: 0 / 1 when something drives it (the same with pull-up and pull-down), 2 when floating
 static uint8_t pinState(uint16_t p){
 	pinMode((uint8_t)p, INPUT_PULLUP);
-	waitUs(30);
+	WaitUs(30);
 	uint8_t up = digitalRead((uint8_t)p);
 	pinMode((uint8_t)p, INPUT_PULLDOWN);
-	waitUs(30);
+	WaitUs(30);
 	uint8_t down = digitalRead((uint8_t)p);
 	pinMode((uint8_t)p, holdAll ? INPUT_PULLUP : INPUT);
 	return up==down ? up : 2;

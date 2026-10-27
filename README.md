@@ -242,11 +242,14 @@ python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
 | `save`, `revert`, `defaults` | write to flash / reload / start from the defaults (RAM) |
 | `detect hall [mV]` | turns the field open loop in 12 directions per electrical turn (complementary PWM, 1 V phase amplitude, raised if the rotor does not follow); the pins whose level follows the rotor are the halls, A/B/C is the assignment for which the main firmware's commutation leads the rotor by 60..120 deg everywhere |
 | `detect vbat [mV]` | battery pin: the one closest to the measured voltage (or the only one reading 20..45 V) |
+| `detect current [mV]` | phase current pins, their phase and sign (`iphasea/b`, `iphasecfg`: correlation with each phase's current while a static field turns), then the bus current pin and `itotaldivider` / `itotalzero` (sampled in the middle of an active vector against the phase currents) |
+| `detect imu` | free pins with an external pull-up, every pair tried as bit-banged I2C; the address and id register (MPU-6xxx, ICM-2xxxx/4xxxx, BMI160/270, LSM6DS*, QMI8658, LIS3DH, SC7A20, QMA*; an unknown chip at an IMU address is kept as `unknown`) -> `imusda`, `imuscl`, `imuaddr`, `imuid` |
 | `detect button [ms]`, `detect charger [ms]` | the pin that changes while you press the button / connect the charger (pins read with pull-up and pull-down: driven 0/1 or floating) |
 | `detect latch` | releases the free pins one by one, saving each as the latch first: the board switches off at the latch pin, the next start holds it |
 | `adc`, `hall` | voltages of the free adc pins, hall state now |
 | `pin <pin> high\|low\|pullup\|pulldown\|input\|read\|blink\|tone [ms]` | drive a pin (LEDs, buzzer) |
 | `step <1-6\|101-112> [mV] [ms]` | hold a block step or field direction; hall state and the currents (triggered like the main firmware) |
+| `scan <k> <mV> <pin>` | hold field direction k (0-11) and sample a pin at 32 points of the pwm period |
 | `rotate <permille> [ms]` | hall commutation test as the main firmware does it; counts forward/backward hall steps |
 | `gen` | `pinstorage` initializer for a firmware with a fixed configuration |
 | `poweroff` | |
