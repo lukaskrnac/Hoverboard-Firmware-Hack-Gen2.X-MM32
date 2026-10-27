@@ -83,6 +83,7 @@ void ShowAdc(void);
 void DetectButton(uint32_t ms);
 void DetectCharger(uint32_t ms);
 void DetectImu(void);                   //pf_imu.c
+void CalImu(void);
 //pf_calib.c
 void CalHall(int32_t mv);
 void CalPoles(uint32_t ms);

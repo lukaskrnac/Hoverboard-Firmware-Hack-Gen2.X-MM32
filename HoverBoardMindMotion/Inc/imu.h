@@ -11,6 +11,8 @@ extern volatile int16_t imuRaw[7];    //accel x y z, temperature, gyro x y z (ch
 
 void ImuInit(void);     //at boot, after the pins: wakes and sets up the chip
 void ImuPoll(void);     //main loop: a reading every 10 ms
-float ImuValue(uint8_t k);    //k 0-2 accel m/s^2, 3-5 gyro deg/s, 6 temperature C; NaN unless running
+//k 0-2 accel m/s^2, 3-5 gyro deg/s (board axes after calibrate imu, X forward Y left Z up), 6 temperature C,
+//7 pitch, 8 roll in degrees (front down / right side down positive); NaN unless running
+float ImuValue(uint8_t k);
 
 #endif

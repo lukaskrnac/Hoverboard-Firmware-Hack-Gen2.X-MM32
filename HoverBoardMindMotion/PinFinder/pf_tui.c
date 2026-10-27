@@ -78,10 +78,10 @@ static void draw(void){
 		nl();
 	}
 	rule();
-	out(" 1 hall sensors   2 LEDs/buzzer   3 battery   4 power button   5 charger"); nl();
-	out(" 6 power latch    7 slave id      8 test motor   9 power off   a all"); nl();
-	out(" calibrate: h hall angles   p poles   m motor R/L   k kv   d current sensing"); nl();
-	out(" c command line   s save   r revert   i info   ? help   @ agent mode"); nl();
+	out(" 1 hall  2 LEDs/buzzer  3 battery  4 button  5 charger"); nl();
+	out(" 6 latch  7 slave id  8 test motor  9 power off  a all"); nl();
+	out(" calibrate: h hall  p poles  m R/L  k kv  d current  g imu"); nl();
+	out(" c command  s save  r revert  i info  ? help  @ agent"); nl();
 	out("> ");
 }
 
@@ -115,8 +115,8 @@ static void ledStart(void){
 	screen = SCR_LED;
 	heading("LEDs and buzzer");
 	out("The other free pins are "); out(ledLow ? "floating" : "pulled up (LEDs on)"); out(", the tried pin blinks."); nl();
-	out(" w/s next/previous pin   r g b red/green/blue(orange) LED   u l upper/lower LED"); nl();
-	out(" z buzzer   p passive buzzer (no oscillator)   t tone on this pin"); nl();
+	out(" w/s next/prev pin  r g b red/green/blue LED  u l upper/lower LED"); nl();
+	out(" z buzzer  p passive buzzer  t tone"); nl();
 	out(" m other pins on/off   Enter back"); nl();
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		if(PinFree(p)) pinMode((uint8_t)p, ledLow ? INPUT : INPUT_PULLUP);
@@ -151,12 +151,12 @@ static void ledKey(int c){
 }
 
 static void rotateStart(void){
-	if(HALLAPIN>=PINCOUNT||HALLBPIN>=PINCOUNT||HALLCPIN>=PINCOUNT){ err("hall pins not set: detect them first (1)"); after(); return; }
+	if(HALLAPIN>=PINCOUNT||HALLBPIN>=PINCOUNT||HALLCPIN>=PINCOUNT){ err("hall pins not set: detect hall first"); after(); return; }
 	screen = SCR_ROTATE;
 	rotPm = 0;
 	RotateStop();
 	heading("test motor (hall commutation)");
-	out(" + / - duty in 5 % steps (negative: backwards)   0 stop   Enter back"); nl();
+	out(" +/- duty 5 % steps (negative: back)  0 stop  Enter back"); nl();
 }
 
 static void rotateKey(int c){
@@ -245,7 +245,8 @@ void TuiKey(int c){
 	case 'p': heading("pole count"); CalPoles(0); after(); break;
 	case 'm': heading("phase resistance and inductance"); CalRL(0); after(); break;
 	case 'k': heading("speed constants"); CalKv("block", 0); CalKv("sine", 0); after(); break;
-	case 'd': lineStart("detect current 1000 "); out("  (+ the shunt value in mOhm if known, e.g. 3)"); break;
+	case 'g': heading("IMU mounting"); CalImu(); after(); break;
+	case 'd': lineStart("detect current 1000 "); out("  (+ shunt mOhm if known, e.g. 3)"); break;
 	case 's': CfgSave(); note("saved"); after(); break;
 	case 'r': if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); draw(); break;
 	case 'i': heading("info"); Info(); after(); break;

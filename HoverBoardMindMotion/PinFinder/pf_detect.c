@@ -63,7 +63,7 @@ void DetectHall(int32_t mv){
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		if(PinFree(p)) pinMode((uint8_t)p, INPUT_PULLUP);    //open collector hall outputs
 	}
-	note("the motor turns slowly; keep the wheel free. Any key stops.");
+	note("motor turns slowly; keep the wheel free, any key stops");
 	uint8_t turns = 0, stop = 0;
 	for(uint8_t n=0;n<16&&turns<TURNS&&!stop;n++){
 		uint16_t pat[PINCOUNT];
@@ -135,9 +135,9 @@ void DetectHall(int32_t mv){
 	if(stop||turns<TURNS||best<0){
 		HALLAPIN = old[0]; HALLBPIN = old[1]; HALLCPIN = old[2];
 		if(stop) err("stopped");
-		else if(turns<TURNS) err("the motor did not follow the field (detect hall <mV> with more voltage)");
-		else if(inverted) err("hall signals fit only inverted (180 deg off the commutation): not supported");
-		else err(nc<3 ? "fewer than 3 hall pins found" : "no assignment of the hall pins fits the commutation");
+		else if(turns<TURNS) err("motor did not follow the field (more mV: detect hall <mV>)");
+		else if(inverted) err("halls fit only inverted (180 deg off): not supported");
+		else err(nc<3 ? "fewer than 3 hall pins found" : "no hall pin order fits the commutation");
 		return;
 	}
 	HALLAPIN = pick[0]; HALLBPIN = pick[1]; HALLCPIN = pick[2];
@@ -153,7 +153,7 @@ void DetectHall(int32_t mv){
 		}
 	}
 	if(tim[0]<0||tim[1]<0||tim[2]<0||tim[0]!=tim[1]||tim[1]!=tim[2]){
-		warn("the hall pins are not all on one timer's inputs: speed measurement will not work");
+		warn("hall pins not on one timer: no speed measurement");
 	}
 	ok();
 }
@@ -196,8 +196,8 @@ void DetectVbat(int32_t expect_mv){
 		ShowAdc();
 		kvp("vbat_kept", VBATPIN);    //unchanged
 		err(expect_mv>0 ? "no pin within 20 % of that voltage" :
-		    inrange ? "several pins look like a battery voltage: give the measured voltage (detect vbat 36.5)"
-		            : "no pin reads 20..45 V: give the measured voltage (detect vbat 36.5)");
+		    inrange ? "several pins look like the battery: give the voltage (detect vbat 36.5)"
+		            : "no pin reads 20..45 V: give the voltage (detect vbat 36.5)");
 		return;
 	}
 	VBATPIN = best;
@@ -264,7 +264,7 @@ void DetectButton(uint32_t ms){
 	kvp("button", p);
 	kvi("released", from);
 	kvi("pressed", to);
-	if(to!=1) warn("not 1 while pressed: the main firmware expects high = pressed");
+	if(to!=1) warn("reads 0 when pressed: the firmware expects 1");
 	ok();
 }
 
@@ -275,7 +275,7 @@ void DetectCharger(uint32_t ms){
 	if(!ms) ms = 30000;
 	uint16_t keep = CHARGEPIN;
 	CHARGEPIN = PIN_NONE;
-	note("connect the charger (start with it disconnected; any key cancels)");
+	note("plug in the charger (start unplugged; any key cancels)");
 	uint16_t p = waitChange(keep, ms, &from, &to);
 	if(p==PIN_NONE){ CHARGEPIN = keep; err("no pin changed"); return; }
 	//states: 0 / 1 driven, 2 floating. Connected floating: pull towards the other level
@@ -295,7 +295,7 @@ void DetectCharger(uint32_t ms){
 void StepHold(uint8_t s, int32_t mv, uint32_t ms){
 	if(s>=101&&s<=112) FieldVector((uint8_t)(s-101), mv>0 ? mv : 1000);
 	else if(s>=1&&s<=6) BlockStep(s, DutyForMv(mv>0 ? mv : 2000));
-	else{ err("step 1..6, or 101..112 for field direction 0..11"); return; }
+	else{ err("step 1..6, or 101..112 = field direction 0..11"); return; }
 	Wait(ms ? ms : 300);
 	uint8_t h = HallState();
 	//current at the end of the hold: averaged triggered samples of the shunt and phase current pins
@@ -356,7 +356,7 @@ void Rotate(int32_t permille, uint32_t ms){
 	kvi("hall_steps_backward", b);
 	kvi("hall_errors", bad);
 	if(VBATPIN<PINCOUNT) kvmv("battery", VbatMv());
-	if(f+b<6) err("the motor did not turn (more duty? hall pins right?)");
+	if(f+b<6) err("motor did not turn (more duty? hall pins?)");
 	else if(bad*10>f+b) err("hall sequence errors");
 	else ok();
 }
@@ -424,8 +424,8 @@ static uint8_t debuggerAttached(void){
 //Releases the free pins one at a time; before each the pin is saved as LATCHPIN. If the board switches
 //off, it was the latch: the next start holds it. If all pins pass, the board has no latch (slave board).
 void LatchFind(void){
-	if(debuggerAttached()) warn("debugger attached: if it powers the MCU, no latch is found");
-	note("release the power button. The board switches off at the latch pin: switch it on again.");
+	if(debuggerAttached()) warn("debugger attached: if it powers the MCU, no latch found");
+	note("release the button; the board switches off at the latch: switch it on again");
 	Wait(2000);
 	holdAll = 1;
 	uint16_t keep = LATCHPIN;
@@ -449,7 +449,7 @@ void LatchFind(void){
 	master = 0;
 	releasePins();
 	kvp("latch", PIN_NONE);
-	note("still powered: no latch (slave board, or debugger supply)");
+	note("still powered: no latch (slave, or debugger supply)");
 	ok();
 }
 
@@ -463,7 +463,7 @@ void PowerOff(void){
 	}
 	Wait(1500);
 	LatchHold();
-	err("still powered (no latch, button held, or powered from the debugger)");
+	err("still powered (no latch, button held, or debugger supply)");
 }
 
 //---------------------------------------------------------------- info
@@ -522,7 +522,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	uint32_t mask = freeAdcMask();
 	int32_t zero[16], v[16];
 	static int16_t d[12][16];
-	note("static currents of a few A in the motor; the wheel may move a little");
+	note("a few A of static current; the wheel may move a little");
 	FieldVector(0, 0);    //all phases at 50 %: no current, low sides on at the sample
 	Wait(50);
 	sampleAvg(mask, 1, zero, 16);
@@ -559,11 +559,11 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	uint8_t n = (pin[0]!=PIN_NONE)+(pin[1]!=PIN_NONE)+(pin[2]!=PIN_NONE);
 	if(n<2){
 		IPHASEAPIN = IPHASEBPIN = PIN_NONE;
-		note("no phase current pins: FOC is not available, sine uses the bus current");
+		note("no phase current pins: no FOC, sine uses the bus current");
 	}else{
 		uint8_t a = pin[0]!=PIN_NONE ? 0 : 1, b = pin[2]!=PIN_NONE ? 2 : 1;    //pairs A,B / B,C / A,C
 		if(a==0&&pin[1]!=PIN_NONE&&b==2&&amp[1]>amp[2]) b = 1;
-		if(sign[a]!=sign[b]){ err("the two phase current pins have opposite signs (one polarity bit)"); return; }
+		if(sign[a]!=sign[b]){ err("phase current pins of opposite sign (one polarity bit)"); return; }
 		IPHASEAPIN = pin[a];
 		IPHASEBPIN = pin[b];
 		IPHASE_CFG = (uint16_t)((a==0&&b==1 ? 0 : a==1 ? 1 : 2)|(sign[a]>0 ? 4 : 0));

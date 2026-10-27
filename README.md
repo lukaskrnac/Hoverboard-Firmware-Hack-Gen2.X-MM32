@@ -24,7 +24,7 @@ register headers, CMSIS) are in `HoverBoardMindMotion/Device/`. A change of the 
 
 Integer division runs on the chip's hardware divider (`Src/hwdiv.S`) and floats on a compact soft
 float (`Src/softfloat.c`, round to nearest even like libgcc, subnormals read as 0); both replace
-libgcc's routines. Size: 27.9 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
+libgcc's routines. Size: 28.8 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
 worst case stack, main loop plus nested interrupts, is ~670 bytes).
 
 MCUs (`make MCU=...`, `Inc/mcu.h`). All four share the SPIN05 register headers and HAL: their
@@ -226,9 +226,13 @@ https://youtu.be/hCaIlEKzI3A
   ICM-426xx or BMI160/270, which also sit at 0x68). Bit-banged I2C on any two pins (`Src/i2c.c`),
   every 10 ms, one byte per main loop pass (~60 us each), +-4 g and +-1000 deg/s, 44 Hz low pass; a
   chip that resets is set up again within a second.
-* CANSimple parameters 0x150-0x157: `hoverboard.imu.state` (0 none, 1 running, 2 no answer),
-  `accel_x/y/z` in m/s^2, `gyro_x/y/z` in deg/s, `temperature` in C, in the chip's own axes (no
-  mounting correction, no angle estimate).
+* CANSimple parameters 0x150-0x159: `hoverboard.imu.state` (0 none, 1 running, 2 no answer),
+  `accel_x/y/z` in m/s^2, `gyro_x/y/z` in deg/s (bias: the mean of the first 0.5 s standing still),
+  `temperature` in C, `pitch` and `roll` in degrees. After PinFinder's `calibrate imu` the values are in
+  the board's axes (ROS: X forward, Y left, Z up) and pitch / roll are zero at the calibrated level;
+  pitch is positive with the front down, roll with the right side down. Complementary filter: the gyro
+  integrated, pulled to the accelerometer's angle with a ~0.5 s time constant. Without the calibration
+  the chip's axes. Bench check: front down 52 deg, right side down 34 deg, back to 0.0.
 * Bench board: a clone at 0x69 on PD0/PD1 that answers WHO_AM_I with 0x2E instead of 0x68 but has the
   MPU-6050 register map.
 
@@ -271,6 +275,7 @@ python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
 | `calibrate poles [ms]` | turn the wheel one turn by hand: hall edges / 3 -> `windings` |
 | `calibrate rl [mV]` | phase resistance (static field at two voltages against the phase currents) and inductance (current rise after a voltage step, sampled every pwm period) -> `motorr`, `phasel` |
 | `calibrate kv block\|sine [max]` | free-running speed at 3 levels: block `speedkv` / `speedd0` (the COM_SPEED model rpm = kv x Vbat x (duty - d0)), sine `sinekv` / `sined0` (field 90 deg ahead of the hall state; the torque constant follows from `sinekv`) |
+| `calibrate imu` | the IMU's mounting: the board stands still as when driving (up, and the level), then is tilted forward by 20-60 deg and held (gravity moves towards -forward) -> `imumount` (1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z), `imurestx/y/z` (gravity at rest: zero pitch and roll) |
 | `detect imu` | free pins with an external pull-up, every pair tried as bit-banged I2C; the address and id register (MPU-6xxx incl. the 0x2E clone, ICM-2xxxx/4xxxx, BMI160/270, LSM6DS*, QMI8658, LIS3DH, SC7A20, QMA*; an unknown chip at an IMU address is kept as `unknown`) -> `imusda`, `imuscl`, `imuaddr`, `imuid` |
 | `detect button [ms]`, `detect charger [ms]` | the pin that changes while you press the button / connect the charger (pins read with pull-up and pull-down: driven 0/1 or floating) |
 | `detect latch` | releases the free pins one by one, saving each as the latch first: the board switches off at the latch pin, the next start holds it |

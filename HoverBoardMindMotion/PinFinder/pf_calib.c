@@ -56,7 +56,7 @@ void CalHall(int32_t mv){
 	int32_t sum[2][8], ref[8];
 	uint8_t n[2][8];
 	for(uint8_t h=0;h<8;h++){ sum[0][h] = sum[1][h] = 0; n[0][h] = n[1][h] = 0; ref[h] = -1; }
-	note("the wheel turns slowly forward and back; keep it free");
+	note("wheel turns slowly both ways; keep it free");
 	int32_t pos = 0;
 	FieldAngle(0, mv);
 	Wait(400);
@@ -85,7 +85,7 @@ void CalHall(int32_t mv){
 	if(stop){ err("stopped"); return; }
 	uint16_t ang[7];
 	for(uint8_t h=1;h<=6;h++){
-		if(!n[0][h]||!n[1][h]){ err("not every hall state seen in both directions (more voltage: calibrate hall <mV>)"); return; }
+		if(!n[0][h]||!n[1][h]){ err("not all hall states seen both ways (more mV: calibrate hall <mV>)"); return; }
 		int32_t f = sum[0][h]/n[0][h], b = sum[1][h]/n[1][h];
 		ang[h] = (uint16_t)(ref[h]+(f+b)/2);
 		if(!ang[h]||ang[h]==0xFFFF) ang[h] = 1;    //0 and 65535 mean unset
@@ -109,7 +109,7 @@ void CalPoles(uint32_t ms){
 	if(!hallsSet()) return;
 	if(!ms) ms = 60000;
 	GatesOff();
-	note("turn the wheel exactly one turn by hand (one way); ends 3 s after it stops");
+	note("turn the wheel one full turn by hand; ends 3 s after it stops");
 	edgeCount = 0;
 	edgePrev = HallState();
 	uint32_t t0 = millis, last = millis;
@@ -126,7 +126,7 @@ void CalPoles(uint32_t ms){
 	int32_t pp = (e+3)/6;
 	WINDINGS = (uint16_t)(2*pp);
 	kvi("windings", WINDINGS);
-	if(e!=6*pp) warn("not a whole number of pole pairs: turn exactly one turn and repeat");
+	if(e!=6*pp) warn("not whole pole pairs: turn exactly one turn, repeat");
 	ok();
 }
 
@@ -139,7 +139,7 @@ static int32_t offA, offB, gain;
 static uint8_t curInit(void){
 	chA = AdcChannel(IPHASEAPIN);
 	chB = AdcChannel(IPHASEBPIN);
-	if(chA<0||chB<0){ err("phase current pins not set: detect current first"); return 0; }
+	if(chA<0||chB<0){ err("no phase current pins: detect current first"); return 0; }
 	uint8_t pair = (uint8_t)(IPHASE_CFG&3);
 	phA = pair==1 ? 1 : 0;
 	phB = pair==0 ? 1 : 2;
@@ -183,7 +183,7 @@ void CalRL(int32_t mv){
 		cur[s] = curRead(i3, 32);
 		kv("current_ma"); outi(cur[s]); out(agent ? " mv " : " mA at mV "); outi(s ? mv : mv/2); nl();
 	}
-	if(cur[1]-cur[0]<300){ GatesOff(); err("too little current (more voltage: calibrate rl <mV>)"); return; }
+	if(cur[1]-cur[0]<300){ GatesOff(); err("too little current (more mV: calibrate rl <mV>)"); return; }
 	int32_t r = (mv-mv/2)*1000/(cur[1]-cur[0]);    //mOhm
 	//inductance: step response of phase phA's current
 	static int16_t smp[64];
@@ -258,8 +258,8 @@ void CalKv(const char* which, int32_t top){
 	uint8_t sine = which&&which[0]=='s';
 	if(top<=0) top = sine ? 4000 : 500;
 	int32_t vb = VbatMv();
-	if(vb<10000){ err("battery voltage unknown: detect vbat first"); return; }
-	note("the wheel turns freely at 3 speeds (keep it unloaded)");
+	if(vb<10000){ err("no battery pin: detect vbat first"); return; }
+	note("wheel spins at 3 speeds (keep it unloaded)");
 	float x[3], y[3];
 	if(sine) centres();
 	RotateStop();
@@ -277,7 +277,7 @@ void CalKv(const char* which, int32_t top){
 	progressEnd();
 	float a, b;
 	fit(x, y, 3, &a, &b);
-	if(a<=0.0f||y[0]<5.0f){ err("the wheel did not turn at all levels (more: calibrate kv block|sine <max>)"); return; }
+	if(a<=0.0f||y[0]<5.0f){ err("wheel did not turn at every level (calibrate kv block|sine <max>)"); return; }
 	int32_t d0 = (int32_t)(-b/a*(sine ? 1.0f : 1000.0f));    //sine: mV, block: permille
 	if(sine){
 		int32_t kvs = (int32_t)(5774.0f*a);    //a = rpm per mV of q voltage

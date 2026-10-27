@@ -41,6 +41,8 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define IMU_SCL pinstorage[84]
 #define IMU_ADDR pinstorage[85]
 #define IMU_ID pinstorage[86]
+#define IMU_MOUNT pinstorage[97]       //IMU mounting (PinFinder calibrate imu; imumath.h)
+#define IMU_REST(k) pinstorage[98+(k)] //gravity when level, chip axes k 0-2, int16 (1024 = 1 g): zero pitch and roll
 #define HALL_ANG(h) pinstorage[86+(h)]   //h 1..6 (words 87-92): angle (65536 per electrical turn) where hall state h
                                          //starts with rising angle (PinFinder calibrate hall); unset: +-30 deg
                                          //around the built-in sector centres

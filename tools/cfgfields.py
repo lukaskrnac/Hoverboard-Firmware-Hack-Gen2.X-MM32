@@ -87,5 +87,9 @@ FIELDS = {
     92: ("hallang6", "num", "hall state 6 edge"),
     93: ("vbatgain", "num", "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
+    97: ("imumount", "num", "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"),
+    98: ("imurestx", "num", "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"),
+    99: ("imuresty", "num", "IMU gravity when level, chip y"),
+    100: ("imurestz", "num", "IMU gravity when level, chip z"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}

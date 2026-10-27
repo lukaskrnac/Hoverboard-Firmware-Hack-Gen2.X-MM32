@@ -184,7 +184,7 @@ void UARTX_Init(u32 baudrate,uint8_t uart){    //8N1, rx + tx, dma requests; reg
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART2, ENABLE);
 	UART_TypeDef* u = uart==1 ? UART1 : UART2;
 	u->CCR = (u->CCR&~(UART_CCR_CHAR|UART_CCR_SPB0|UART_CCR_SPB1|UART_CCR_PEN|UART_CCR_PSEL))|UART_WordLength_8b;
-	uint32_t div = (uart==1 ? RCC_GetPCLK2Freq() : RCC_GetPCLK1Freq())/baudrate;
+	uint32_t div = SystemCoreClock/baudrate;    //both APB buses run at the core clock (system_mm32spin05.c: no prescaler)
 	u->BRR = div/16;
 	u->FRA = div%16;
 	u->GCR = (u->GCR&~UART_GCR_AUTOFLOW)|UART_GCR_TX|UART_GCR_RX|UART_GCR_UART|UART_GCR_DMA;

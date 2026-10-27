@@ -48,7 +48,7 @@ static void help(void){
 	static const char* const h[] = {
 		"info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults | gen",
 		"detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | latch",
-		"calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max]",
+		"calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max] | imu",
 		"adc | hall | pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]",
 		"step <1-6|101-112> [mV] [ms] | rotate <permille> [ms] | poweroff | tui | agent",
 	};
@@ -70,7 +70,7 @@ static void setWord(const char* name, const char* val){
 	else if(pin!=PIN_NONE) v = pin;
 	else{
 		v = num(val, &g);
-		if(!g||v<0||v>65535){ err("value: a number 0..65535, a pin name or none"); return; }
+		if(!g||v<0||v>65535){ err("value: 0..65535, a pin or none"); return; }
 		if(CfgIsPin((uint8_t)idx)&&v>=PINCOUNT&&v!=PIN_NONE){ err("not a pin"); return; }
 	}
 	pinstorage[idx] = (uint16_t)v;
@@ -95,7 +95,7 @@ static void pinCmd(const char* name, const char* mode, const char* arg){
 		return;
 	}
 	if(!PinFree(p)&&p!=LEDRPIN&&p!=LEDGPIN&&p!=LEDBPIN&&p!=LEDUPIN&&p!=LEDDPIN&&p!=BUZZERPIN&&p!=pinstorage[11]){
-		err("pin in use (SWD, uart, latch, hall, ...): only read is allowed");
+		err("pin in use (SWD, uart, latch, hall...): read only");
 		return;
 	}
 	uint32_t ms = optnum(arg);
@@ -142,24 +142,26 @@ void Command(char* line){
 	else if(!strcmp(c, "set")) setWord(a1, a2);
 	else if(!strcmp(c, "save")){ CfgSave(); note("saved"); ok(); }
 	else if(!strcmp(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
-	else if(!strcmp(c, "defaults")){ CfgDefaults(); note("defaults in RAM: save to keep them"); ok(); }
-	else if(!strcmp(c, "detect")){
-		if(!a1) err("detect what? hall vbat current imu button charger latch");
-		else if(!strcmp(a1, "hall")) DetectHall((int32_t)optnum(a2));
-		else if(!strcmp(a1, "vbat")) DetectVbat(millivolts(a2));
-		else if(!strcmp(a1, "current")) DetectCurrent((int32_t)optnum(a2), millivolts(a3));    //shunt mOhm -> uOhm
-		else if(!strcmp(a1, "imu")) DetectImu();
-		else if(!strcmp(a1, "button")) DetectButton(optnum(a2));
-		else if(!strcmp(a1, "charger")) DetectCharger(optnum(a2));
-		else if(!strcmp(a1, "latch")) LatchFind();
-		else err("detect what? hall vbat button charger latch");
-	}
-	else if(!strcmp(c, "calibrate")){
-		if(a1&&!strcmp(a1, "hall")) CalHall((int32_t)optnum(a2));
-		else if(a1&&!strcmp(a1, "poles")) CalPoles(optnum(a2));
-		else if(a1&&!strcmp(a1, "rl")) CalRL((int32_t)optnum(a2));
-		else if(a1&&!strcmp(a1, "kv")) CalKv(a2, (int32_t)optnum(a3));
-		else err("calibrate what? hall poles rl kv");
+	else if(!strcmp(c, "defaults")){ CfgDefaults(); note("defaults in RAM (save keeps them)"); ok(); }
+	else if(!strcmp(c, "detect")||!strcmp(c, "calibrate")){
+		const char* w = a1 ? a1 : "";
+		if(c[0]=='d'){
+			if(!strcmp(w, "hall")) DetectHall((int32_t)optnum(a2));
+			else if(!strcmp(w, "vbat")) DetectVbat(millivolts(a2));
+			else if(!strcmp(w, "current")) DetectCurrent((int32_t)optnum(a2), millivolts(a3));    //shunt mOhm -> uOhm
+			else if(!strcmp(w, "imu")) DetectImu();
+			else if(!strcmp(w, "button")) DetectButton(optnum(a2));
+			else if(!strcmp(w, "charger")) DetectCharger(optnum(a2));
+			else if(!strcmp(w, "latch")) LatchFind();
+			else err("detect what? hall vbat current imu button charger latch");
+		}else{
+			if(!strcmp(w, "hall")) CalHall((int32_t)optnum(a2));
+			else if(!strcmp(w, "poles")) CalPoles(optnum(a2));
+			else if(!strcmp(w, "rl")) CalRL((int32_t)optnum(a2));
+			else if(!strcmp(w, "kv")) CalKv(a2, (int32_t)optnum(a3));
+			else if(!strcmp(w, "imu")) CalImu();
+			else err("calibrate what? hall poles rl kv imu");
+		}
 	}
 	else if(!strcmp(c, "adc")){ ShowAdc(); ok(); }
 	else if(!strcmp(c, "hall")){

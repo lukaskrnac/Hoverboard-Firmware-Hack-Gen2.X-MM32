@@ -96,5 +96,9 @@
 	F(92, 0, "hallang6") \
 	F(93, 0, "vbatgain") \
 	F(96, 0, "extmagic") \
+	F(97, 0, "imumount") \
+	F(98, 0, "imurestx") \
+	F(99, 0, "imuresty") \
+	F(100, 0, "imurestz") \
 
-#define CFG_FIELD_COUNT 95
+#define CFG_FIELD_COUNT 99

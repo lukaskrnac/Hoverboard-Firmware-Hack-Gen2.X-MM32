@@ -572,6 +572,30 @@
    "access": "r",
    "unit": "0xDCAD = extension record valid"
   },
+  "hoverboard.config.imumount": {
+   "id": 97,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"
+  },
+  "hoverboard.config.imurestx": {
+   "id": 98,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"
+  },
+  "hoverboard.config.imuresty": {
+   "id": 99,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU gravity when level, chip y"
+  },
+  "hoverboard.config.imurestz": {
+   "id": 100,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU gravity when level, chip z"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",
@@ -936,7 +960,7 @@
    "id": 337,
    "type": "float",
    "access": "r",
-   "unit": "m/s^2 (+-4 g; chip axes), 100 Hz; NaN unless running"
+   "unit": "m/s^2 (+-4 g), 100 Hz, board axes after calibrate imu (X forward, Y left, Z up; else the chip's); NaN unless running"
   },
   "hoverboard.imu.accel_y": {
    "id": 338,
@@ -954,7 +978,7 @@
    "id": 340,
    "type": "float",
    "access": "r",
-   "unit": "deg/s (+-1000; chip axes)"
+   "unit": "deg/s (+-1000), board axes, bias from the first 0.5 s standing still"
   },
   "hoverboard.imu.gyro_y": {
    "id": 341,
@@ -973,6 +997,18 @@
    "type": "float",
    "access": "r",
    "unit": "C (MPU-6050 scale)"
+  },
+  "hoverboard.imu.pitch": {
+   "id": 344,
+   "type": "float",
+   "access": "r",
+   "unit": "deg, front down positive, 0 = the level of calibrate imu (gyro + accelerometer, 0.5 s)"
+  },
+  "hoverboard.imu.roll": {
+   "id": 345,
+   "type": "float",
+   "access": "r",
+   "unit": "deg, right side down positive, 0 = the level of calibrate imu"
   },
   "save_configuration": {
    "id": 512,

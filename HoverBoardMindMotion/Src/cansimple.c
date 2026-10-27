@@ -65,9 +65,9 @@ enum{
 	EP_HOLD_CURRENT = 0x138, EP_HOLD_WINDOW, EP_POS_ACCEL, EP_TORQUE_RAMP_RATE, EP_INERTIA, EP_VEL_LIMIT_TOL,
 	EP_PHASE_L, EP_HOLD_ENABLE, EP_OVERSPEED_ERROR, EP_TORQUE_VEL_LIMIT, EP_CURRENT_BW,
 	EP_POS_INTEGRATOR_GAIN, EP_POS_DERIVATIVE_GAIN, EP_VEL_DERIVATIVE_GAIN,
-	//IMU (imu.c): state uint8, then float: accel m/s^2, gyro deg/s, temperature C
+	//IMU (imu.c): state uint8, then float: accel m/s^2, gyro deg/s, temperature C, pitch and roll deg
 	EP_IMU_STATE = 0x150, EP_IMU_ACCEL_X, EP_IMU_ACCEL_Y, EP_IMU_ACCEL_Z, EP_IMU_GYRO_X, EP_IMU_GYRO_Y, EP_IMU_GYRO_Z,
-	EP_IMU_TEMPERATURE,
+	EP_IMU_TEMPERATURE, EP_IMU_PITCH, EP_IMU_ROLL,
 	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
 };
 
@@ -456,7 +456,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_SAVE_CONFIGURATION: if(!write) return 0; RemoteSaveConfig(); break;
 			case EP_CLEAR_ERRORS: if(!write) return 0; axisDisarm = 0; FocClearTrip(); break;
 			default:
-				if(ep<EP_IMU_ACCEL_X||ep>EP_IMU_TEMPERATURE) return 0;
+				if(ep<EP_IMU_ACCEL_X||ep>EP_IMU_ROLL) return 0;
 				wrF((uint8_t*)&r, ImuValue((uint8_t)(ep-EP_IMU_ACCEL_X)));
 		}
 	}

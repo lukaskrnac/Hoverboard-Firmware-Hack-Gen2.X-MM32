@@ -4,16 +4,29 @@
 #include "sim_eeprom.h"
 #include <string.h>
 
-static const struct{ uint8_t idx, pin; const char* name; } fields[CFG_FIELD_COUNT] = {
-#define F(i, p, n) {i, p, n},
+//packed: index | pin << 7 per field, the names one after the other ('\0' separated); 8 bytes less per
+//field than a table of {index, pin, char*}
+static const uint8_t fieldIdx[CFG_FIELD_COUNT] = {
+#define F(i, p, n) (uint8_t)((i)|(p)<<7),
 	CFG_FIELDS
 #undef F
 };
+static const char fieldNames[] =
+#define F(i, p, n) n "\0"
+	CFG_FIELDS
+#undef F
+	;
+static const char* nameOf(uint8_t f){
+	const char* s = fieldNames;
+	while(f--) s += strlen(s)+1;
+	return s;
+}
 static uint16_t saved[128];    //the record in flash (or the defaults): CfgChanged()
 
 int16_t CfgIndex(const char* name){
-	for(uint8_t i=0;i<CFG_FIELD_COUNT;i++){
-		if(!strcmp(name, fields[i].name)) return fields[i].idx;
+	const char* n = fieldNames;
+	for(uint8_t i=0;i<CFG_FIELD_COUNT;i++,n+=strlen(n)+1){
+		if(!strcmp(name, n)) return fieldIdx[i]&127;
 	}
 	//a number: the word index
 	int32_t v = 0;
@@ -28,19 +41,19 @@ int16_t CfgIndex(const char* name){
 
 static int16_t field(uint8_t idx){
 	for(uint8_t i=0;i<CFG_FIELD_COUNT;i++){
-		if(fields[i].idx==idx) return i;
+		if((fieldIdx[i]&127)==idx) return i;
 	}
 	return -1;
 }
 
 const char* CfgName(uint8_t idx){
 	int16_t f = field(idx);
-	return f<0 ? 0 : fields[f].name;
+	return f<0 ? 0 : nameOf((uint8_t)f);
 }
 
 uint8_t CfgIsPin(uint8_t idx){
 	int16_t f = field(idx);
-	return f>=0&&fields[f].pin;
+	return f>=0&&fieldIdx[f]>>7;
 }
 
 void CfgPrint(uint8_t idx){

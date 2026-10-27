@@ -64,8 +64,11 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         **Main firmware (2026-10-28):** `Src/imu.c` + `Src/i2c.c` (shared with PinFinder): the bench chip is an
         MPU-6050 clone (register map read over SWD: accel offsets 0x06, self test 0x0D-0x10, WHO_AM_I
         0x2E); 100 Hz, one byte per main loop pass (a whole burst blocked ~2 ms, then ~1 ms); CANSimple
-        0x150-0x157. Open: a tilt / angle estimate (needs the mounting axes as config), other register
-        maps (ICM-426xx, BMI160/270, LSM6DS*, QMI8658), the web console display.
+        0x150-0x159. Mounting (`calibrate imu`, words 97-100): board axes, gyro bias, pitch / roll by a
+        complementary filter (bench: signs and level verified by tilting the board). PinFinder space: the
+        config name table and the IMU chip table packed (-480 B), messages shortened, UART baud from
+        SystemCoreClock (-150 B in both images). Open: other register maps (ICM-426xx, BMI160/270, LSM6DS*,
+        QMI8658); a non axis-aligned mounting is only levelled (pitch / roll stay about the nearest axes).
       - **Done:** charger detect pin (`detect charger`, tried by the user) and the hall angle calibration
         (`calibrate hall`, see Calibrations).
 - [x] **P6 Buzzer without an internal oscillator**: `buzzerpassive=2` (word 79): low battery alarm toggled
@@ -181,7 +184,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash 27.9 of 30 KB (2.8 KB free; PinFinder 30.5 of 30 KB, 140 B free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash 28.8 of 30 KB (1.9 KB free; PinFinder 30.6 of 30 KB, 84 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.

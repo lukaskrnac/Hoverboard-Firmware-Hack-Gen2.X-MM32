@@ -604,6 +604,30 @@
    "name": "extmagic",
    "kind": "num",
    "meaning": "0xDCAD = extension record valid"
+  },
+  {
+   "index": 97,
+   "name": "imumount",
+   "kind": "num",
+   "meaning": "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"
+  },
+  {
+   "index": 98,
+   "name": "imurestx",
+   "kind": "num",
+   "meaning": "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"
+  },
+  {
+   "index": 99,
+   "name": "imuresty",
+   "kind": "num",
+   "meaning": "IMU gravity when level, chip y"
+  },
+  {
+   "index": 100,
+   "name": "imurestz",
+   "kind": "num",
+   "meaning": "IMU gravity when level, chip z"
   }
  ]
 }
