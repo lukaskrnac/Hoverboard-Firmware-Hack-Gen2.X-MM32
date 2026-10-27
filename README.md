@@ -151,6 +151,12 @@ measured acceleration (20 ms filter); the FOC current loop's P / I (`curkp`, `cu
 lowered a 150 rpm step's overshoot from 5 to 2 %; FOC velocity D raised it (3 -> 8 -> 13 % at 0.02 / 0.05
 Nm/(turns/s^2): the lagging hall speed and the integrator); position I took a hold-off move that stopped
 a step short to the target (0.24 s at 60).
+Position tuning on the bench wheel (FOC, hold off, steps of 1 hall step to 2 turns): the overshoot of long
+moves (32 steps on 2 turns) was the regeneration limit, not the gains: braking pumped the bench supply to
+`batfull` (27 V) and the braking current was cut. Approach `accel_limit` 5 turns/s^2 stays below it (<= 1
+step); 20 is fine on a battery. `pos_gain` 10 overshot fewer steps than 20 (0-3 vs 4-7 of 12, all <= 1
+step) at 0.1 s more for 5 steps; lower velocity integrator gains hunted. With the hold on the same moves
+settle in 0.03-0.3 s without overshoot.
 They are stored in an extension config record (words 64-127) that is saved in the slot before the main
 record: PinFinder keeps reading and writing the main record; a record it appends leaves the extension at
 the defaults. `tools/mm32config.py show/set` handles both.

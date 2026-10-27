@@ -231,6 +231,7 @@ void speedupdate(void){
 		//gates off at once: above base speed with field weakening the back emf then charged the bus
 		//through the body diodes). Estop / IDLE still switch the gates off at once.
 		int32_t posErr = 0, posSpeed = 0;
+		uint8_t posRest = 0;    //FOC position without the hold: at the target, standing
 		int32_t vlim = cfgOrDefault(POS_RPM, 300);    //vel_limit, rpm
 		int32_t dtms = (int32_t)(millis-inT);
 		inT = millis;
@@ -302,6 +303,10 @@ void speedupdate(void){
 				int32_t pl = (int32_t)MCM_Sqrt(ae/16*(ac*9/80))*2/3;    //accel_limit (default 20 turns/s^2)
 				if(p>pl) p = pl; else if(p<-pl) p = -pl;
 				if(!holdOn&&ae<=POS_FINE/2) p = 0;    //without the hold: no hunting inside the step
+				//and no current there once standing: the speed loop (3.3x below 60 rpm) acted on the last hall
+				//interval's stale +-3 rpm and the estimate's whole step jumps at a hall edge: +-1.5 A at ~16 Hz
+				//for up to 0.8 s after a long move. It restarts from 0 when the error leaves the half step.
+				posRest = !holdOn&&ae<=POS_FINE/2&&af<=5;
 				//and it accelerates at that rate too (1200 rpm/s): from a standing start the full current
 				//limit (10 A, ~3700 rpm/s here) outran the hall angle tracker, it snapped, a 32 A trip
 				int32_t sl = ac*3*dtms/5000+1;
@@ -339,7 +344,8 @@ void speedupdate(void){
 					}else if(ctl==CTRL_POSITION){
 						//fastspeed: the 6 interval average lags in the reversals and hard stops of position
 						//moves (143 rpm read against 21 in a reversal: the loop drove 10 A the wrong way, trip)
-						i = focHold ? 0 : FocSpeedCtrl(posSpeed, fastspeed, 0);
+						if(posRest) FocSpeedReset();
+						i = focHold||posRest ? 0 : FocSpeedCtrl(posSpeed, fastspeed, 0);
 						//inertia (ODrive): torque feed forward of the trajectory's acceleration
 						if(!focHold&&INERTIA&&INERTIA!=0xFFFF) i += (int32_t)((float)INERTIA*0.1f*InputAccel()/TorqueConstant());
 					}else{
