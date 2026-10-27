@@ -102,6 +102,7 @@ static int32_t holdIq;              //load current, mA, electrical frame
 static int32_t spRef, spI;    //speed loop (below): rpm << 8, mA << 8
 static uint32_t spT;
 static uint8_t spRun;
+static SpeedDeriv spD;    //velocity D
 
 static uint16_t holdA0;             //electrical angle of position 0 (mod 6 steps)
 static int16_t holdAngle(int32_t p){    //electrical angle of a position: one electrical turn = 6 steps
@@ -503,6 +504,7 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 	if(!spRun){    //bumpless from the speed the wheel has
 		spRef = meas<<8;
 		spRun = 1;
+		spD.last = meas; spD.acc = 0;
 	}
 	int32_t d = ((sp<<8)-spRef)*dt/100;    //tref 100 ms (not in position mode: a lag inside its loop)
 	spRef = filt ? (d ? spRef+d : sp<<8) : sp<<8;
@@ -534,6 +536,12 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 		if(spI>imax) spI = imax; else if(spI<-imax) spI = -imax;
 	}
 	u = kp*e*256+spI;
+	int32_t kd = cfg(FOC_SPD_KD, 0);
+	if(kd){    //D on the measured speed: 0.01 mA per rpm/s
+		int32_t dd = kd*SpeedDerivStep(&spD, meas, dt)/100, im = imax>>8;
+		if(dd>im) dd = im; else if(dd<-im) dd = -im;
+		u -= dd<<8;
+	}
 	if(u>imax) u = imax; else if(u<-imax) u = -imax;
 	return u>>8;
 }

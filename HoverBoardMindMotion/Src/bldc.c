@@ -34,6 +34,18 @@ volatile uint32_t axisDisarm;     //the error that switched the axis to IDLE, un
 volatile uint8_t posDone;         //position mode: at the target
 static uint8_t posHeld;
 static int32_t posSp;             //FOC position: speed set point, slewed (rpm)
+static int32_t posI;              //position I, rpm << 4
+
+//position I and D (POS_KI / POS_KD, default off), rpm. I on the error in 1/POS_FINE step within 4 steps
+//of the target only (outside it resets: on a long move it would wind up and overshoot); D on trajectory
+//speed - wheel speed. run 0 (the FOC hold, sine/block at the target): both off, I reset.
+static int32_t PosID(int32_t errF, int32_t ff, int32_t meas, int32_t dtms, int32_t vlim, uint8_t run){
+	if(!run){ posI = 0; return 0; }
+	if(errF>4*POS_FINE||errF<-4*POS_FINE) posI = 0;
+	else posI += cfgOrDefault(POS_KI, 0)*errF/POS_FINE*dtms*16/10000;
+	if(posI>vlim<<4) posI = vlim<<4; else if(posI<-(vlim<<4)) posI = -(vlim<<4);
+	return (posI>>4)+cfgOrDefault(POS_KD, 0)*(ff-meas)/100;
+}
 
 //speed for the FOC speed loop: fastspeed (the last hall interval) below 60 rpm, realspeed (6 intervals,
 //one electrical turn: the hall sector widths cancel) above 120, blended between. The sectors differ by
@@ -250,6 +262,7 @@ void speedupdate(void){
 		}
 		uint8_t focPos = ctl==CTRL_POSITION&&COMMUTATION(DRIVEMODE)==COMMUT_FOC&&!held;
 		if(!focPos){ FocHoldStop(); posSp = realspeed; }
+		if(held||ctl!=CTRL_POSITION) posI = 0;
 		if(ctl==CTRL_POSITION){
 			//targets and the estimate in 1/POS_FINE step
 			if(timedOut){
@@ -267,6 +280,7 @@ void speedupdate(void){
 				//target's electrical angle. (It was P with a +-1 step dead band at 2 rpm per step: a 1 step
 				//command did nothing, it stopped up to 4 deg off, ~1.2 s for half a turn.)
 				int32_t af = fastspeed<0 ? -fastspeed : fastspeed;
+				int32_t p = errF/POS_FINE*PosGain()/10+(errF%POS_FINE)*PosGain()/10/POS_FINE;
 				uint8_t holdOn = (uint8_t)cfgBool(HOLD_ENABLE, 1);
 				int32_t hw = cfgOrDefault(HOLD_WINDOW, 150)*POS_FINE/100, ac = cfgOrDefault(POS_ACCEL, 2000);    //0.01 turns/s^2
 				if(focHold){
@@ -276,9 +290,11 @@ void speedupdate(void){
 				}else if(holdOn&&errF<=hw&&errF>=-hw&&af<=25&&ff<=25&&ff>=-25){
 					FocHoldStart(target);
 				}
+				p += PosID(errF, ff, fastspeed, dtms, vlim, !focHold);
 				int32_t dh = target-focHoldPos;
-				posDone = InputPosDone()&&focHold&&dh<=2&&dh>=-2;
-				int32_t p = errF/POS_FINE*PosGain()/10+(errF%POS_FINE)*PosGain()/10/POS_FINE;
+				//arrived: in the hold at the target; without the hold within half a step, standing (it was
+				//the hold only: with it off trajectory_done never came)
+				posDone = InputPosDone()&&(focHold ? dh<=2&&dh>=-2 : !holdOn&&errF<=POS_FINE/2&&errF>=-POS_FINE/2&&af<=2);
 				//and no faster than it can stop from at 20 turns/s^2 (1800 steps/s^2): sqrt(2 a err) steps/s =
 				//sqrt(14 errF) * 2/3 rpm. With P alone half a turn overshot by 7 steps (still ~110 rpm 3 steps
 				//before the target).
@@ -295,7 +311,8 @@ void speedupdate(void){
 			}else{
 				posErr = errF>=0 ? (errF+POS_FINE/2)/POS_FINE : -((-errF+POS_FINE/2)/POS_FINE);    //whole steps
 				posDone = InputPosDone()&&posErr<=1&&posErr>=-1;
-				posSpeed = ff+PositionSpeed(posErr);
+				int32_t v = PositionSpeed(posErr);    //0 at the target (+-1 step): I and D off there
+				posSpeed = ff+v+PosID(errF, ff, realspeed, dtms, vlim, v!=0);
 			}
 			if(posSpeed>vlim) posSpeed = vlim; else if(posSpeed<-vlim) posSpeed = -vlim;
 		}

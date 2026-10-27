@@ -79,7 +79,7 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash: 29.9 of 30 KB (LTO saved 3 KB, float subtraction via the addition 1.1 KB). Next room: the
+- [ ] Flash: 30.6 of 30 KB (120 bytes free; LTO saved 3 KB, float subtraction via the addition 1.1 KB). Next room: the
       remaining soft float (~2.5 KB: add, mul, div, compares) is mostly the CANSimple float conversions.
 - [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
       measured, see hallhandle.c), calibration_current / motor calibration, dc_max_positive/negative_current

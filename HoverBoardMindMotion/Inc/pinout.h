@@ -27,6 +27,12 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define OVERSPEED_ERROR pinstorage[71]   //enable_overspeed_error: 1 off, 2 on, default off
 #define TORQUE_VEL_LIMIT pinstorage[72]  //enable_torque_mode_vel_limit: 1 off, 2 on, default on
 #define PHASE_L pinstorage[73]           //phase inductance, uH, default 460
+//D and I terms, 0/65535 = 0 (off). D acts on the measured speed (no kick on a set point step), filtered 20 ms
+#define POS_KI pinstorage[74]            //position I: 0.1 rpm per (hall step * s)
+#define POS_KD pinstorage[75]            //position D: 0.01 rpm per rpm of speed error (trajectory - wheel)
+#define FOC_SPD_KD pinstorage[76]        //FOC velocity D: 0.01 mA per rpm/s
+#define SINE_KD pinstorage[77]           //sine velocity D: 0.01 permille modulation per rpm/s
+#define SPEED_KD pinstorage[78]          //block velocity D: 0.01 permille duty per rpm/s
 static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : def); }
 
 

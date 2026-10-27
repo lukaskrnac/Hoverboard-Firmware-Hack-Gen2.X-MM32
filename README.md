@@ -142,6 +142,15 @@ All settings are CANSimple endpoints with ODrive's names and units where ODrive 
 (default on as in ODrive: torque control stops accelerating at `vel_limit`), `phase_inductance`,
 `current_control_bandwidth` (sets the current loop gains kp = L*bw, ki = R*bw), and for the FOC position
 hold `hoverboard.position.hold_current` (stiffness), `hold_enable`, `hold_window`, `accel_limit`.
+Every loop's gains are settings: position P (`pos_gain`), I (`hoverboard.controller.pos_integrator_gain`,
+within 4 hall steps of the target) and D (`pos_derivative_gain`, on trajectory speed - wheel speed);
+velocity P / I (`vel_gain`, `vel_integrator_gain`; sine / block: config words `sinekp`/`sineki`,
+`speedkp`/`speedki`) and D (`hoverboard.controller.vel_derivative_gain`; `sinekd`, `speedkd`) on the
+measured acceleration (20 ms filter); the FOC current loop's P / I (`curkp`, `curki`, or
+`current_control_bandwidth`). The I and D terms default to 0 (off). Measured on the bench wheel: sine D 3
+lowered a 150 rpm step's overshoot from 5 to 2 %; FOC velocity D raised it (3 -> 8 -> 13 % at 0.02 / 0.05
+Nm/(turns/s^2): the lagging hall speed and the integrator); position I took a hold-off move that stopped
+a step short to the target (0.24 s at 60).
 They are stored in an extension config record (words 64-127) that is saved in the slot before the main
 record: PinFinder keeps reading and writing the main record; a record it appends leaves the extension at
 the defaults. `tools/mm32config.py show/set` handles both.

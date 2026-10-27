@@ -85,6 +85,11 @@ FIELDS = {
     71: ("overspeederr", "num", "enable_overspeed_error: 1 off, 2 on; 0/65535 = off"),
     72: ("torquevellim", "num", "enable_torque_mode_vel_limit: 1 off, 2 on; 0/65535 = on"),
     73: ("phasel", "num", "phase inductance uH; 0/65535 = 460"),
+    74: ("poski", "num", "position I: 0.1 rpm per (hall step * s), within 4 steps of the target; 0/65535 = 0 (off)"),
+    75: ("poskd", "num", "position D: 0.01 rpm per rpm of speed error (trajectory - wheel); 0/65535 = 0 (off)"),
+    76: ("focspdkd", "num", "FOC velocity D: 0.01 mA per rpm/s of the measured speed; 0/65535 = 0 (off)"),
+    77: ("sinekd", "num", "SINE_SPEED D: 0.01 permille modulation per rpm/s of the measured speed; 0/65535 = 0 (off)"),
+    78: ("speedkd", "num", "COM_SPEED D: 0.01 permille duty per rpm/s of the measured speed; 0/65535 = 0 (off)"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
 }
 BY_NAME = {v[0]: k for k, v in FIELDS.items()}

@@ -63,6 +63,7 @@ enum{
 	//extension record (config words 64..): scaled like VEL_RAMP_RATE.., then bools (uint8), bandwidth
 	EP_HOLD_CURRENT = 0x138, EP_HOLD_WINDOW, EP_POS_ACCEL, EP_TORQUE_RAMP_RATE, EP_INERTIA, EP_VEL_LIMIT_TOL,
 	EP_PHASE_L, EP_HOLD_ENABLE, EP_OVERSPEED_ERROR, EP_TORQUE_VEL_LIMIT, EP_CURRENT_BW,
+	EP_POS_INTEGRATOR_GAIN, EP_POS_DERIVATIVE_GAIN, EP_VEL_DERIVATIVE_GAIN,
 	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
 };
 
@@ -337,6 +338,15 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 		case EP_VEL_GAIN:    //Nm/(turns/s) <- FOC speed loop mA/rpm
 			if(write) FOC_SPD_KP = toWord(f/(0.06f*kt));
 			*val = (float)cfgOrDefault(FOC_SPD_KP, 30)*0.06f*kt; return 1;
+		case EP_POS_INTEGRATOR_GAIN:    //((turns/s)/turn)/s <- 0.1 rpm per (hall step * s)
+			if(write) POS_KI = toWord(f*600.0f/spt);
+			*val = (float)cfgOrDefault(POS_KI, 0)*spt/600.0f; return 1;
+		case EP_POS_DERIVATIVE_GAIN:    //(turns/s)/(turns/s) <- 0.01
+			if(write) POS_KD = toWord(f*100.0f);
+			*val = (float)cfgOrDefault(POS_KD, 0)/100.0f; return 1;
+		case EP_VEL_DERIVATIVE_GAIN:    //Nm/(turns/s^2) <- 0.01 mA per rpm/s
+			if(write) FOC_SPD_KD = toWord(f/(0.0006f*kt));
+			*val = (float)cfgOrDefault(FOC_SPD_KD, 0)*0.0006f*kt; return 1;
 		case EP_VEL_INTEGRATOR_GAIN:    //(Nm/s)/(turns/s) <- mA/(rpm*s)
 			if(write) FOC_SPD_KI = toWord(f/(0.06f*kt));
 			*val = (float)cfgOrDefault(FOC_SPD_KI, 100)*0.06f*kt; return 1;

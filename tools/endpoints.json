@@ -446,6 +446,36 @@
    "access": "rw",
    "unit": "phase inductance uH; 0/65535 = 460"
   },
+  "hoverboard.config.poski": {
+   "id": 74,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position I: 0.1 rpm per (hall step * s), within 4 steps of the target; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.poskd": {
+   "id": 75,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position D: 0.01 rpm per rpm of speed error (trajectory - wheel); 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.focspdkd": {
+   "id": 76,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC velocity D: 0.01 mA per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.sinekd": {
+   "id": 77,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED D: 0.01 permille modulation per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.speedkd": {
+   "id": 78,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED D: 0.01 permille duty per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
   "hoverboard.config.extmagic": {
    "id": 96,
    "type": "uint16",
@@ -775,6 +805,24 @@
    "type": "uint8",
    "access": "rw",
    "unit": "1 = torque control limits the speed to vel_limit (torque falls with vel_gain); default 1"
+  },
+  "hoverboard.controller.pos_integrator_gain": {
+   "id": 323,
+   "type": "float",
+   "access": "rw",
+   "unit": "((turns/s)/turn)/s: position I, within 4 hall steps of the target; default 0 (off)"
+  },
+  "hoverboard.controller.pos_derivative_gain": {
+   "id": 324,
+   "type": "float",
+   "access": "rw",
+   "unit": "(turns/s)/(turns/s): position D on trajectory speed - wheel speed; default 0 (off)"
+  },
+  "hoverboard.controller.vel_derivative_gain": {
+   "id": 325,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/(turns/s^2): FOC velocity D on the measured speed (20 ms filter); default 0 (off)"
   },
   "axis0.config.motor.current_control_bandwidth": {
    "id": 322,
