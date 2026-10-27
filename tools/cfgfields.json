@@ -243,7 +243,7 @@
    "index": 34,
    "name": "itotaldivider",
    "kind": "num",
-   "meaning": "itotal = divider * Vadc (1/shunt ohm); bench board 419"
+   "meaning": "itotal = divider * Vadc (1/shunt ohm: R003 = 333; detect current with the shunt value)"
   },
   {
    "index": 35,

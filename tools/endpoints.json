@@ -210,7 +210,7 @@
    "id": 34,
    "type": "uint16",
    "access": "rw",
-   "unit": "itotal = divider * Vadc (1/shunt ohm); bench board 419"
+   "unit": "itotal = divider * Vadc (1/shunt ohm: R003 = 333; detect current with the shunt value)"
   },
   "hoverboard.config.trajaccel": {
    "id": 35,
