@@ -50,9 +50,8 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         field directions, complementary PWM): bench PA2 = B, PA6 = C, falling, iphasecfg 1, 4/4 runs; gain
         from motorr shown for information (529-537 vs 515 calibrated). Bus pin (PA7) and its zero/divider from
         the active vector (one phase high) sampled in its middle, one channel per conversion, against
-        I_x = -(I_a + I_b): 8 linear points, 2.35 counts/A, zero -3.5..-4.6 counts -> **itotaldivider ~330,
-        itotalzero ~400, while blockcal.py gave 419 / 145**. Both use the op-amps (gain 515) as the
-        reference; check which is right against the PSU display (webcam) before trusting either. Boards
+        I_x = -(I_a + I_b): 8 linear points, 2.35 counts/A, zero -3.5..-4.6 counts -> itotaldivider ~330,
+        itotalzero ~400 (blockcal.py's 419 / 145 was wrong: the shunt is R003, see Calibrations). Boards
         without phase current pins: the bus pin is not searched yet (needs a reference: motorr).
       - **Done (`detect imu`):** pull-up pins -> I2C pairs (a pair where > 8 addresses acknowledge is not I2C:
         bench PB3), id registers. Bench: unknown chip at 0x69 on SDA PD0 / SCL PD1, WHO_AM_I (0x75) = 0x2E,
@@ -87,7 +86,9 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       `detect current` with the shunt value. The bus pin choice is now the steadily rising pin over 8
       levels (PA0, an op-amp input, rose more in a 2-level test). TIM1 / UART init as register writes in
       initialize.c (identical register dump, -204 B main firmware). PinFinder 30.1 / 30 KB: little room left.
-      Open: which bus calibration is right (shunt marking?), `calibrate poles` with a person, inverted halls.
+      Settled 2026-10-28: the bench shunt is R003 (3 mOhm): `detect current 1000 3` -> iphasegain 524-549
+      (saved: mean 535), itotaldivider 333, itotalzero 438; blockcal.py's 419 / 145 was 25 % off. Open:
+      `calibrate poles` with a person, inverted halls.
 - [ ] **P8 More targets.** One source tree, `make MCU=...`:
       - MM32SPIN06: same library as SPIN05, untested with GCC; check the pin table, flash/RAM size,
         linker script, the op-amps (if any) and the hardware divider.

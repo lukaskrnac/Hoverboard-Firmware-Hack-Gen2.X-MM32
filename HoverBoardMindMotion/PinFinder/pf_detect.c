@@ -509,9 +509,9 @@ static uint32_t freeAdcMask(void){
 	return m;
 }
 
-static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint8_t n){    //avg per channel (x n)
+static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint16_t n){    //avg per channel (x n)
 	for(uint8_t c=0;c<16;c++) avg[c] = 0;
-	for(uint8_t i=0;i<n;i++){
+	for(uint16_t i=0;i<n;i++){
 		AdcScanAt(mask, at);
 		for(uint8_t c=0;c<16;c++) if(mask>>c&1) avg[c] += AdcValue(c);
 	}
@@ -587,21 +587,29 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	//8 levels (0.75 .. 2.5 x mv), every candidate pin sampled in the middle of the active vector, one channel
 	//per conversion (a scan converts its channels ~1.7 us apart, the window is ~+-7 us). The bus pin is the
 	//one that rises steadily with the current (op-amp inputs read high-impedance noise there: flat or jumpy)
-	static uint16_t avg[8][16];    //counts x 8
+	static uint16_t avg[8][16];    //counts x 8, summed over the passes
 	float xs[8];
-	for(uint8_t s=0;s<8;s++){
-		FieldVector(kx, mv*(s+3)/4);
-		Wait(60);
-		uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
-		for(uint8_t c=0;c<16;c++){
-			int32_t one[16];
-			if(!(mask>>c&1)) continue;
-			sampleAvg(1u<<c, at, one, 64);
-			avg[s][c] = (uint16_t)(one[c]/8);
+	for(uint8_t s=0;s<8;s++){ xs[s] = 0; for(uint8_t c=0;c<16;c++) avg[s][c] = 0; }
+	FieldVector(kx, mv*5/2);    //the rotor aligns first: a swinging rotor changed the current between the samples
+	Wait(500);
+	//3 passes: a 3 mOhm shunt is ~2.4 counts per A, the slope of one pass varied +-3 %
+	for(uint8_t pass=0;pass<3;pass++){
+		for(uint8_t s=0;s<8;s++){
+			FieldVector(kx, mv*(s+3)/4);
+			Wait(150);
+			uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
+			sampleAvg(mask, 1, v, 16);
+			int32_t before = PHASE_X_MA();
+			for(uint8_t c=0;c<16;c++){
+				int32_t one[16];
+				if(!(mask>>c&1)) continue;
+				sampleAvg(1u<<c, at, one, 192);
+				avg[s][c] = (uint16_t)(avg[s][c]+one[c]/72);
+			}
+			sampleAvg(mask, 1, v, 16);
+			xs[s] += (float)(before+PHASE_X_MA())/6000.0f;    //A, before and after the bus samples
+			progress(pass*8+s+1, 24);
 		}
-		sampleAvg(mask, 1, v, 16);
-		xs[s] = (float)PHASE_X_MA()/1000.0f;    //A
-		progress(s+1, 8);
 	}
 	FieldVector(0, 0);
 	GatesOff();
@@ -625,7 +633,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		float den = (float)np*sxx-sx*sx;
 		if(!steady||np<3||den<0.01f) continue;
 		float a = ((float)np*sxy-sx*sy)/den;
-		if(a>0.5f&&a>slope){ slope = a; z = (sy-a*sx)/(float)np; best = p; }
+		if(a>0.5f&&(a>slope||p==ITOTALPIN)&&best!=ITOTALPIN){ slope = a; z = (sy-a*sx)/(float)np; best = p; }    //the configured pin first
 	}
 	if(best==PIN_NONE){ err("no bus current pin found"); return; }
 	ITOTALPIN = best;
