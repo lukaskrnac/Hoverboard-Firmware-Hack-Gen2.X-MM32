@@ -4,33 +4,36 @@
 #include "pinout.h"
 #include "bldc.h"
 
-//running averages of the adc isr: 32 (vbat) and 64 (itotal) samples, one per pwm period
+//running averages of the adc isr: 32 (vbat) and 64 (itotal) samples, one per pwm period. The samples
+//are kept as int16 (0.01 V / 0.01 A: +-327 V / A), clamped
 static uint8_t vindex;
 static int vdatasum;
-static int vavgarr[32];
+static int16_t vavgarr[32];
 static uint8_t aindex;
 static int adatasum;
-static int aavgarr[64];
+static int16_t aavgarr[64];
+
+static int16_t clamp16(int v){ return (int16_t)(v>32767 ? 32767 : (v<-32768 ? -32768 : v)); }
 
 void avgvbat(void){
-
+	int16_t v = clamp16(vbat);
 	if(vindex >= 32){
-    vindex = 0;
-  }
-  vdatasum = vdatasum + vbat - vavgarr[vindex];
-  vavgarr[vindex] = vbat;
-  fvbat = (int)(vdatasum>>5);
-  vindex++;
+		vindex = 0;
+	}
+	vdatasum = vdatasum + v - vavgarr[vindex];
+	vavgarr[vindex] = v;
+	fvbat = (int)(vdatasum>>5);
+	vindex++;
 }
 void avgItotal(void){
-
+	int16_t v = clamp16(itotal);
 	if(aindex >= 64){
-    aindex = 0;
-  }
-  adatasum = adatasum + itotal - aavgarr[aindex];
-  aavgarr[aindex] = itotal;
-  fitotal = (int)(adatasum>>6);
-  aindex++;
+		aindex = 0;
+	}
+	adatasum = adatasum + v - aavgarr[aindex];
+	aavgarr[aindex] = v;
+	fitotal = (int)(adatasum>>6);
+	aindex++;
 }
 
 //COM_SPEED / SINE_SPEED: PI with feed forward and a reference model, run from the main loop every ~2 ms.

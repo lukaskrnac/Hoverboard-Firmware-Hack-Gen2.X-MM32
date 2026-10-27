@@ -78,7 +78,6 @@ static volatile int32_t focIqRef;  //mA, motor frame
 static volatile int16_t focVCmd;   //permille, motor frame; voltage mode if nonzero
 static volatile uint8_t focVoltMode;
 
-static int32_t lastIdRef, lastIqRef;
 static volatile int8_t qSat;    //q voltage on its limit: +1 towards positive focIqRef (motor frame), -1 negative
 
 //Position hold (FOC position mode, near the target): the frame is not the hall angle but the target's
@@ -138,14 +137,42 @@ void FocHoldStop(void){
 	__enable_irq();
 }
 
-//capture for tuning and fault analysis over SWD, per pwm period: id, iq (mA), vd, vq (mV, electrical
-//frame), ia (mA), angle. focTraceN: write 0xFF = one shot from the next reference step of >= 200 mA;
-//0xFE = ring buffer until a trip (then focTraceN = FOC_TRACE_N, the oldest entry at focTracePos)
+//capture for tuning and fault analysis over SWD (make TRACE=1; 768 bytes of RAM), per pwm period: id,
+//iq (mA), vd, vq (mV, electrical frame), ia (mA), angle. focTraceN: write 0xFF = one shot from the next
+//reference step of >= 200 mA; 0xFE = ring buffer until a trip (then focTraceN = FOC_TRACE_N, the oldest
+//entry at focTracePos)
+#ifdef FOC_TRACE
 #define FOC_TRACE_N 64
 volatile int16_t focTrace[FOC_TRACE_N][6];
 volatile uint8_t focTraceN = FOC_TRACE_N;
 volatile uint8_t focTracePos;
 volatile uint8_t focTraceDiv = 1;    //record every n-th period
+static int32_t lastIdRef, lastIqRef;
+static void trace(int32_t id, int32_t iq, int32_t vd, int32_t vq, int16_t th, int32_t idRef, int32_t iqRef){
+	if(focTraceN==0xFF){
+		int32_t a = iqRef-lastIqRef, b = idRef-lastIdRef;
+		if(a>=200||a<=-200||b>=200||b<=-200) focTraceN = 0;
+	}
+	static uint8_t decim;    //focTraceDiv: record every n-th period (a longer window)
+	uint8_t n = ++decim>=focTraceDiv ? focTraceN : 0xFD;    //0xFD: not this period
+	if(n!=0xFD) decim = 0;
+	if(n==0xFE){
+		n = focTracePos;
+		focTracePos = (uint8_t)((n+1)%FOC_TRACE_N);
+	}
+	if(n<FOC_TRACE_N){
+		volatile int16_t* e = focTrace[n];
+		e[0] = (int16_t)id; e[1] = (int16_t)iq; e[2] = (int16_t)vd; e[3] = (int16_t)vq;
+		e[4] = (int16_t)ia; e[5] = th;
+		if(focTraceN<FOC_TRACE_N) focTraceN++;
+	}
+	lastIdRef = idRef; lastIqRef = iqRef;
+}
+#define TRACE_FREEZE() do{ if(focTraceN==0xFE) focTraceN = FOC_TRACE_N; }while(0)    //freeze the ring at a trip
+#else
+#define trace(id, iq, vd, vq, th, idRef, iqRef) ((void)0)
+#define TRACE_FREEZE() ((void)0)
+#endif
 volatile int16_t focTripI[3];    //phase currents of the sample that tripped, mA
 static int32_t median9(const int16_t* h){    //insertion sort of a copy
 	int16_t v[HIST];
@@ -295,7 +322,7 @@ static void park(int32_t* id, int32_t* iq, int16_t thS){
 		if(++tripN>=2){
 			focTrip = 1;
 			focTripI[0] = (int16_t)ia; focTripI[1] = (int16_t)ib; focTripI[2] = (int16_t)ic;
-			if(focTraceN==0xFE) focTraceN = FOC_TRACE_N;    //freeze the ring
+			TRACE_FREEZE();
 		}
 	}else{
 		tripN = 0;
@@ -443,24 +470,7 @@ void FocControl(void){
 		fwId = 0;
 	}
 
-	if(focTraceN==0xFF){
-		int32_t a = iqRef-lastIqRef, b = idRef-lastIdRef;
-		if(a>=200||a<=-200||b>=200||b<=-200) focTraceN = 0;
-	}
-	static uint8_t decim;    //focTraceDiv: record every n-th period (a longer window)
-	uint8_t n = ++decim>=focTraceDiv ? focTraceN : 0xFD;    //0xFD: not this period
-	if(n!=0xFD) decim = 0;
-	if(n==0xFE){
-		n = focTracePos;
-		focTracePos = (uint8_t)((n+1)%FOC_TRACE_N);
-	}
-	if(n<FOC_TRACE_N){
-		volatile int16_t* e = focTrace[n];
-		e[0] = (int16_t)id; e[1] = (int16_t)iq; e[2] = (int16_t)vd; e[3] = (int16_t)vq;
-		e[4] = (int16_t)ia; e[5] = th;
-		if(focTraceN<FOC_TRACE_N) focTraceN++;
-	}
-	lastIdRef = idRef; lastIqRef = iqRef;
+	trace(id, iq, vd, vq, th, idRef, iqRef);
 
 	ipark1.Ds = vd*5676/v;    //Q15 modulation
 	ipark1.Qs = vq*5676/v;
