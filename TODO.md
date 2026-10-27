@@ -48,8 +48,10 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
       field weakening integrator (on the demanded voltage incl. the P terms) and the speed loop
       interact; a feed forward d current from the speed (and the integrator only trimming) is the
       next thing to try.
-- [ ] **PWM whine** (4.39 kHz, audible at low speed). The adc isr takes 47-66 us (soft division on
-      the M0), so the pwm period cannot shrink with the control running every period. Plan: pwm at
+- [ ] **PWM whine** (4.39 kHz, audible at low speed). The adc isr takes 88 us on average, 110 us at
+      most in FOC (sine 53 / 73, block 28 / 40; measured at 120 rpm with the hardware divider: it was
+      126 / 168 in FOC with libgcc's division), so the pwm period cannot shrink with the control running
+      every period. Plan: pwm at
       2-4x (`pwmres` 4096/2730/2048) with the control every n-th period (the isr returns early in
       between), so the control period and all its timing stay 227.6 us. Cost: the op-amps need >= 2.5
       us of low side time either side of the sample (they lag the shunt by ~5 us, measured with all
@@ -79,8 +81,13 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
-- [ ] Flash: 30.6 of 30 KB (76 bytes free; LTO saved 3 KB, float subtraction via the addition 1.1 KB). Next room: the
-      remaining soft float (~2.5 KB: add, mul, div, compares) is mostly the CANSimple float conversions.
+- [ ] Flash 26.1 of 30 KB (4.6 KB free), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+      ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
+      vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
+      (1.2 KB, a switch per endpoint), the 512 byte sine table.
+- [ ] Halting the core over SWD (pyOCD, the tools' `Mm32.halt()`) leaves the bridge switching with the
+      last compare values: a static voltage vector, at speed against the back emf. Set DBGMCU TIM1_STOP
+      (if this MM32 has it: outputs off while halted) or have `halt()` clear MOE / AOE and restore them.
 - [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
       measured, see hallhandle.c), calibration_current / motor calibration, dc_max_positive/negative_current
       (bus current limits; the regeneration limit is by voltage, `batfull`), spinout detection.
@@ -144,6 +151,11 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 | a756f4a | tools restore registers, RAM, DMA after a halt (resume after `mm32config set` faulted or ran with garbage) |
 | e9dcff6 656b0c3 | -Wextra etc. for our code, prototypes, include guards, scoped pack; dead code removed, file-local symbols static |
 | a6a38bf 6473849 6bb2952 775ecd2 | -nostartfiles, Makefile dependency, UTF-8 sources, whitespace/includes, .editorconfig |
+| 2f4a251 | hardware divider (HWDIV) for `/` and `%`, compact soft float: flash 30.6 -> 26.2 KB, FOC isr 126 -> 88 us |
+| 52e423a | RAM -960 bytes: FOC trace only with `make TRACE=1`, int16 averaging samples |
+| c434093 | table-driven GPIO, commutation, block brake and LED code (-1.2 KB) |
+| 41bff1f | CANSimple: negative values stored as 0 in config words (they wrapped: -2.5 V undervoltage = 63 V) |
+| 932084a | mm32flash: UART DMA stopped while halted (EN = 0 does not stop it), reprogram on verify failure |
 
 Verification for every change: flashed to the bench board and checked with RemoteUartBus telemetry
 (bus replies, speed steps, CPU load by IPSR sampling); refactors also by comparing `objdump -d -r` of

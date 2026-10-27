@@ -14,9 +14,16 @@ The firmware builds with the open source Arm GNU toolchain, no Keil or vendor pa
 cd HoverBoardMindMotion
 make                                   # build/hoverboard.bin, .hex, .elf
 make CROSS=/path/to/bin/arm-none-eabi- # toolchain not on PATH
+make TRACE=1                           # with the FOC capture buffer for SWD tools (768 bytes of RAM)
 ```
 Needs `arm-none-eabi-gcc` (tested with 14.2.Rel1) and `make`. The device headers (MindMotion
-register headers, CMSIS) are in `HoverBoardMindMotion/Device/`.
+register headers, CMSIS) are in `HoverBoardMindMotion/Device/`. A change of the flags (`TRACE`,
+`CROSS`) rebuilds everything.
+
+Integer division runs on the chip's hardware divider (`Src/hwdiv.S`) and floats on a compact soft
+float (`Src/softfloat.c`, round to nearest even like libgcc, subnormals read as 0); both replace
+libgcc's routines. Size: 26.1 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
+worst case stack, main loop plus nested interrupts, is ~670 bytes).
 
 Supported by the GCC build: **MM32SPIN05** (tested on hardware). MM32SPIN06 uses the same
 library and may work but is untested. MM32SPIN25 is not ported yet, see
@@ -127,8 +134,9 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
   ahead of the wheel, so an unreachable command doesn't wind it up: a lower command takes effect at
   once. The command is limited to `vel_limit` before the ramp.
 - **PWM frequency:** `pwmres` (TIM1 period, read at boot) must stay at 8192 (4.39 kHz) or above. The
-  control interrupt takes 47-66 us and the phase current op-amps lag the shunt by ~5 us; at 2048
-  (17.6 kHz) neither fits, so lower values are replaced by 8192.
+  control interrupt takes (average / max, at 120 rpm) 88 / 110 us in FOC, 53 / 73 us in sine, 28 /
+  40 us in block, and the phase current op-amps lag the shunt by ~5 us; at 2048 (17.6 kHz, a 57 us
+  period) neither fits, so lower values are replaced by 8192.
 
 Configs saved before the version field (word 63) used 2/3 for SINE_VOLT/SINE_SPEED; they are
 migrated at boot. FOC needs the two phase current pins (`iphasea`/`iphaseb`, `iphasecfg` selects the
