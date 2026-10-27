@@ -32,6 +32,7 @@ RCC = 0x40021000
 IWDG_KR, DBGMCU_CR = 0x40003000, 0x40013404
 RCC_APB2ENR_DBGMCU, DBGMCU_CR_IWDG_STOP = 1 << 22, 1 << 8
 DMA1_CCR = [0x40020008 + 0x14 * n for n in range(5)]      # channel 1..5 configuration (bit 0 = EN)
+UART_GCR = [0x40013818, 0x40004418]                         # UART1, UART2 global control (bit 1 = DMA requests)
 CORE_REGS = ["r%d" % i for i in range(13)] + ["sp", "lr", "pc", "xpsr", "msp", "psp", "primask", "control"]
 
 # r0 = dst, r1 = src, r2 = halfword count, r3 = FLASH_REG:
@@ -58,10 +59,15 @@ class Mm32:
         The firmware runs the watchdog at ~500 ms; it cannot be stopped once started and its reset
         powers latched boards off. On this MM32 DBGMCU IWDG_STOP freezes it whenever debug is
         enabled, not only while halted, so soft_start() clears the bit again.
-        A halt does not stop the firmware's UART RX DMA, which wrote received bus bytes into the
-        programming buffer (its 1-byte target sRxBuffer was at BUF_AT + 0x18)."""
+        A halt does not stop the firmware's UART RX DMA, which writes received bus bytes into RAM
+        (its ring can overlap the programming buffer at BUF_AT: a frame from a polling master landed in
+        the flash image). Clearing the channel's EN bit does not stop it on this MM32 (measured: 60
+        bytes arrived with EN = 0), so the UARTs' DMA requests are switched off as well."""
         self.t.halt()
         self.saved_regs = [(r, self.t.read_core_register(r)) for r in CORE_REGS]
+        self.saved_uart = [(gcr, self.r(gcr)) for gcr in UART_GCR]
+        for gcr, v in self.saved_uart:
+            self.w(gcr, v & ~2)
         self.saved_ram = self.t.read_memory_block32(RAM, RAM_SIZE // 4)
         self.saved_dma = [(ccr, self.r(ccr)) for ccr in DMA1_CCR]
         for ccr, v in self.saved_dma:
@@ -80,6 +86,14 @@ class Mm32:
             self.t.write_core_register(reg, val)
         for ccr, v in self.saved_dma:
             self.w(ccr, v)
+        for gcr, v in self.saved_uart:
+            self.w(gcr, v)
+            if v & 2:
+                # the bytes received while halted overran the receiver, and a byte already waiting
+                # makes no new DMA request: the firmware received nothing until the data register
+                # was read (measured). Drop it and clear the overrun flag.
+                self.r(gcr - 0x18 + 0x04)                   # RDR
+                self.w(gcr - 0x18 + 0x14, (1 << 1) | (1 << 3))    # ICR: RX, RXOERR
         self.w(DBGMCU_CR, self.r(DBGMCU_CR) & ~DBGMCU_CR_IWDG_STOP)
         self.feed()
         self.t.resume()
@@ -198,12 +212,19 @@ def main():
             print("backup:", a.backup)
         # always erase the whole application area, so no code of an older, bigger image survives
         end = FLASH_BASE + FLASH_SIZE if a.erase_config else CONFIG
-        mcu.erase(FLASH_BASE, end)
-        mcu.program(image)
-        back = bytes(mcu.t.read_memory_block8(FLASH_BASE, len(image)))
-        bad = [i for i in range(len(image)) if back[i] != image[i]]
-        if bad:
-            raise SystemExit("verify FAILED at +0x%x (%d bytes differ)" % (bad[0], len(bad)))
+        for attempt in range(3):
+            mcu.erase(FLASH_BASE, end)
+            mcu.program(image)
+            back = bytes(mcu.t.read_memory_block8(FLASH_BASE, len(image)))
+            bad = [i for i in range(len(image)) if back[i] != image[i]]
+            if not bad:
+                break
+            print("verify failed at +0x%x (%d bytes differ), programming again" % (bad[0], len(bad)))
+        else:
+            # resuming would run the old firmware's code from wherever it stopped in the new, corrupt image
+            session.options.set("resume_on_disconnect", False)
+            raise SystemExit("verify FAILED at +0x%x (%d bytes differ); core left halted with the watchdog frozen "
+                             "(the board stays on): flash again" % (bad[0], len(bad)))
         print("programmed and verified %d bytes, erased 0x%08x-0x%08x%s" %
               (len(image), FLASH_BASE, end, " (config erased)" if a.erase_config else ""))
         if a.start == "soft":
