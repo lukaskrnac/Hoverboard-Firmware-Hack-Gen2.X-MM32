@@ -516,13 +516,13 @@
    "id": 289,
    "type": "float",
    "access": "rw",
-   "unit": "(turns/s)/turn: position stiffness"
+   "unit": "(turns/s)/turn: position loop; FOC default 20, then the hold within 1.5 hall steps"
   },
   "axis0.controller.config.vel_gain": {
    "id": 290,
    "type": "float",
    "access": "rw",
-   "unit": "Nm/(turns/s), FOC velocity loop"
+   "unit": "Nm/(turns/s), FOC velocity loop; 0 = default (position mode 3.3x the velocity mode's)"
   },
   "axis0.controller.config.vel_integrator_gain": {
    "id": 291,

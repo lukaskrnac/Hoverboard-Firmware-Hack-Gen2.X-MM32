@@ -33,6 +33,7 @@ extern volatile int32_t fastspeed;    //rpm from the last hall interval (hallhan
 
 extern void HALLModuleInit(HALLType *u);
 extern void HALLModuleCalc(HALLType *u);
+extern volatile int32_t hallPosFine;    //position, 1/POS_FINE hall step (bldc.h)
 extern volatile int16_t hallAngleSample;    //rotor angle at this period's current sample
 #define HALL_FILTER_US 14    //hall timer input filter delay (initialize.c)
 

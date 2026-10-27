@@ -104,6 +104,21 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
     (VEL_RAMP; voltage commands slew at 1 ‰/ms) instead of stopping at once.
 - **Overvoltage:** the board coasts while the bus is 3 V above `batfull`, so braking doesn't pump a
   bench supply.
+- **FOC position:** positions are kept in 1/256 hall step (90 steps per turn). Far from the target a
+  P loop on the fine position (`pos_gain`, default 20 (turns/s)/turn like ODrive) feeds the speed loop,
+  limited to the speed it can stop from at 20 turns/s^2 and accelerating at that rate. Within 1.5 steps
+  and below 25 rpm the hold
+  takes over: the current vector is put at the target's electrical angle (d current 40 % of the
+  current limit, at most 4 A) and the rotor is pulled there like a microstepped stepper. The q axis
+  carries the load: it starts with the speed loop's integral (the current that held the load on the
+  way in) and adds to it while the hall sensors show the rotor sagging more than ~1 deg; it is voltage
+  driven (`motorr` x current), which also damps the rotor. Leaving the hold hands that current back to
+  the speed loop, so a load does not drop. Bench wheel: 1-5 steps settle in ~0.05 s, half a turn in 0.2-0.35 s;
+  the rotor stands within 0.25-0.5 deg of the target (hall edge check, unloaded). A load above the
+  hold torque makes it slip; the position loop then takes over again. Sine/block position modes work
+  in whole hall steps. Position mode runs the speed loop on the last hall interval with 10/3 of the
+  velocity gains below 60 rpm, falling to 1x at 200 rpm (higher at cruise speed was unstable). On a
+  bench supply set `batfull` near its voltage: hard stops regenerate (the bus rose to 42 V).
 - **VEL_RAMP** (`vel_ramp_rate`): the set point runs at most 0.25 s of the ramp (at least 30 rpm)
   ahead of the wheel, so an unreachable command doesn't wind it up: a lower command takes effect at
   once. The command is limited to `vel_limit` before the ramp.

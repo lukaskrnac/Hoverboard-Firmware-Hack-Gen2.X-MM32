@@ -64,6 +64,7 @@ enum{
 };
 
 static int32_t posOffset;    //odometer at position 0 (Set_Absolute_Position), hall steps
+static float posTurns(void){ return (float)(hallPosFine-posOffset*POS_FINE)/((float)StepsPerTurn()*POS_FINE); }
 static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val);
 static void setInputMode(uint32_t m){ if(InputModeSupported(m)) INPUT_MODE = (uint16_t)m; }
 
@@ -129,7 +130,7 @@ static uint8_t getMsg(uint8_t cmd, uint8_t* d){
 			wrU32(d, axisErrors); wrU32(d+4, axisDisarm);
 			return 8;
 		case CMD_GET_ENCODER_ESTIMATES:
-			wrF(d, (float)(iOdom-posOffset)/(float)StepsPerTurn());
+			wrF(d, posTurns());
 			wrF(d+4, (float)realspeed/60.0f);
 			return 8;
 		case CMD_GET_IQ:{
@@ -197,7 +198,7 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 		case CMD_SET_INPUT_POS:
 			if(len>=4){
 				float steps = rdF(d)*(float)StepsPerTurn();
-				posCmd = clampF(steps, 2000000000)+posOffset;
+				posCmd = clampF(steps*POS_FINE, 2000000000)+posOffset*POS_FINE;
 				posVelFf = len>=6 ? (int16_t)(d[4]|d[5]<<8)*6/100 : 0;    //0.001 turns/s -> rpm
 				inputArrived();
 			}
@@ -244,7 +245,7 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			if(len>=4){
 				int32_t steps = clampF(rdF(d)*(float)StepsPerTurn(), 2000000000);
 				posOffset = iOdom-steps;
-				posCmd = iOdom;    //no jump: the target is where the wheel is
+				posCmd = hallPosFine;    //no jump: the target is where the wheel is
 			}
 			break;
 		case CMD_SET_POS_GAIN:    //(turns/s) per turn -> 0.1 rpm per hall step
@@ -309,7 +310,7 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 			*val = (float)cfgOrDefault(POS_RPM, 300)/60.0f; return 1;
 		case EP_POS_GAIN:    //(turns/s)/turn <- 0.1 rpm per hall step
 			if(write) POS_KP = toWord(f*600.0f/spt);
-			*val = (float)cfgOrDefault(POS_KP, 20)*spt/600.0f; return 1;
+			*val = (float)PosGain()*spt/600.0f; return 1;
 		case EP_VEL_GAIN:    //Nm/(turns/s) <- FOC speed loop mA/rpm
 			if(write) FOC_SPD_KP = toWord(f/(0.06f*kt));
 			*val = (float)cfgOrDefault(FOC_SPD_KP, 30)*0.06f*kt; return 1;
@@ -373,8 +374,8 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_VBUS: wrF((uint8_t*)&r, (float)fvbat/100.0f); break;
 			case EP_IBUS: wrF((uint8_t*)&r, (float)BusCurrent()/100.0f); break;
 			case EP_POS_ESTIMATE:
-				if(write){ int32_t steps = clampF(f*(float)StepsPerTurn(), 2000000000); posOffset = iOdom-steps; posCmd = iOdom; }
-				wrF((uint8_t*)&r, (float)(iOdom-posOffset)/(float)StepsPerTurn()); break;
+				if(write){ int32_t steps = clampF(f*(float)StepsPerTurn(), 2000000000); posOffset = iOdom-steps; posCmd = hallPosFine; }
+				wrF((uint8_t*)&r, posTurns()); break;
 			case EP_VEL_ESTIMATE: wrF((uint8_t*)&r, (float)realspeed/60.0f); break;
 			case EP_IQ_MEASURED: case EP_IQ_SETPOINT:{
 				uint8_t q[8]; getMsg(CMD_GET_IQ, q);
@@ -388,15 +389,15 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_ODOMETER: r = (uint32_t)iOdom; break;
 			case EP_CONTROL_MODE: if(write) setControlMode(v); r = controlModeOdrive(); break;
 			case EP_INPUT_MODE: if(write) setInputMode(v); r = InputMode(); break;
-			case EP_POS_SETPOINT: wrF((uint8_t*)&r, (inPosSp-(float)posOffset)/(float)StepsPerTurn()); break;
-			case EP_VEL_SETPOINT: wrF((uint8_t*)&r, inVelSp/(float)StepsPerTurn()); break;
+			case EP_POS_SETPOINT: wrF((uint8_t*)&r, (inPosSp/POS_FINE-(float)posOffset)/(float)StepsPerTurn()); break;
+			case EP_VEL_SETPOINT: wrF((uint8_t*)&r, inVelSp/POS_FINE/(float)StepsPerTurn()); break;
 			case EP_ID_MEASURED: wrF((uint8_t*)&r, FocSensing() ? (float)focIdF/1000.0f : __builtin_nanf("")); break;
 			case EP_COMMUTATION:
 				if(write&&v<=COMMUT_FOC) SetDriveMode((uint8_t)(v*4+CONTROL(DRIVEMODE)));
 				r = COMMUTATION(DRIVEMODE); break;
 			case EP_INPUT_POS:
-				if(write){ posCmd = clampF(f*(float)StepsPerTurn(), 2000000000)+posOffset; inputArrived(); }
-				wrF((uint8_t*)&r, (float)(posCmd-posOffset)/(float)StepsPerTurn()); break;
+				if(write){ posCmd = clampF(f*(float)StepsPerTurn()*POS_FINE, 2000000000)+posOffset*POS_FINE; inputArrived(); }
+				wrF((uint8_t*)&r, (float)(posCmd-posOffset*POS_FINE)/((float)StepsPerTurn()*POS_FINE)); break;
 			case EP_INPUT_VEL:
 				if(write&&CONTROL(DRIVEMODE)==CTRL_SPEED){ speed = clampF(f*60.0f, 1000); inputArrived(); }
 				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_SPEED ? (float)speed/60.0f : 0.0f); break;

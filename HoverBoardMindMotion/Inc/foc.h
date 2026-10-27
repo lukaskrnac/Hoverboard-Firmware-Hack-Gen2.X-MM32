@@ -19,7 +19,12 @@ void FocControl(void);         //current loop and pwm, after HALLModuleCalc()
 //main loop (speedupdate)
 void FocSetCurrent(int32_t iq);      //torque: q current reference, mA
 void FocSetVoltage(int32_t permille);    //q voltage, permille of the usable maximum, current limited
-int32_t FocSpeedCtrl(int32_t sp, int32_t meas);    //rpm -> q current reference, mA
+int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt);    //rpm -> q current reference, mA; filt: set point filter
+void FocHoldStart(int32_t target);    //position hold at a fine position (1/POS_FINE step)
+void FocHoldTarget(int32_t target);
+void FocHoldStop(void);
+extern volatile uint8_t focHold, focHoldSlip;
+extern volatile int32_t focHoldPos;
 void FocSpeedReset(void);
 void FocClearTrip(void);
 int32_t FocIqSetpoint(void);         //mA

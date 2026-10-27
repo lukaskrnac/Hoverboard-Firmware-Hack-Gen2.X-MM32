@@ -7,12 +7,15 @@
 //                 decel_limit) from the current set point and velocity to input_pos, planned again
 //                 when input_pos changes; velocity feed forward as POS_FILTER
 //The position loop (P on the hall steps, bldc.c) corrects what the wheel misses of the set point.
-//The position set point is kept relative to the target (base): float has 24 bits, at 125000 steps one
-//unit in the last place is already 0.008 steps.
+//Positions in 1/POS_FINE hall step. The position set point is kept relative to the target (base): float
+//has 24 bits, at 125000 steps one unit in the last place is already 0.008 steps.
 #include <string.h>
 #include "inputmode.h"
 #include "pinout.h"
 #include "cansimple.h"
+#include "bldc.h"
+
+static float sptF(void){ return (float)StepsPerTurn()*(float)POS_FINE; }    //set point units per turn
 
 float inPosSp, inVelSp;
 static float rampRpm;
@@ -45,7 +48,7 @@ uint8_t InputMode(void){
 void InputTrack(int32_t steps, int32_t rpm){
 	base = steps; rel = 0;
 	inPosSp = (float)steps;
-	inVelSp = (float)rpm*(float)StepsPerTurn()/60.0f;
+	inVelSp = (float)rpm*sptF()/60.0f;
 	rampRpm = (float)rpm;
 	planned = 0;
 }
@@ -71,7 +74,7 @@ int32_t InputVel(int32_t rpm, int32_t dtms, uint8_t holdDown, int32_t meas){
 		if(d>0&&rampRpm>m+lead&&rampRpm>old) rampRpm = old>m+lead ? old : m+lead;
 		else if(d<0&&rampRpm<m-lead&&rampRpm<old) rampRpm = old<m-lead ? old : m-lead;
 	}
-	inVelSp = rampRpm*(float)StepsPerTurn()/60.0f;
+	inVelSp = rampRpm*sptF()/60.0f;
 	return roundF(rampRpm);
 }
 
@@ -115,7 +118,7 @@ static void eval(void){    //ODrive TrapezoidalTrajectory::eval
 }
 
 int32_t InputPos(int32_t target, int32_t ffRpm, int32_t dtms, int32_t* velFf){
-	float spt = (float)StepsPerTurn(), dt = (float)dtms/1000.0f;
+	float spt = sptF(), dt = (float)dtms/1000.0f;
 	uint8_t m = InputMode();
 	uint8_t moved = target!=base;
 	rel += (float)(base-target);    //exact for differences below 2^24 steps
@@ -146,5 +149,5 @@ int32_t InputPos(int32_t target, int32_t ffRpm, int32_t dtms, int32_t* velFf){
 
 uint8_t InputPosDone(void){
 	if(InputMode()==IM_TRAP_TRAJ) return t>=Tf;
-	return inVelSp<0.5f&&inVelSp>-0.5f;
+	return inVelSp<0.5f*POS_FINE&&inVelSp>-0.5f*POS_FINE;    //half a step per second
 }

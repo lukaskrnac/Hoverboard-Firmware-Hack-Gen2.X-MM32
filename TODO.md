@@ -28,8 +28,8 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Bus current in sine mode on boards **without** phase current pins: the shunt is sampled at the
       zero vector and reads ~0 (noise); they need a second sample inside an active vector. (With the
       pins, sine now uses the phase currents like FOC, up to 90 % modulation.)
-- [ ] Position: FOC settles 1-2 steps off (the speed set point near the target is below what the
-      halls can measure); the target is int16 (the command field). Sine takes 1.6-2.2 s per move.
+- [ ] Position (v1 protocol): the target is int16 hall steps (the command field). Sine takes 1.6-2.2 s
+      per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
       same command; block torque depends on the shunt calibration.
 - [ ] FOC field weakening with 13 A of d current (~840 rpm at 24 V) shakes and trips (9 A: 0.7-0.9
@@ -70,9 +70,15 @@ supply, unloaded wheel, ST-Link for SWD, FT232R USB-UART on the masterslave head
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
       `main` deploys GitLab Pages). Try the console once in Firefox (WebSerial add-on, over http).
 
-- [ ] Position resolution is one hall step (1/90 turn). Interpolating the estimate with the sine/FOC
-      angle only helps while moving; holding between hall edges needs a sensor or holding the
-      electrical angle (stepper-like, costs current).
+- [ ] FOC position hold with a real load (a weight): the load current handling (speed loop integral
+      at entry, +4.4 A/s while the hall state shows >= 1 deg of sag, back to the speed loop at exit) is
+      only tested on the free wheel. Check that a hanging weight neither drops nor oscillates.
+- [ ] FOC position hold costs current all the time it holds (up to 4 A of d current, ~7 W): drop it
+      after a while at the target (like a stepper's idle current) as far as the load allows; make the
+      hold current a parameter (no config word left). Sine/block position still work on whole steps.
+- [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
+      speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
+      30/100 passed every run; the tracker should handle a reversal between edges better.
 - [ ] TORQUE_RAMP input mode (no config word left; words 28-31, 35, 43 hold the other input modes).
 - [ ] Flash: 27.3 of 30 KB with LTO (-flto saved 3 KB). Check before adding more.
 - [ ] Bus line above 230400 baud: the open-drain TX needs a stronger pull-up (or push-pull for a

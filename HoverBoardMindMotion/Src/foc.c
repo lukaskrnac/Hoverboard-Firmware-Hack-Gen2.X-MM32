@@ -41,7 +41,7 @@
 #define SAMPLE_MAX   31200
 #define INV_SQRT3_Q15 18919
 
-static int32_t cfg(uint16_t v, int32_t def){ return v ? v : def; }
+static int32_t cfg(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }    //0 and 65535 (an unset word) = default
 #define GAIN()   cfg(IPHASE_GAIN, 515)    //0.1 mA per adc count
 #define IMAX()   (cfg(FOC_IMAX, 100)*100) //mA
 #define KP()     cfg(CUR_KP, 400)         //mV per A
@@ -80,6 +80,62 @@ static volatile uint8_t focVoltMode;
 
 static int32_t lastIdRef, lastIqRef;
 static volatile int8_t qSat;    //q voltage on its limit: +1 towards positive focIqRef (motor frame), -1 negative
+
+//Position hold (FOC position mode, near the target): the frame is not the hall angle but the target's
+//electrical angle, with a d current (40 % of the current limit, at most 4 A): the rotor is pulled there like a stepper,
+//to a fraction of a hall step (1 deg mechanical = 15 deg electrical; the hall sensors cannot tell where
+//the rotor is between two edges). The q axis is voltage driven (R * load current, below): a short
+//circuit for the back emf, it damps the rotor (with the q current regulated the rotor rang on the
+//magnetic spring). The angle moves to the
+//target at <= HOLD_RATE per period. A hall state more than 90 deg el from the held angle means the rotor
+//slipped (load above the hold torque): focHoldSlip, the position loop takes over again.
+//A load (a weight) needs torque, not only the spring: the hold starts with the speed loop's integral as a
+//q voltage feed forward (R * I, MOTOR_R: the short circuit damping stays), adds to it while the hall
+//state shows the rotor >= 15 deg el (1 deg mechanical) behind the held angle, and gives it back to the
+//speed loop's integrator when it ends. (With the old dead band the integrator decayed at the target: the
+//load sagged until the next hall step, then the loop caught it again.)
+#define HOLD_RATE 2                 //1/POS_FINE step per period: ~34 steps/s
+volatile uint8_t focHold, focHoldSlip;
+volatile int32_t focHoldPos;        //held position, 1/POS_FINE step
+static volatile int32_t holdTarget;
+static int32_t holdIq;              //load current, mA, electrical frame
+static int32_t spRef, spI;    //speed loop (below): rpm << 8, mA << 8
+static uint32_t spT;
+static uint8_t spRun;
+
+static uint16_t holdA0;             //electrical angle of position 0 (mod 6 steps)
+static int16_t holdAngle(int32_t p){    //electrical angle of a position: one electrical turn = 6 steps
+	int32_t m = p%(6*POS_FINE); if(m<0) m += 6*POS_FINE;
+	return (int16_t)(holdA0-(uint32_t)(m*65536/(6*POS_FINE)));
+}
+
+void FocHoldStart(int32_t target){
+	__disable_irq();
+	int32_t m = (iOdom*POS_FINE)%(6*POS_FINE); if(m<0) m += 6*POS_FINE;
+	holdA0 = (uint16_t)(HALL1.CWAngleTab[HALL1.PreRaw]+(uint32_t)(m*65536/(6*POS_FINE)));    //centre of this sector
+	focHoldPos = hallPosFine;
+	holdTarget = target;
+	holdIq = -spI/256;    //the speed loop's integral (the steady load), not its output: that was the
+	                      //braking current of the approach (5.6 A into a standing wheel)
+	focHoldSlip = 0;
+	intD = intQ = 0;
+	focHold = 1;
+	__enable_irq();
+}
+
+void FocHoldTarget(int32_t target){
+	holdTarget = target;
+}
+
+void FocHoldStop(void){
+	if(!focHold) return;
+	__disable_irq();
+	focHold = 0;
+	intD = intQ = 0;
+	spI = -holdIq*256;    //the load current back to the speed loop (motor frame)
+	spRun = 0;           //its reference from the measured speed
+	__enable_irq();
+}
 
 //capture for tuning and fault analysis over SWD, per pwm period: id, iq (mA), vd, vq (mV, electrical
 //frame), ia (mA), angle. focTraceN: write 0xFF = one shot from the next reference step of >= 200 mA;
@@ -135,6 +191,7 @@ void FocInit(void){
 }
 
 void FocReset(void){
+	focHold = 0;
 	intD = intQ = 0;
 	fwId = 0;
 	focIqRef = 0;
@@ -211,8 +268,7 @@ void FocMeasure(void){
 
 //d and q current (electrical frame) of this period's sample, after HALLModuleCalc(): the tracker's angle
 //at the sample (the output angle has a lead for the pwm)
-static void park(int32_t* id, int32_t* iq){
-	int16_t thS = hallAngleSample;
+static void park(int32_t* id, int32_t* iq, int16_t thS){
 	Trig_Components sc = MCM_Trig_Functions(thS);
 	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
 	int32_t d = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
@@ -256,7 +312,7 @@ static void park(int32_t* id, int32_t* iq){
 
 void FocObserve(void){    //sine: I_d / I_q for telemetry
 	int32_t id, iq;
-	if(sampleOk) park(&id, &iq);
+	if(sampleOk) park(&id, &iq, hallAngleSample);
 }
 
 static void zeroVector(void){
@@ -277,7 +333,32 @@ void FocControl(void){
 	int32_t vmax = MOD_MAX*v/5676;          //mV; phase amplitude Vbus/sqrt(3) at modulation 32768
 	int16_t th = HALL1.Angle;
 	int32_t id, iq;
-	park(&id, &iq);
+	if(focHold){
+		int32_t d = holdTarget-focHoldPos;
+		focHoldPos += d>HOLD_RATE ? HOLD_RATE : (d<-HOLD_RATE ? -HOLD_RATE : d);
+		th = holdAngle(focHoldPos);
+		park(&id, &iq, th);
+		int16_t dr = (int16_t)(th-(int16_t)HALL1.CWAngleTab[HALL1.PreRaw]);
+		if(dr>16384||dr<-16384) focHoldSlip = 1;
+		int32_t imax = IMAX();
+		if(dr>8192&&holdIq<imax) holdIq++;    //rotor behind (lower angle): + q turns the angle up; 4.4 A/s
+		else if(dr<-8192&&holdIq>-imax) holdIq--;
+		int32_t ih = IMAX()*4/10; if(ih>4000) ih = 4000;
+		int32_t kp = KP(), ed = ih-id;
+		intD += KI()*(((int32_t)PWM_PERIOD+18)/36)*ed/1000;
+		int32_t vd = kp*ed/1000+intD/1000;
+		if(vd>vmax){ intD -= (vd-vmax)*1000; vd = vmax; } else if(vd<-vmax){ intD -= (vd+vmax)*1000; vd = -vmax; }
+		intQ = 0; fwId = 0; qSat = 0;
+		focIdNow = ih;
+		int32_t vq = holdIq*cfg(MOTOR_R, 300)/1000;    //mV (cfg() read 65535 as 65 Ohm until it took 65535 as default)
+		if(vq>vmax/2) vq = vmax/2; else if(vq<-vmax/2) vq = -vmax/2;
+		ipark1.Ds = vd*5676/v; ipark1.Qs = vq*5676/v; ipark1.Theta = th;
+		IPARK_MACRO1(&ipark1);
+		pwm_gen.Mode = SEVENMODE; pwm_gen.Alpha = ipark1.Alpha; pwm_gen.Beta = ipark1.Beta;
+		PWM_GEN_calc(&pwm_gen); Update_PWM(&pwm_gen);
+		return;
+	}
+	park(&id, &iq, hallAngleSample);
 
 	//references in the electrical frame: + q turns the angle up = negative realspeed
 	//d current (field weakening, focIdRef) only while the angle is known: between hall edges the angle is
@@ -405,9 +486,6 @@ void FocSetVoltage(int32_t permille){
 }
 
 //speed loop: PI on the speed error against a first order reference (like SpeedCtrl), output q current
-static int32_t spRef, spI;    //rpm << 8, mA << 8
-static uint32_t spT;
-static uint8_t spRun;
 
 void FocSpeedReset(void){
 	spI = 0;
@@ -415,7 +493,7 @@ void FocSpeedReset(void){
 	spT = millis;
 }
 
-int32_t FocSpeedCtrl(int32_t sp, int32_t meas){
+int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 	int32_t dt = millis-spT;
 	int32_t imax = IMAX()<<8;
 	spT = millis;
@@ -426,15 +504,26 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas){
 		spRef = meas<<8;
 		spRun = 1;
 	}
-	int32_t d = ((sp<<8)-spRef)*dt/100;    //tref 100 ms
-	spRef = d ? spRef+d : sp<<8;
+	int32_t d = ((sp<<8)-spRef)*dt/100;    //tref 100 ms (not in position mode: a lag inside its loop)
+	spRef = filt ? (d ? spRef+d : sp<<8) : sp<<8;
 	if(sp==0&&meas==0&&spRef==0){
 		//stopped at a 0 rpm set point: the integrator decays (100 ms). Left as it was it pushed ~0.3 A
-		//against static friction until the wheel broke loose, then swung +-50 rpm (the speed shows late)
-		spI -= spI*dt/100;
+		//against static friction until the wheel broke loose, then swung +-50 rpm (the speed shows late).
+		//Not above 1 A: that is a load (a slope, a weight), decayed it sagged and was caught again.
+		if(spI<(1000<<8)&&spI>-(1000<<8)) spI -= spI*dt/100;
 	}
 	int32_t e = (spRef>>8)-meas;
-	int32_t kp = cfg(FOC_SPD_KP, 30), ki = cfg(FOC_SPD_KI, 100);    //mA per rpm, mA per rpm*s
+	//mA per rpm, mA per rpm*s, default 30 / 100 (kp 50 limit-cycled at the stop, and the gain multiplies
+	//the hall interval noise into torque). Position mode: 10/3 of that below 60 rpm, falling to 1x at 200
+	//rpm. Near the target it has to follow the braking curve (at 30 mA/rpm 3.3 A of braking took ~110 rpm
+	//of error: half a turn overshot 4-5 steps; 3.3x: 0-3, 0.21-0.34 s; 5 steps 0.05 s instead of 0.14-
+	//0.18), and the hold takes over before the stop. At cruise speed 3.3x was unstable (+-10 A every
+	//sample at 470 rpm, the bus pumped to 38 V, a trip).
+	int32_t kp = cfg(FOC_SPD_KP, 30), ki = cfg(FOC_SPD_KI, 100);
+	if(!filt){
+		int32_t am = meas<0 ? -meas : meas, g = am<=60 ? 100 : (am>=200 ? 30 : 100-(am-60)/2);    //percent*3
+		kp = kp*g/30; ki = ki*g/30;
+	}
 	int32_t di = ki*e*256/1000*dt;
 	int32_t u = kp*e*256+spI+di;
 	//no integration into a current the voltage cannot drive (q voltage on its limit): at top speed the
