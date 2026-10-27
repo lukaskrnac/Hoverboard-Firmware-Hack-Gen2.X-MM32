@@ -12,7 +12,9 @@ please also check the autodetect&configuration section
 The firmware builds with the open source Arm GNU toolchain, no Keil or vendor pack needed.
 ```bash
 cd HoverBoardMindMotion
-make                                   # build/hoverboard.bin, .hex, .elf
+make                                   # build/hoverboard.bin, .hex, .elf (MM32SPIN05)
+make MCU=F031                          # another MCU: SPIN05, SPIN06, SPIN25, F031 -> build/<mcu>/
+make targets                           # main firmware + PinFinder for every MCU (compile check)
 make CROSS=/path/to/bin/arm-none-eabi- # toolchain not on PATH
 make TRACE=1                           # with the FOC capture buffer for SWD tools (768 bytes of RAM)
 ```
@@ -22,12 +24,23 @@ register headers, CMSIS) are in `HoverBoardMindMotion/Device/`. A change of the 
 
 Integer division runs on the chip's hardware divider (`Src/hwdiv.S`) and floats on a compact soft
 float (`Src/softfloat.c`, round to nearest even like libgcc, subnormals read as 0); both replace
-libgcc's routines. Size: 26.4 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
+libgcc's routines. Size: 26.6 of 30 KB flash, 1.4 KB of 4 KB RAM plus the 1 KB stack reserve (the
 worst case stack, main loop plus nested interrupts, is ~670 bytes).
 
-Supported by the GCC build: **MM32SPIN05** (tested on hardware). MM32SPIN06 uses the same
-library and may work but is untested. MM32SPIN25 is not ported yet, see
-`HoverBoardMindMotion/Device/MM32SPIN2x/Source/README.md`.
+MCUs (`make MCU=...`, `Inc/mcu.h`). All four share the SPIN05 register headers and HAL: their
+timers, ADC, UART, DMA, GPIO, RCC, flash, watchdog and hardware divider have the same addresses and
+register layout (compared in the vendor SVD files). Every image uses the 32 KB layout (30 KB code, the
+config in the last 2 KB) and 4 KB of RAM, so the tools work the same on all of them.
+
+| MCU | state | differences |
+|---|---|---|
+| **MM32SPIN05** | tested on hardware (bench board) | reference; internal op-amps (PFOP) need no setup |
+| MM32F031 ("q") | PinFinder runs on a board (UART PB6/PB7 found, nothing driven yet) | the same die as the SPIN05 (IDCODE 0xCC4460B1) without the gate driver; no UART2 pins |
+| MM32SPIN06 | builds, untested | the SPIN05 pin tables (as the old Keil target) |
+| MM32SPIN25 | builds, untested | pin/AF tables from its datasheet; 72 MHz from the PLL (the old Keil build ran 96 MHz); op-amps OP1-3 (outputs PA6, PB2, PB10) enabled when their output pin is a configured current pin |
+
+The PWM pins are PA8-PA10 / PB13-PB15 (AF2) on all of them; a board that wires its gate driver
+elsewhere is not supported.
 
 ## Flashing over SWD
 ```bash

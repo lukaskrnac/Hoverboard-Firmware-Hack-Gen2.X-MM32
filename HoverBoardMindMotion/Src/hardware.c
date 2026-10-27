@@ -7,7 +7,9 @@ static GPIO_TypeDef* const ports[4] = { GPIOA, GPIOB, GPIOC, GPIOD };
 
 
 
-#ifdef TARGET_MM32SPIN25
+//Tables per MCU: from the vendor datasheets' pin and alternate function tables (AF0..AF7).
+#if defined(MCU_SPIN25)
+//MM32SPIN25 (DS_MM32SPIN2x_p 1.21). TIM1 PWM as the SPIN05: PA8-PA10 / PB13-PB15 on AF2.
 
 static const uint8_t pins[PINCOUNT] = {
 P(IOA,0),
@@ -85,16 +87,16 @@ const MM32TIM23 halltims[TIMCOUNT] = {
 {PD7,GPIO_AF_5,0},
 };
 
+//UART2 TX on PA14 (AF1) is SWCLK: not listed
 const MM32UART uarts[UARTCOUNT] = {
-{PB6,GPIO_AF_0,1},
-{PB7,GPIO_AF_0,0},
-{PB8,GPIO_AF_0,0},
-{PB9,GPIO_AF_0,1},
-{PD0,GPIO_AF_3,1},
-{PD1,GPIO_AF_3,0},
+{PB6,GPIO_AF_0,1,1},
+{PB7,GPIO_AF_0,0,1},
+{PB8,GPIO_AF_0,0,1},
+{PB9,GPIO_AF_0,1,1},
+{PD0,GPIO_AF_3,1,1},
+{PD1,GPIO_AF_3,0,1},
 {PA2,GPIO_AF_1,1,2},
 {PA3,GPIO_AF_1,0,2},
-{PA6,GPIO_AF_3,0,2},
 {PA15,GPIO_AF_1,0,2},
 };
 
@@ -106,6 +108,7 @@ const MM32TIMBK ocps[TIMBKCOUNT] = {
 };
 
 #else
+//MM32SPIN05/06 and MM32F031 (DS_MM32F031xx_q 1.25: the same alternate functions, but no UART2 pins)
 
 static const uint8_t pins[PINCOUNT] = {
 P(IOA,0),
@@ -178,12 +181,14 @@ const MM32UART uarts[UARTCOUNT] = {
 {PB4,GPIO_AF_3,0,1},
 {PB6,GPIO_AF_0,1,1},
 {PB7,GPIO_AF_0,0,1},
+#ifndef MCU_NO_UART2
 {PA2,GPIO_AF_1,1,2},
 {PA3,GPIO_AF_1,0,2},
 {PA6,GPIO_AF_3,0,2},
 {PA15,GPIO_AF_1,0,2},
 {PB7,GPIO_AF_4,1,2},
 {PB8,GPIO_AF_4,0,2},
+#endif
 };
 
 const MM32TIMBK ocps[TIMBKCOUNT] = {

@@ -14,11 +14,18 @@
 #define IOD 4
 
 
-#ifdef TARGET_MM32SPIN25
+//pin table sizes of the selected MCU (hardware.c; mcu.h)
+#if defined(MCU_SPIN25)
 #define PINCOUNT 34
-#define ADCCOUNT 13
-#define TIMCOUNT 22
-#define UARTCOUNT 10
+#define ADCCOUNT 12
+#define TIMCOUNT 21
+#define UARTCOUNT 9
+#define TIMBKCOUNT 4
+#elif defined(MCU_NO_UART2)
+#define PINCOUNT 33
+#define ADCCOUNT 10
+#define TIMCOUNT 14
+#define UARTCOUNT 4
 #define TIMBKCOUNT 4
 #else
 #define PINCOUNT 33

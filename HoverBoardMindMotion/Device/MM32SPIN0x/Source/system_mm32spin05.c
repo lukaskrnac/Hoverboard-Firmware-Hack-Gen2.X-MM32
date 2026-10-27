@@ -761,6 +761,17 @@ void SetSysClockToXX_HSI(void)
 
     RCC->CR &= (u32)0x000FFFFF;
 
+#if defined(MCU_SPIN25)
+    //MM32SPIN25: a real PLL from the HSI (48 MHz / 4 = 12 MHz), x6 = 72 MHz like the other MCUs (the vendor
+    //file and the old Keil build ran it at 96 MHz). Bit 20 is PLLDIV here, not HSI_72M. As the SPIN2x pack's
+    //SetSysClockToXX_HSI(): PLLMUL bits 26.., PLLDIV bits 20.., PLLON bit 24, PLLRDY bit 25.
+    AutoCalPllFactor(12000000, SystemCoreClock, &plln, &pllm);
+    RCC->CR &= (u32)0x000FFFFF;
+    RCC->CR |= ((u32)plln << 26) | ((u32)pllm << 20);
+    RCC->CR |= 1U << 24;
+    while((RCC->CR & (1U << 25)) == 0) {
+    }
+#else
     AutoCalPllFactor(HSI_VALUE_PLL_ON, SystemCoreClock, &plln, &pllm);
 
     RCC->CR &= (u32)0x000FFFFF;
@@ -775,6 +786,7 @@ void SetSysClockToXX_HSI(void)
     }
 		*/
 		RCC->CR |= 0x01U<<20;//added by AILIFE, enable 72mhz HSI
+#endif
 		
     //Select PLL as system clock source
     RCC->CFGR &= (u32)((u32)~(RCC_CFGR_SW));

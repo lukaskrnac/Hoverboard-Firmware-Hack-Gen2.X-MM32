@@ -8,11 +8,6 @@
 #include "hal_conf.h"
 #include "hardware.h"
 #include "main.h"
-#ifdef TARGET_MM32SPIN25
-#include "spin25-redefine.h"
-#include "HAL_device.h"
-#endif
-
 
 //normal io
 void io_init(void){
@@ -261,6 +256,20 @@ void adc_Init(void){
 			}
 		}
 	}
+#ifdef MCU_OPAMPS
+	//SPIN25: op-amp n drives its output pin (OP1 PA6, OP2 PB2, OP3 PB10; OP4's PA9 is a PWM pin); enabled
+	//when that pin is a configured current input (gain and inputs: the board's resistors). OPAMP_CSR
+	//bit 8*n, the op-amps are on the COMP interface clock.
+	static const uint8_t opOut[3] = { PA6, PB2, PB10 };
+	uint32_t csr = 0;
+	for(uint8_t k=0;k<3;k++){
+		if(opOut[k]==ITOTALPIN||opOut[k]==IPHASEAPIN||opOut[k]==IPHASEBPIN) csr |= 1u<<(8*k);
+	}
+	if(csr){
+		RCC->APB2ENR |= 1u<<15;
+		*(volatile uint32_t*)0x40013C10 = csr;
+	}
+#endif
 
 	ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
 }

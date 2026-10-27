@@ -1,5 +1,7 @@
-# GCC build for the MM32SPIN05 hoverboard firmware.
-#   make                  build build/hoverboard.{elf,bin,hex}
+# GCC build for the MindMotion hoverboard firmware.
+#   make                  build build/hoverboard.{elf,bin,hex} for the MM32SPIN05
+#   make MCU=F031         another MCU: SPIN05 (default), SPIN06, SPIN25, F031; output in build/<mcu>/
+#   make targets          main firmware and PinFinder for every MCU (a compile check of all of them)
 #   make CROSS=/path/to/arm-none-eabi-    use a toolchain that is not on PATH
 #   make flash            flash over SWD with pyOCD (../tools/mm32flash.py, keeps the board config)
 #   make clean
@@ -9,7 +11,17 @@ CC      := $(CROSS)gcc
 OBJCOPY := $(CROSS)objcopy
 SIZE    := $(CROSS)size
 
-BUILD   := build
+# All MCUs share the SPIN05 register headers and HAL: their peripherals have the same register layout
+# (compared in the vendor SVD files). They differ in the pin tables (hardware.c), the clock (SPIN25: PLL)
+# and the op-amps (SPIN25: enabled per configured pin). Every image uses the same 32 KB layout (30 KB
+# code, the config in the last 2 KB) and 4 KB of RAM, the smallest of the four, so the tools and the
+# config address are the same on every board.
+MCUS    := SPIN05 SPIN06 SPIN25 F031
+MCU     ?= SPIN05
+ifeq ($(filter $(MCU),$(MCUS)),)
+$(error MCU=$(MCU): one of $(MCUS))
+endif
+BUILD   := $(if $(filter SPIN05,$(MCU)),build,build/$(shell echo $(MCU) | tr A-Z a-z))
 TARGET  := $(BUILD)/hoverboard
 LDSCRIPT := Device/MM32SPIN0x/Source/mm32spin05.ld
 
@@ -26,7 +38,7 @@ ARCH    := -mcpu=cortex-m0 -mthumb
 # -fno-strict-aliasing: the vendor HAL type-puns peripheral pointers (*(u32*)&gpio)
 # -flto: 3 KB less flash (of 30 KB); the SWD tools still find the globals by name
 CFLAGS  := $(ARCH) -Os -flto -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common \
-           -fno-strict-aliasing -Wall $(INC)
+           -fno-strict-aliasing -Wall $(INC) -DMCU_$(MCU)
 # make TRACE=1: the FOC capture buffer for SWD tools (foc.c, 768 bytes of RAM)
 ifeq ($(TRACE),1)
 CFLAGS  += -DFOC_TRACE
@@ -94,6 +106,9 @@ flash-pinfinder: $(PF).bin
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all clean flash pinfinder flash-pinfinder
+targets:
+	@set -e; for m in $(MCUS); do echo "== $$m"; $(MAKE) --no-print-directory MCU=$$m all pinfinder; done
+
+.PHONY: all clean flash pinfinder flash-pinfinder targets
 -include $(PF_OBJ:.o=.d)
 -include $(DEP)

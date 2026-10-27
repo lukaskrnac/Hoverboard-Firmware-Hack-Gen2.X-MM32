@@ -4,3 +4,4 @@ HoverBoardGigaDevice/BinariesToFlash/hoverboard*
 /HoverBoardMindMotion/build
 __pycache__/
 *.pyc
+backups/

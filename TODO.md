@@ -89,22 +89,23 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       Settled 2026-10-28: the bench shunt is R003 (3 mOhm): `detect current 1000 3` -> iphasegain 524-549
       (saved: mean 535), itotaldivider 333, itotalzero 438; blockcal.py's 419 / 145 was 25 % off. Open:
       inverted halls (P9).
-- [ ] **P8 More targets.** One source tree, `make MCU=...`:
-      - MM32SPIN06: same library as SPIN05, untested with GCC; check the pin table, flash/RAM size,
-        linker script, the op-amps (if any) and the hardware divider.
-      - MM32SPIN25: needs the MM32SPIN2x pack headers (`Device/MM32SPIN2x/Source/README.md`), its HAL is
-        vendored in `Library/MM32SPIN25`; different pin count/AFs, op-amps (`hal_op.c`), flash/RAM size
-        and the config page address (to check).
-      - MM32F030 / MM32F031 (and the `origin/pinfinder-spin280` branch's MM32SPIN0280): general-purpose
-        M0 parts on some boards; vendor headers, clock tree (maximum clock to check: PWM_RES and every
-        timing assume 72 MHz), no gate driver/op-amps.
-        **Next (2026-10-28): the user has an MM32F031 board.** Order: back up its flash over SWD (the
-        stock firmware may be read-protected: check before anything is erased), identify the chip
-        (IDCODE, flash/RAM size), vendor pack/headers, then PinFinder for it first (finds the pin map and
-        runs the motor without the full firmware), then the main firmware's block/sine modes (no op-amps
-        expected: bus shunt only, so no FOC unless the board has phase shunts).
-      Runtime: PinFinder reports the chip (DBGMCU IDCODE, flash size register) and refuses a firmware
-      built for another MCU; the flasher checks the same before programming.
+- [ ] **P8 More targets.** Done (2026-10-28): `make MCU=SPIN05|SPIN06|SPIN25|F031`, `make targets` builds
+      main + PinFinder for all four without warnings; the SPIN05 images are byte-identical to before. One
+      header set (the SPIN05's): the vendor SVDs of all four have the same register layout for every
+      peripheral we use. Differences in `Inc/mcu.h`, the pin tables in `hardware.c` (SPIN25 rewritten from
+      its datasheet: the old table had UART entries without a UART number, a wrong PA6 UART2 RX, ADCCOUNT 13
+      for 12 entries; F031: no UART2), `system_mm32spin05.c` (SPIN25: PLL to 72 MHz, not 96) and
+      `adc_Init()` (SPIN25 op-amps OP1-3 for configured current pins). Old Keil SPIN25 files removed.
+      MM32F031 board: same die as the SPIN05 (IDCODE 0xCC4460B1, 32 KB), PinFinder answers on PB6/PB7;
+      paused (hardware trouble on that board). Stock firmware: `backups/` (not in git).
+      Open:
+      - SPIN06 / SPIN25 untested on hardware; their IDCODEs are unknown. Runtime check (PinFinder
+        reports the chip and refuses a firmware for another MCU; the flasher checks before programming):
+        needs the IDCODEs first. SPIN05 and F031 cannot be told apart by IDCODE (same die).
+      - PinFinder on SPIN25: `detect current` scans ADC pins, but the op-amp outputs only drive their pins
+        when enabled; enable OP1-3 during the scan (their pins must be free).
+      - SPIN06 has 16 KB RAM / 64 KB flash, SPIN25 8 KB RAM: unused (all images use the 32 KB / 4 KB layout).
+      - MM32F030 / the `origin/pinfinder-spin280` branch's MM32SPIN0280: not looked at.
 - [ ] **P9 Still not detected / features to consider** (review, then promote to items):
       - E-stop input (bench PB0) and WS2812 header (PB12): detect + support (E-stop = disarm like the
         CANSimple Estop; WS2812 status LED like the RGB LED).
