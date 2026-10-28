@@ -158,6 +158,16 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       2026-10-28: partial field weakening fixed (the speed loop on realspeed with field weakening too: 5 A
       0.5-0.7 m/s^2, was 1.7-2.0). With 9 A both speed sources shake alike: 2.8 m/s^2 and +-14 rpm at 680 rpm
       (I_d -7.5..-8 A), 1.6 at 740: the large d current itself (this item), not the speed measurement.
+      2026-10-28 (phone accelerometer, free wheel, 24.5 V): the shaking needs a large d current, not field
+      weakening or speed: I_d forced (id_setpoint 0x112) at 300 rpm, no field weakening: 0 A 0.54 m/s^2, -3 A
+      0.8, -4.5 A 4.6, -5.5 A 13.8, -6 A 6-21 m/s^2 (growing; speed +-100 rpm, a ~52 Hz oscillation). Ruled out:
+      the speed source (realspeed / fastspeed), the field weakening integrator (P terms out of its input,
+      low pass, 4x slower: no change), the hall tracker gain (1/4..1/32 per edge at -4.5 A: 4.2-4.7), a frame
+      shift proportional to I_d (k LSB per A along the motion: at 680 rpm / 9 A field weakening -1000..-1300
+      halved the vibration and needed less I_d, but -1600 lost torque and tripped CURRENT_LIMIT_VIOLATION; at
+      300 rpm with forced I_d it made it worse). Next: a FOC trace (make TRACE=1, read over SWD with the
+      wheel stopped) of a -4.5 A run to see which of i_d, i_q, v_d, v_q, the angle oscillates first. Do not
+      run forced I_d below -5 A again (2 g of shaking). Never SWD while it runs (wedges the ST-Link).
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
