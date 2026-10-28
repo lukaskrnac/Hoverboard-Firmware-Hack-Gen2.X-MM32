@@ -198,6 +198,17 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
+      2026-10-28: no trip in 40 reversals from 230-290 rpm (target flipped mid-move, gains 30/100 .. 100/333), but
+      they shake (phone accelerometer): 1.8-2.5 m/s^2 rms (peaks 10-17, 35-90 Hz) at the defaults, 6-7 at 60/200,
+      9 at 100/333; holding 0.04-0.1, cruise <= 1. Only below ~100 rpm: the start, the reversal, the end of the
+      braking. The supply is not involved (bus <= 26 V, below batfull). Trace (TRACE=1, 0.9 ms): iqRef swings
+      -4..-6.5 A -> +2.4..+4.4 A at single hall edges where fastspeed jumps 20-25 -> 84-151 rpm within one sector,
+      which 4 A cannot do (~1500 rpm/s): the low speed measurement is inconsistent while the q current swings,
+      probably the edges moving with the q current (armature reaction, like the d current item above).
+      Fixed meanwhile: the tracker started only after ~6 edges (sector centres, 60 deg steps; bc6789f).
+      Not it: the 3.3x low speed gain (1x, 2x, 3.3x shake alike), speed extrapolation between edges (tried).
+      Half the speed gains (15/50): 0.8 m/s^2 but 0.1 turn overshoot. Next: measure the edge shift per A of q
+      current (slow FOC velocity with a q current step) and correct the boundary for it, or an observer.
 - [ ] Flash 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
