@@ -206,9 +206,18 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       which 4 A cannot do (~1500 rpm/s): the low speed measurement is inconsistent while the q current swings,
       probably the edges moving with the q current (armature reaction, like the d current item above).
       Fixed meanwhile: the tracker started only after ~6 edges (sector centres, 60 deg steps; bc6789f).
-      Not it: the 3.3x low speed gain (1x, 2x, 3.3x shake alike), speed extrapolation between edges (tried).
-      Half the speed gains (15/50): 0.8 m/s^2 but 0.1 turn overshoot. Next: measure the edge shift per A of q
-      current (slow FOC velocity with a q current step) and correct the boundary for it, or an observer.
+      Not it: speed extrapolation between edges (tried). (A sweep of the 3.3x low speed gain was invalid:
+      cfgOrDefault() takes the value, not the word index - the experiment read the constant 106.)
+      Half the speed gains (15/50): 0.8 m/s^2 but 0.1 turn overshoot.
+      Edge shift with the q current (q square wave +-1..2 A, 25 Hz, on FOC velocity 1-2 turns/s; tracker error
+      at each edge): ~+10 deg el per A on the first edge after a flip, both directions; correcting the tracker's
+      boundary by 5 deg el per A of q current (sign: bnd += 5 deg * iq in the electrical frame) removed it
+      (+-13 -> +-2 deg, sd 14 -> 5.5) but the reversals only went 2.2 -> 2.0 m/s^2; correcting the intervals
+      too made it worse (2.5, bus sagged to 19 V at 60/200). The error rings (later edges of a half period
+      the other sign: +9 then -17 deg at 1 turn/s): a mechanical response, not instantaneous armature
+      reaction. Suspect the bench mount: the stator (halls) rocking on its axle clamp under torque (1 deg
+      mechanical = 15 deg el), resonant at ~40-60 Hz like the shaking. Experiment code: scratch reversal/
+      foc.c.edgeshift, hallhandle.c.edgeshift (words 106 amplitude, 107 c). Check the mount first.
 - [ ] Flash 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
