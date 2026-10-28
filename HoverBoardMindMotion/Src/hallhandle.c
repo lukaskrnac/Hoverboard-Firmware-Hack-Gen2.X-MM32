@@ -179,7 +179,11 @@ void HALLModuleCalc(HALLType *u){
 	//angle on the sector centre at the edge (30 deg ahead) and interpolated as if this ran every 62.5 us
 	//instead of every pwm period (2*ARR/72 MHz = 227.6 us), so the angle lagged and jumped.
 	if(!com){
-		if(edge&&u->HallTimeSum>=6*65535){
+		//The tracker starts from the last interval alone, at the second edge of a start or after a reversal. (On
+		//the average of six, > 65 ms each, it took ~6 edges: FOC position moves started and reversed on sector
+		//centres held 10-30 ms and stepped 60 deg el at the edges, the rotor lurched from stall to ~100 rpm, and
+		//the speed loop answered with +-5 A per edge: 2-2.4 m/s^2 rms, peaks 14, 35-70 Hz.)
+		if(edge&&u->HallTime[i]>=65535){
 			//no speed known (below ~10 rpm, after a reversal): the middle of the sector, error <= 30 deg.
 			//Starting at the boundary with a crawling interpolation the error grew to 60 deg until the next
 			//edge snapped it: in FOC a current transient that tripped (position hold near its target).
