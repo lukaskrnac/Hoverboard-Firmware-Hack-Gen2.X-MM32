@@ -155,17 +155,9 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       gates off above base speed: the back emf charges the bus through the diodes (a bench supply's
       overvoltage protection cut out). Braking from above base speed also raises a bench supply's
       bus (ramps pause and no braking current above `batfull`).
-- [ ] Partial field weakening (target speed just above base speed, the d current between 0 and
-      `fwimax`): the speed swings +-8-12 rpm at 1-10 Hz, 1.1-1.3 m/s^2 at 570-600 rpm with 5 A (the
-      old firmware the same, 1.3); at full field weakening (target beyond reach) 0.4-0.7, without
-      field weakening 0.2-0.5. I_d swings +-0.7 A around the field weakening controller's value. The
-      field weakening integrator (on the demanded voltage incl. the P terms) and the speed loop
-      interact; a feed forward d current from the speed (and the integrator only trimming) is the
-      next thing to try.
-      2026-10-28 re-measured (94 % limit, SK150C 24.5 V, 5 A): speed sd 4.0 / 3.3 / 4.2 rpm at 560 / 590 / 620
-      rpm (partial), 3.4 at 700 (full, 644 rpm reached), 1.9 at 450 (no field weakening): partial is no longer
-      worse than full. Vibration not measured (no accelerometer on the wheel now): re-check with it before
-      changing the controller.
+      2026-10-28: partial field weakening fixed (the speed loop on realspeed with field weakening too: 5 A
+      0.5-0.7 m/s^2, was 1.7-2.0). With 9 A both speed sources shake alike: 2.8 m/s^2 and +-14 rpm at 680 rpm
+      (I_d -7.5..-8 A), 1.6 at 740: the large d current itself (this item), not the speed measurement.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %

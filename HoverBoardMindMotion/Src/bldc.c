@@ -53,8 +53,11 @@ static int32_t PosID(int32_t errF, int32_t ff, int32_t meas, int32_t dtms, int32
 //up to 5 deg el and the edges jitter with the current: on fastspeed the loop (every 2 ms) turned that
 //into torque steps, broadband 20-250 Hz vibration that grew with speed (480 rpm: 0.78 m/s^2, 0.29 on
 //realspeed, a coasting wheel 0.33). realspeed lags ~3 intervals: below 60 rpm the loop limit-cycled on
-//it (0 -> 20 rpm: 115 % overshoot). With field weakening fastspeed again, faded in over its first 1 A:
-//there the loop swung +-13 rpm on realspeed (1.6 m/s^2 at 570 rpm with 5 A, 1.2 on fastspeed).
+//it (0 -> 20 rpm: 115 % overshoot). With field weakening it was fastspeed again (the loop had swung
+//+-13 rpm on realspeed there, before the hall tracker fixes); that was the vibration of partial field
+//weakening: 1.7-2.0 m/s^2 with a 57 Hz peak at 560-620 rpm with 5 A, I_q sd 0.12 A. On realspeed now:
+//0.6-0.7 m/s^2, the speed sd 3-4 rpm (was 3.5-4.9), also through steps in and out of field weakening
+//(2026-10-28). With 9 A both shake alike (~2.8 m/s^2 at 680 rpm: the edges move with the d current).
 //The same blend for the block speed loop (COM_SPEED): with the low side on for the step (commutation.h) the
 //wheel turns from ~5 % duty, and realspeed's lag limit-cycled it there (started from rest at 15-60 rpm it
 //swung between -12 and 140 rpm; the dead band of the old drive had hidden it).
@@ -64,12 +67,7 @@ static int32_t LowSpeedMeas(void){
 	if(a>=120) return realspeed;
 	return (f*(120-a)+realspeed*(a-60))/60;
 }
-static int32_t FocSpeedMeas(void){
-	int32_t f = fastspeed, m = LowSpeedMeas();
-	int32_t fw = -FocFieldWeakening();
-	if(fw>=1000) return f;
-	return (m*(1000-fw)+f*fw)/1000;
-}
+static int32_t FocSpeedMeas(void){ return LowSpeedMeas(); }
 
 //position gain, 0.1 rpm per hall step: POS_KP, default FOC 133 (ODrive's pos_gain 20 (turns/s)/turn),
 //block / sine 20 (they act on whole hall steps; more hunts around the target)
