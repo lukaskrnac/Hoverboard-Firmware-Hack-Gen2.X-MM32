@@ -62,6 +62,12 @@ protected) chip must be unlocked with a full chip erase first, see the installat
   long as debug is enabled (until power off), not only while halted. `tools/mm32flash.py` and
   `tools/mm32config.py` handle this themselves. To build without the watchdog, remove
   `#define WATCHDOG` in `Inc/pinout.h`.
+- A halted core leaves TIM1 running: the bridge keeps switching with the last compare values (a static
+  voltage vector, against the back emf at speed). The tools' halt (`Mm32.halt()`, used by
+  `mm32flash.py` and `mm32config.py`) clears TIM1 MOE / AOE right after the halt and its resume sets them
+  back (measured: the hold current's switching stopped while halted, the hold went on after the resume).
+  A plain debugger halt does not: clear bit 15 of TIM1_BDTR (0x40012C44) first. DBGMCU's TIMx_STOP
+  bits only freeze the counter.
 
 ## Control methods
 Two protocols on the same UART (one baud, config field `baud` in units of 100: 1152 = 115200):

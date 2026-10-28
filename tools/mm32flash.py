@@ -42,6 +42,7 @@ PROGRAM_STUB = struct.pack("<13H", 0x880C, 0x8004, 0x68DD, 0x2601, 0x4235, 0xD1F
                            0x3002, 0x3102, 0x3A01, 0xD1F5, 0xBE00, 0xBF00, 0xBF00)
 STUB_AT, BUF_AT, CHUNK, STACK_AT = 0x20000100, 0x20000400, 0x800, 0x20000FF0
 RAM, RAM_SIZE = 0x20000000, 0x1000                          # the routines use the firmware's RAM
+TIM1_BDTR, BDTR_MOE, BDTR_AOE = 0x40012C44, 1 << 15, 1 << 14   # the bridge outputs: main / automatic output enable
 
 
 class Mm32:
@@ -62,8 +63,14 @@ class Mm32:
         A halt does not stop the firmware's UART RX DMA, which writes received bus bytes into RAM
         (its ring can overlap the programming buffer at BUF_AT: a frame from a polling master landed in
         the flash image). Clearing the channel's EN bit does not stop it on this MM32 (measured: 60
-        bytes arrived with EN = 0), so the UARTs' DMA requests are switched off as well."""
+        bytes arrived with EN = 0), so the UARTs' DMA requests are switched off as well.
+        TIM1 keeps running while the core is halted: the bridge went on switching with the last compare
+        values, a static voltage vector (against the back emf at speed). Its main output enable (and the
+        automatic one, which would set it again at the next update) is cleared first; resume() sets them
+        back. DBGMCU's TIMx_STOP only freezes the counter, which can leave a phase switched on."""
         self.t.halt()
+        self.saved_bdtr = self.r(TIM1_BDTR)
+        self.w(TIM1_BDTR, self.saved_bdtr & ~(BDTR_MOE | BDTR_AOE))
         self.saved_regs = [(r, self.t.read_core_register(r)) for r in CORE_REGS]
         self.saved_uart = [(gcr, self.r(gcr)) for gcr in UART_GCR]
         for gcr, v in self.saved_uart:
@@ -95,6 +102,7 @@ class Mm32:
                 self.r(gcr - 0x18 + 0x04)                   # RDR
                 self.w(gcr - 0x18 + 0x14, (1 << 1) | (1 << 3))    # ICR: RX, RXOERR
         self.w(DBGMCU_CR, self.r(DBGMCU_CR) & ~DBGMCU_CR_IWDG_STOP)
+        self.w(TIM1_BDTR, self.r(TIM1_BDTR) | (self.saved_bdtr & (BDTR_MOE | BDTR_AOE)))    # the gates as they were
         self.feed()
         self.t.resume()
 

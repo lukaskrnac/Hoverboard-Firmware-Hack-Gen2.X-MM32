@@ -194,9 +194,6 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.
-- [ ] Halting the core over SWD (pyOCD, the tools' `Mm32.halt()`) leaves the bridge switching with the
-      last compare values: a static voltage vector, at speed against the back emf. Set DBGMCU TIM1_STOP
-      (if this MM32 has it: outputs off while halted) or have `halt()` clear MOE / AOE and restore them.
 - [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
       measured, see hallhandle.c), calibration_current / motor calibration, dc_max_positive/negative_current
       (bus current limits; the regeneration limit is by voltage, `batfull`), spinout detection.
