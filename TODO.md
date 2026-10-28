@@ -172,6 +172,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       spring. Fix = a rotor angle with bandwidth above ~50 Hz: a back emf / flux observer fused with the
       halls (sizeable). Until then fwimax <= ~5 A (README). Do not force I_d below -5 A again (2 g of
       shaking); never SWD while it runs (wedges the ST-Link).
+      Speed dependent (36 V, I_d forced, no field weakening): -4.5 A shook at 300 rpm only (450-750 calm), -6 A
+      at 600 not at 750, 0 A nowhere: not a mechanical resonance. Field weakening now capped at 8 mA per rpm
+      (smooth at any fwimax, ~647 rpm at 24 V instead of a shaking 680-733 with 9 A). More speed at the same
+      voltage still needs a rotor angle that follows the wobble (observer).
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %

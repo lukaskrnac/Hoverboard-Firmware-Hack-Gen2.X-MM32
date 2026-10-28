@@ -42,6 +42,7 @@
 static int32_t modMax = 30802, sampleMax = 31200;
 #define MOD_MAX modMax
 #define SAMPLE_MAX sampleMax
+#define FW_MA_PER_RPM 8                 //field weakening d current limit per rpm (below)
 #define INV_SQRT3_Q15 18919
 
 static int32_t cfg(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }    //0 and 65535 (an unset word) = default
@@ -487,6 +488,15 @@ void FocControl(void){
 	//omega*L (~0.37 V at 600 rpm). (An earlier "815 rpm with 6 A" was the median glitch filter feeding
 	//stale currents: the real d current was larger and uncontrolled, ~180 W from the supply.)
 	if(fwmax>imax*9/10) fwmax = imax*9/10;
+	//and at most FW_MA_PER_RPM per rpm: a negative d current in a frame off the rotor pushes it further off,
+	//and the hall frame follows the rotor better the faster it turns (more edges per second). Forced d
+	//current, bench, 36 V (no field weakening needed): -4.5 A shook at 300 rpm (3.1 m/s^2), not at 450-750;
+	//-6 A shook at 600 rpm (3.9 m/s^2, +-18 rpm), not at 750; 0 A nowhere (0.55-0.97, 300-800 rpm). With
+	//9 A of field weakening at 24 V, 680 rpm shook at 2.8 m/s^2.
+	{
+		int32_t a = realspeed<0 ? -realspeed : realspeed;
+		if(fwmax>a*FW_MA_PER_RPM) fwmax = a*FW_MA_PER_RPM;
+	}
 	if(fwmax&&vmag){
 		fwId -= (vmag-vmax*95/100)/64;
 		if(fwId<-fwmax) fwId = -fwmax; else if(fwId>0) fwId = 0;
