@@ -144,9 +144,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       (alternating), a short second isr run reads the shunt there and sets the trigger back to TRGO; bus current
       = (window 1 x I1 + window 2 x I2) / period; windows < 6 us count 0; SysTick restores the trigger if a
       sample never comes. Bench without the phase pins (config), sine 2 turns/s, braked by hand: follows the
-      load (0.1-1.2 A) but reads 1.5x the supply's current at every load, as the bench shunt's calibration
-      (itotaldivider 333 / itotalzero 495 from detect current) has never been checked against a meter: check
-      it against the SK150C (block, braked) before trusting either.
+      load (0.1-1.2 A) but reads 1.5x the supply's current at every load. Block, braked, same board: 1.6-1.85x.
+      So the bus shunt calibration from PinFinder's detect current (itotaldivider 333 / itotalzero 495, derived
+      from the phase currents) reads ~1.8x high on the bench board; not recalibrated against the supply (that
+      would only fix this board). If detect current is revisited: check its bus divider against a known load.
 - [ ] Position (v1 protocol): the target is int16 hall steps (the command field). Sine takes 1.6-2.2 s
       per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
