@@ -141,7 +141,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
 - [ ] Bus current in sine mode on boards **without** phase current pins: the shunt is sampled at the
       zero vector and reads ~0 (noise); they need a second sample inside an active vector. (With the
-      pins, sine now uses the phase currents like FOC, up to 90 % modulation.)
+      pins, sine now uses the phase currents like FOC.)
 - [ ] Position (v1 protocol): the target is int16 hall steps (the command field). Sine takes 1.6-2.2 s
       per move.
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
@@ -169,15 +169,13 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       2-4x (`pwmres` 4096/2730/2048) with the control every n-th period (the isr returns early in
       between), so the control period and all its timing stay 227.6 us. Cost: the op-amps need >= 2.5
       us of low side time either side of the sample (they lag the shunt by ~5 us, measured with all
-      phases at one duty): the modulation limit falls from 90 % to ~85 % at 13 kHz, ~80 % at 17.6 kHz
+      phases at one duty): the modulation limit falls from 94 % to ~85 % at 13 kHz, ~80 % at 17.6 kHz
       (top speed before field weakening), and 2-4x switching losses. The output lead (10/8) must be
       measured again then.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
       modulation until now (2.5 A shown); fixed, they are valid to 95.3 %.
-- [ ] FOC modulation limit 90 % could be ~94 %: the op-amps read correctly down to +-2.5 us of low
-      side time (C), +-1.5 us (B); 94 % leaves +-3.4 us. +4 % top speed before field weakening.
 - [ ] At high current and speed (field weakening) the ST-Link and the FTDI drop off USB now and then
       (ground noise through the shared USB ground, the hub resets). Test scripts read over the bus
       there; an isolator on the SWD/UART link would help.

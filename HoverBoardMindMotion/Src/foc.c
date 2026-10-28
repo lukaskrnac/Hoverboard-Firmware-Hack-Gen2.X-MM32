@@ -5,7 +5,7 @@
 //is only valid while the low sides conduct and saturates otherwise (gates off, high side on), so the
 //adc samples at the pwm counter's zero (TIM1 CC4 = 1, centre of the low side time), the zero current
 //offsets are measured with the gates on and the zero vector applied, and the modulation is limited to
-//90 % of the linear range (low side time at the sample >= ~5 us). Measured gain: 19.4 counts/A
+//94 % of the linear range (low side time at the sample >= ~3.4 us; the op-amps need 2.5). Measured gain: 19.4 counts/A
 //(51.5 mA per count), offset ~1520 counts.
 //Received UART traffic (the master transmitting on the RemoteUartBus) couples into the op-amp outputs:
 //at 115200 ~5 samples per second read ~170 counts (~9 A) off on one channel, mostly for one period,
@@ -36,7 +36,7 @@
 #include "FOC_Math.h"
 #include "calculation.h"
 
-#define MOD_MAX      29491        //90 % of the linear svpwm range (32768)
+#define MOD_MAX      30802        //94 % of the linear svpwm range (32768)
 //sine: phase currents valid up to 95.3 % (31211): low side time +-2.7 us at 8192, the op-amps need 2.5
 #define SAMPLE_MAX   31200
 #define INV_SQRT3_Q15 18919
