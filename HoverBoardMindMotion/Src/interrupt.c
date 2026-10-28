@@ -23,6 +23,27 @@ volatile uint8_t realdir=0;
 static uint8_t buzzLevel;
 volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILIMIT)
 
+//Bus current in sine on a board without phase current pins. At the control sample (the counter's zero) all
+//low sides conduct and the shunt reads ~0. In centre aligned pwm the switch state depends on the counter
+//value only: between the smallest and the middle compare value one high side is on (the shunt carries that
+//phase's current), between the middle and the largest two (minus the third phase's current). So after the
+//control step the adc trigger moves to TIM1 CC4 in the middle of one of the two windows (they alternate),
+//its conversion is read in a short second run of this isr, which sets the trigger back to TRGO. The bus
+//current = (window 1 x I1 + window 2 x I2) / period. A window too short for a settled sample counts as 0
+//(it carries little). BusSampleCheck() (SysTick) restores the trigger if a sample never came.
+#define BUS_MINW 432                 //timer counts (6 us): the sample >= 3 us from both switching edges
+static volatile uint8_t busPending, busWhich;
+static volatile uint32_t busT;
+static int32_t busI[2];              //0.01 A, the last sample of each window
+static int32_t shuntCurrent(int32_t a){    //an adc reading of the shunt -> 0.01 A (0 below the zero)
+	int32_t raw = a-(int32_t)itotaloffset, zero = cfgOrDefault(ITOTAL_ZERO, 0);
+	return raw>0&&vrefint ? (int32_t)ITOTAL_DIVIDER*(raw*100+zero)*120/vrefint/100 : 0;
+}
+static void adcTrigger(uint32_t src){ ADC1->ADCR = (ADC1->ADCR&~ADC_CR_TRGSEL)|src; }
+void BusSampleCheck(void){
+	if(busPending&&millis-busT>2){ busPending = 0; adcTrigger(ADC_CR_T1_TRIG); }
+}
+
 
 //commutation interrupt
 void TIM1_BRK_UP_TRG_COM_IRQHandler(void){
@@ -35,7 +56,16 @@ void ADC1_COMP_IRQHandler(void){
 		TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
   }
 	if(RESET != ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
+		if(busPending){    //the CC4 sample inside an active vector: the bus current, then back to the control sample
+			adcTrigger(ADC_CR_T1_TRIG);
+			busPending = 0;
+			busI[busWhich] = shuntCurrent(analogRead(ITOTALPIN));
+			ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
+			return;
+		}
 		adcticks++;
+		//the compare values active in this period (written by the last control step, loaded at this update)
+		int32_t cc[3] = { (int32_t)TIM1->CCR1, (int32_t)TIM1->CCR2, (int32_t)TIM1->CCR3 };
 		if(poweron<127){//cancel out adc offset
 			itotaloffset+=analogRead(ITOTALPIN);
 			poweron++;
@@ -64,11 +94,17 @@ void ADC1_COMP_IRQHandler(void){
 				                                : (uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
 				//a zero below adc 0 (ITOTAL_ZERO) reads 0 up to that current (0.76 A on the bench board), then
 				//the shifted value
-				int32_t raw = (int32_t)analogRead(ITOTALPIN)-(int32_t)itotaloffset;
-				int32_t zero = cfgOrDefault(ITOTAL_ZERO, 0);
-				itotal = raw>0 ? (int32_t)ITOTAL_DIVIDER*(raw*100+zero)*120/vrefint/100 : 0;
+				itotal = shuntCurrent(analogRead(ITOTALPIN));
 			}
 			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC, sine = COMMUTATION(DRIVEMODE)==COMMUT_SINE;
+			//sine without phase current pins: the bus current from the active vectors (above)
+			uint8_t busv = sine&&!FocAvailable()&&ITOTALPIN<PINCOUNT&&(TIM1->BDTR&TIM_BDTR_MOEN);
+			int32_t lo = cc[0], mid = cc[1], hi = cc[2], t;
+			if(lo>mid){ t = lo; lo = mid; mid = t; }
+			if(mid>hi){ t = mid; mid = hi; hi = t; }
+			if(lo>mid){ t = lo; lo = mid; mid = t; }
+			if(busv) itotal = ((mid-lo)*busI[0]+(hi-mid)*busI[1])/(int32_t)PWM_PERIOD;
+			else busI[0] = busI[1] = 0;
 			if(foc||sine){
 				//phase currents (if the board has the pins); itotal from them: the shunt reads ~0 at this
 				//sample time (all low sides on)
@@ -108,6 +144,16 @@ void ADC1_COMP_IRQHandler(void){
 				FocObserve();
 			}else if(foc){
 				FocControl();
+			}
+			if(busv){    //the next bus sample: the other window of this period's vectors
+				busWhich ^= 1;
+				int32_t a = busWhich ? mid : lo, b = busWhich ? hi : mid;
+				if(b-a>=BUS_MINW){
+					TIM1->CCR4 = (uint16_t)((a+b)/2);
+					busT = millis;
+					busPending = 1;
+					adcTrigger(ADC_CR_TIM1_CC4);
+				}else busI[busWhich] = 0;
 			}
 		}
 		ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);

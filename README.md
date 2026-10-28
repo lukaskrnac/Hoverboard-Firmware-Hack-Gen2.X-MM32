@@ -123,6 +123,10 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
   - Block: a current loop on the bus shunt, which carries the phase current at the sample time in
     block mode.
   - Sine: no current sensing; the voltage is computed from `motorr` and the back EMF.
+- **Bus current in sine without phase current pins:** the shunt is sampled inside the active vectors (the adc
+  trigger moves to TIM1 CC4 between the compare values for one sample per control period, the two windows
+  alternating) and weighted by their durations; the zero vector sample reads ~0. It follows the load on the
+  bench (braked by hand), the scale depends on the shunt calibration (`itotaldivider`, `itotalzero`).
 - **Field weakening** is off by default (CANSimple: `hoverboard.foc.field_weakening_current`,
   `hoverboard.sine.field_weakening_advance`; the console's drive panel has both).
   - FOC: `fwimax`, the most negative d current, at most 90 % of the current limit. A controller sets

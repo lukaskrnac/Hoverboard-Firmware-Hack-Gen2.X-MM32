@@ -1,6 +1,7 @@
 
 #include "delay.h"
 #include "main.h"
+#include "interrupt.h"
 #include "hal_rcc.h"
 
 static __IO u32 sTimingDelay;
@@ -25,6 +26,7 @@ void SysTick_Handler(void)
 {
     TimingDelayDecrement();
 	millis++;
+	BusSampleCheck();    //interrupt.c: a bus current sample that never came
 }
 
 void DELAY_Ms(__IO u32 count)
