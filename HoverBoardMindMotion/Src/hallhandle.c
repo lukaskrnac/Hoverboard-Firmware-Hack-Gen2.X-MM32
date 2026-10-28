@@ -126,7 +126,7 @@ void HALLModuleCalc(HALLType *u){
 		//count running since the previous edge: it was taken as an edge two periods old (the angle
 		//tracker ~2 periods of travel off, at 300 rpm on ~10 % of the edges). A count above 1.5 periods
 		//is that case: the interval is the count, the edge is now.
-		uint32_t per = ((uint32_t)TIM1->ARR+18)/36;    //pwm period, us
+		uint32_t per = (CTRL_ARR+18)/36;    //control period, us
 		uint32_t cnt = tim->CNT;
 		if(cnt>per*3/2){
 			u->HallTime[i] = cnt;
@@ -197,8 +197,8 @@ void HALLModuleCalc(HALLType *u){
 			//with the d current. The rotor (inertia) turns smoothly: the edges correct, they do not set.
 			int32_t s = u->MoveDir;
 			uint32_t ivl = u->HallTime[i];    //us
-			uint32_t per = ((uint32_t)TIM1->ARR+18)/36;    //pwm period, us
-			uint32_t k = (uint32_t)TIM1->ARR*16384/54;    //65536*2*ARR/72/6 / interval: per period, 65536 per turn
+			uint32_t per = (CTRL_ARR+18)/36;    //control period, us
+			uint32_t k = CTRL_ARR*16384/54;    //65536*2*ARR/72/6 / interval: per period, 65536 per turn
 			uint32_t q = k/ivl, r = k%ivl;    //(k<<16)/ivl in 32 bits: 2^32 per turn
 			int32_t wMeas = s*(int32_t)((q<<16)+(((r<<8)/ivl)<<8));
 			uint32_t bnd = (uint32_t)(s>0 ? bndLo[raw] : bndHi[raw])<<16;    //the edge just crossed
@@ -249,10 +249,12 @@ void HALLModuleCalc(HALLType *u){
 		if(pllOn){
 			//output lead 10/8 periods: measured with FOC at 300 and 480 rpm, where the d voltage the loops
 			//settle at (no d current) is 0 (frame on the rotor). (It was 9/8 with the tracker that ran
-			//a period ahead at the edges.)
+			//a period ahead at the edges.) With the control every n-th pwm period (pwmDiv): the outputs
+			//take effect at the next update, n pwm periods later, and hold n periods, centred 1.5 n
+			//later; less the measured 1/4 pwm period: (24 - 4/n)/16 control periods (n = 1: 10/8)
 			int32_t aw = pllW<0 ? -pllW : pllW;
 			u->IncAngle = (int16_t)(aw>>16);
-			u->Angle = (int16_t)((pllTh+(uint32_t)(pllW/8*10))>>16)+u->MoveDir*CWShift;
+			u->Angle = (int16_t)((pllTh+(uint32_t)(pllW/16*(24-4/pwmDiv)))>>16)+u->MoveDir*CWShift;
 			//the tracker angle is the one when the hall timer is read here, ~25 us (1/8 period) after the
 			//counter zero, the current sample's time
 			hallAngleSample = (int16_t)((pllTh-(uint32_t)(pllW/8))>>16);

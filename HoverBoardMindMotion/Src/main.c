@@ -43,6 +43,7 @@ static uint8_t chargeRaw;
 static uint32_t chargeT;
 uint8_t uarten=1;
 uint8_t halltimen=1;
+uint8_t pwmDiv=1;    //pwm periods per control period (pinout.h)
 ////////////////////////////////////////////////////////////////////////////////////////////
 //  compile device specefic firmware for mass produce
 //  change EEPROMEN to 0
@@ -114,10 +115,13 @@ s32 main(void){
 
 	ConfigMigrate();
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
-	//pwm period: not below 8192 (4.39 kHz). The adc isr takes 47-66 us, and the phase current op-amps lag
-	//the shunt by ~5 us and need >= 2.5 us of low side time either side of the sample: at 2048 (17.6
-	//kHz, 57 us) neither fits. The RAM value only takes effect here (the code uses the timer's ARR).
-	if(PWM_RES<8192||PWM_RES>16383) PWM_RES = 8192;
+	//pwm period 2048..16383 (17.6..2.2 kHz). The control (the adc isr: 53-73 us in sine, 88-110 in FOC) runs
+	//at ~4.39 kHz whatever the pwm: every pwmDiv-th period below 8192 (2: 8.8 kHz, 3: 13.2, 4: 17.6). It ran
+	//every period, and from ~8.8 kHz the isr overran its period: the sine angle stood still while the field
+	//kept driving, up to ~100 W into a standing motor. The phase current modulation limit follows the
+	//shorter low side time (foc.c). The RAM value only takes effect here (the code uses the timer's ARR).
+	if(PWM_RES<2048||PWM_RES>16383) PWM_RES = 8192;
+	pwmDiv = PWM_RES>=8192 ? 1 : (uint8_t)((8192+PWM_RES/2)/PWM_RES);
 
 	//initialize normal gpio
 	io_init();
@@ -129,6 +133,11 @@ s32 main(void){
 	BLDC_init();
 	//initialize timer
 	TIM1_init(PWM_RES, 0);
+	//the adc on TRGO = the update event, every pwmDiv-th period at the counter's zero (the centre of the low
+	//side time; the repetition counter counts half periods). The compare registers reload there too, so a
+	//control step's outputs hold for its whole period. RCR is preloaded: from the next update on.
+	TIM1->RCR = (uint32_t)(2*pwmDiv-1);
+	TIM1->CR2 = (TIM1->CR2&~TIM_CR2_MMS)|TIM_CR2_MMS_UPDATE;
 	//systick config
 	//timer1 commutation interrupt config
 	NVIC_Configure(TIM1_BRK_UP_TRG_COM_IRQn, 1);

@@ -4,7 +4,7 @@
 #include "pinout.h"
 #include "bldc.h"
 
-//running averages of the adc isr: 32 (vbat) and 64 (itotal) samples, one per pwm period. The samples
+//running averages of the adc isr: 32 (vbat) and 64 (itotal) samples, one per control period. The samples
 //are kept as int16 (0.01 V / 0.01 A: +-327 V / A), clamped
 static uint8_t vindex;
 static int vdatasum;

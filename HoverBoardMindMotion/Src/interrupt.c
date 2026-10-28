@@ -18,7 +18,7 @@
 static uint32_t itotaloffset=0;
 volatile uint8_t poweron=0;
 static uint16_t vrefint;    //last internal 1.2V reference conversion
-static volatile uint32_t adcticks;    //adc interrupts since boot (one per pwm period)
+static volatile uint32_t adcticks;    //adc interrupts since boot (one per control period, pinout.h)
 volatile uint8_t realdir=0;
 static uint8_t buzzLevel;
 volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILIMIT)

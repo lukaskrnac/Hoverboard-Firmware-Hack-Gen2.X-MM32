@@ -261,7 +261,7 @@
    "index": 37,
    "name": "pwmres",
    "kind": "num",
-   "meaning": "TIM1 period, 8192..16383 (4.39..2.2 kHz), read at boot"
+   "meaning": "TIM1 period 2048..16383 (17.6..2.2 kHz), read at boot; the control stays at ~4.39 kHz, FOC modulation limit 94 % at 8192, 76 % at 2048"
   },
   {
    "index": 38,

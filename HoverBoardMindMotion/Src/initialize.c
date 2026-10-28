@@ -225,7 +225,7 @@ void adc_Init(void){
 	ADC_InitStructure.ADC_PRESCALE = ADC_PCLK2_PRESCALE_6;							//for 72MHz
 	ADC_InitStructure.ADC_Mode = ADC_Mode_Single_Period;
 	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC4;
+	ADC_InitStructure.ADC_ExternalTrigConv = ADC1_ExternalTrigConv_T1_TRIG;    //TIM1 TRGO: every pwmDiv-th update (main.c)
 	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
 	ADC_Init(ADC1, &ADC_InitStructure);
 	ADC_ExternalTrigConvCmd(ADC1,ENABLE);

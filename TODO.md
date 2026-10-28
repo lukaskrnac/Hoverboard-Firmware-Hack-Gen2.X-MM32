@@ -162,16 +162,6 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       field weakening integrator (on the demanded voltage incl. the P terms) and the speed loop
       interact; a feed forward d current from the speed (and the integrator only trimming) is the
       next thing to try.
-- [ ] **PWM whine** (4.39 kHz, audible at low speed). The adc isr takes 88 us on average, 110 us at
-      most in FOC (sine 53 / 73, block 28 / 40; measured at 120 rpm with the hardware divider: it was
-      126 / 168 in FOC with libgcc's division), so the pwm period cannot shrink with the control running
-      every period. Plan: pwm at
-      2-4x (`pwmres` 4096/2730/2048) with the control every n-th period (the isr returns early in
-      between), so the control period and all its timing stay 227.6 us. Cost: the op-amps need >= 2.5
-      us of low side time either side of the sample (they lag the shunt by ~5 us, measured with all
-      phases at one duty): the modulation limit falls from 94 % to ~85 % at 13 kHz, ~80 % at 17.6 kHz
-      (top speed before field weakening), and 2-4x switching losses. The output lead (10/8) must be
-      measured again then.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %

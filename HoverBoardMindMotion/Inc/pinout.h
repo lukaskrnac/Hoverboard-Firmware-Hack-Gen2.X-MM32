@@ -95,9 +95,13 @@ static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : de
 #define ITOTAL_DIVIDER pinstorage[34]    //itotal = divider * adc voltage: 1/shunt ohm for a direct shunt (333 = 3 mOhm: the
                                          //bench board's R003; PinFinder detect current <mV> <shunt mOhm>)
 #define BAUD pinstorage[36]    //uart baud / 100 (config version 2; 1152 = 115200)
-#define PWM_RES pinstorage[37]    //TIM1 period (centre aligned: 72 MHz / 2 / PWM_RES), read at boot; 8192 .. 16383
+#define PWM_RES pinstorage[37]    //TIM1 period (centre aligned: 72 MHz / 2 / PWM_RES), read at boot; 2048 .. 16383
 //the period the timer runs at: the code uses this, not PWM_RES (a RAM change applies at the next start)
 #define PWM_PERIOD ((uint16_t)TIM1->ARR)
+//the control period: the adc (and its isr, the whole motor control) runs every pwmDiv-th pwm period (TIM1's
+//repetition counter and TRGO, main.c); as an ARR, so (CTRL_ARR+18)/36 is the period in us
+extern uint8_t pwmDiv;
+#define CTRL_ARR ((uint32_t)TIM1->ARR*pwmDiv)
 #define SLAVE_ID pinstorage[38]
 #define WINDINGS pinstorage[39]
 #define INVERT_LOWSIDE pinstorage[40]

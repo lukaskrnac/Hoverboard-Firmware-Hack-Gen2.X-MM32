@@ -228,7 +228,7 @@
    "id": 37,
    "type": "uint16",
    "access": "rw",
-   "unit": "TIM1 period, 8192..16383 (4.39..2.2 kHz), read at boot"
+   "unit": "TIM1 period 2048..16383 (17.6..2.2 kHz), read at boot; the control stays at ~4.39 kHz, FOC modulation limit 94 % at 8192, 76 % at 2048"
   },
   "hoverboard.config.slaveid": {
    "id": 38,

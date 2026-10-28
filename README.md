@@ -157,10 +157,17 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
 - **VEL_RAMP** (`vel_ramp_rate`): the set point runs at most 0.25 s of the ramp (at least 30 rpm)
   ahead of the wheel, so an unreachable command doesn't wind it up: a lower command takes effect at
   once. The command is limited to `vel_limit` before the ramp.
-- **PWM frequency:** `pwmres` (TIM1 period, read at boot) must stay at 8192 (4.39 kHz) or above. The
-  control interrupt takes (average / max, at 120 rpm) 88 / 110 us in FOC, 53 / 73 us in sine, 28 /
-  40 us in block, and the phase current op-amps lag the shunt by ~5 us; at 2048 (17.6 kHz, a 57 us
-  period) neither fits, so lower values are replaced by 8192.
+- **PWM frequency:** `pwmres` (TIM1 period, read at boot), 2048..16383 = 17.6..2.2 kHz; default 8192
+  (4.39 kHz). The control (the adc interrupt: 88 / 110 us average / max in FOC, 53 / 73 in sine) always
+  runs at ~4.39 kHz: below 8192 every n-th pwm period (4096: 2 = 8.8 kHz, 2730: 3 = 13.2 kHz, 2048: 4 =
+  17.6 kHz), by TIM1's repetition counter and the adc on its TRGO, so the outputs of a control step hold
+  for its whole period. (Before, the interrupt ran every period and overran it from ~8.8 kHz: the sine
+  angle stood still while the field kept driving, up to ~100 W into a standing motor.) Cost: the phase
+  current op-amps need 2.5 us of low side time either side of the sample, so the FOC modulation limit
+  falls with the period: 94 % at 4.39 kHz (top speed 544 rpm on the bench wheel at 24 V), 88 % at 8.8
+  (509), 84 % at 13.2 (472), 76 % at 17.6 kHz (436); field weakening makes up the rest. Block and sine
+  run unchanged at every setting (bench: the same currents at 0.25-2 turns/s, ~1 W from the supply).
+  17.6 kHz is above most people's hearing.
 
 Configs saved before the version field (word 63) used 2/3 for SINE_VOLT/SINE_SPEED; they are
 migrated at boot. FOC needs the two phase current pins (`iphasea`/`iphaseb`, `iphasecfg` selects the

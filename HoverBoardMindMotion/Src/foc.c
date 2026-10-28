@@ -21,7 +21,7 @@
 //the bus current come from the filtered d / q, the trip one period later (after the angle). The offset
 //calibration (standing, zero vector) keeps a median of 9 per channel. A trip needs two periods in a row.
 //
-//Loop: every pwm period in the adc isr. Park angle = the hall tracker's angle at the sample
+//Loop: every control period (every pwmDiv-th pwm period, ~4.39 kHz) in the adc isr. Park angle = the hall tracker's angle at the sample
 //(hallAngleSample; HALL1.Angle has the output lead); PI per axis in mV with back emf feed
 //forward on q and the dq decoupling (omega*L*i, L 0.46 mH: at 170 Hz electrical omega*L ~ 0.5 Ohm, as
 //large as kp); on the voltage circle d first, q gets the rest, integration stops in saturation.
@@ -36,9 +36,12 @@
 #include "FOC_Math.h"
 #include "calculation.h"
 
-#define MOD_MAX      30802        //94 % of the linear svpwm range (32768)
-//sine: phase currents valid up to 95.3 % (31211): low side time +-2.7 us at 8192, the op-amps need 2.5
-#define SAMPLE_MAX   31200
+//modulation limits from the low side time the op-amps need either side of the sample (2.5 us): FOC 94 % at
+//8192 (+-3.4 us; 4.39 kHz), sine's valid phase currents to 95.3 % (+-2.73 us). The low side half time is
+//(1 - m) T / 4: at 4096 (8.8 kHz) 88 / 90.4 %, at 2048 (17.6 kHz) 76 / 81 % (FocInit())
+static int32_t modMax = 30802, sampleMax = 31200;
+#define MOD_MAX modMax
+#define SAMPLE_MAX sampleMax
 #define INV_SQRT3_Q15 18919
 
 static int32_t cfg(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }    //0 and 65535 (an unset word) = default
@@ -213,6 +216,8 @@ uint8_t FocAvailable(void){
 }
 
 void FocInit(void){
+	modMax = 32768-446956L*36/(int32_t)TIM1->ARR;      //32768 * 4 * 3.41 us / T, T = ARR/36 us
+	sampleMax = 32768-357826L*36/(int32_t)TIM1->ARR;   //2.73 us
 	adc1 = adcResultReg(IPHASEAPIN);
 	adc2 = adcResultReg(IPHASEBPIN);
 	FocReset();
@@ -373,7 +378,7 @@ void FocControl(void){
 		else if(dr<-8192&&holdIq>-imax) holdIq--;
 		int32_t ih = cfg(HOLD_CURRENT, 40)*100, ihm = IMAX()*9/10; if(ih>ihm) ih = ihm;    //hold_current
 		int32_t kp = KP(), ed = ih-id;
-		intD += KI()*(((int32_t)PWM_PERIOD+18)/36)*ed/1000;
+		intD += KI()*(((int32_t)CTRL_ARR+18)/36)*ed/1000;
 		int32_t vd = kp*ed/1000+intD/1000;
 		if(vd>vmax){ intD -= (vd-vmax)*1000; vd = vmax; } else if(vd<-vmax){ intD -= (vd+vmax)*1000; vd = -vmax; }
 		intQ = 0; fwId = 0; qSat = 0;
@@ -412,7 +417,7 @@ void FocControl(void){
 	int32_t ed = idRef-id, eq = iqRef-iq;
 	if(ed>20000) ed = 20000; else if(ed<-20000) ed = -20000;
 	if(eq>20000) eq = 20000; else if(eq<-20000) eq = -20000;
-	int32_t kp = KP(), kiTs = KI()*(((int32_t)PWM_PERIOD+18)/36);    //Ts in us
+	int32_t kp = KP(), kiTs = KI()*(((int32_t)CTRL_ARR+18)/36);    //Ts in us: the control period
 	int32_t kv = cfg(SINE_KV, 242);
 	//back emf feed forward and decoupling from realspeed (6 hall intervals), not fastspeed (the last one):
 	//the hall intervals jitter with the phase current (+-3 % at no load, +-20 % with field weakening at
