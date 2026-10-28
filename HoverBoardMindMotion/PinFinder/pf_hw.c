@@ -118,14 +118,13 @@ void GatesOff(void){
 	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
 }
 
-//bldc.c's commutate() (commutation.h): CCxNE alone follows OCxREF, so the low side is on together with the
-//high side for the duty
+//bldc.c's commutate() (commutation.h): the high side chops, the low side stays on for the step
 static const uint16_t blockCcer[7] = BLOCK_CCER_INIT;
 
 static void outputs(uint32_t ccer, uint16_t duty){
 	const uint32_t all = TIM_CCER_CC1EN|TIM_CCER_CC1NEN|TIM_CCER_CC2EN|TIM_CCER_CC2NEN|TIM_CCER_CC3EN|TIM_CCER_CC3NEN;
-	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|TIM_OCMode_PWM1|TIM_OCMode_PWM1<<8;
-	TIM1->CCMR2 = (TIM1->CCMR2&~TIM_CCMR2_OC3M)|TIM_OCMode_PWM1;
+	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|BlockOcMode(ccer, 0)|BlockOcMode(ccer, 1)<<8;
+	TIM1->CCMR2 = (TIM1->CCMR2&~TIM_CCMR2_OC3M)|BlockOcMode(ccer, 2);
 	TIM1->CCER = (TIM1->CCER&~all)|ccer;
 	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = duty;
 	TIM1->EGR = TIM_EventSource_COM;

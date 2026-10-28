@@ -256,10 +256,12 @@ void CalKv(const char* which, int32_t top){
 	if(!hallsSet()) return;
 	if(WINDINGS<2||WINDINGS>200){ err("windings not set: calibrate poles first"); return; }
 	uint8_t sine = which&&which[0]=='s';
-	if(top<=0) top = sine ? 4000 : 500;
+	//block: 18 / 24 / 30 % (with the low side on for the step the speed is linear in the duty from ~5 % to ~30 %
+	//and bends above: 30-50 % put d0 below 0 and it was not stored)
+	if(top<=0) top = sine ? 4000 : 300;
 	int32_t vb = VbatMv();
 	if(vb<10000){ err("no battery pin: detect vbat first"); return; }
-	note("wheel spins at 3 speeds (keep it unloaded)");
+	note("wheel spins at 3 speeds (unloaded)");
 	float x[3], y[3];
 	if(sine) centres();
 	RotateStop();

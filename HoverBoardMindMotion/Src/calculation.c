@@ -39,7 +39,8 @@ void avgItotal(void){
 //COM_SPEED / SINE_SPEED: PI with feed forward and a reference model, run from the main loop every ~2 ms.
 //Output in permille of full scale (duty for block, modulation 32768 for sine), internally permille<<8.
 //Plants measured on an unloaded wheel at 24.3 V (first order):
-//  block: rpm = 0.958 * (duty_permille - 185), tau 0.5 s (freewheels, no active braking)
+//  block: rpm = 0.87 * (duty_permille - 53), tau 0.5 s (freewheels, no active braking; the old drive, both sides
+//  chopping: 0.958 * (duty - 185), see commutation.h)
 //  sine:  rpm = 0.588 * (modulation_permille - 10), tau 0.06 s (complementary switching brakes too)
 //Feed forward = dead band + rpm / (kv * vbat). The PI acts on the error against the set point filtered
 //by tref (reference model), so it only corrects what the feed forward model misses.
@@ -73,7 +74,7 @@ void SpeedParams(uint8_t mode, SpeedPlant* p){    //config fields, 0 = default
 	}else{
 		//default gains 2x below where steps from rest start to overshoot (100/200), 4x below instability
 		p->kp = cfgOr(SPEED_KP, 50); p->ki = cfgOr(SPEED_KI, 100); p->kd = cfgOrDefault(SPEED_KD, 0);
-		p->kv = cfgOr(SPEED_KV, 395); p->d0 = cfgOr(SPEED_D0, 185); p->tref = 350;
+		p->kv = cfgOr(SPEED_KV, 355); p->d0 = cfgOr(SPEED_D0, 53); p->tref = 350;
 		p->umax = SPD_UMAX;
 	}
 }
@@ -151,7 +152,7 @@ int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm){    //mA (magnitud
 	if(dt > 20) dt = 20;
 	if(rpm > 1000) rpm = 1000; else if(rpm < -1000) rpm = -1000;
 	int32_t ff = (p.d0<<8)+rpm*256000/(p.kv*v/1000);    //permille<<8: FeedForward() of the speed along the command;
-	if(ff < 0) ff = 0;    //no current flows below the dead band (block needs 18.5 % at standstill)
+	if(ff < 0) ff = 0;    //below the dead band (friction: ~5 % at standstill) no torque
 	int32_t e = iref - imeas;
 	int32_t di = 800*e/1000*256/1000*dt;    //ki 800 permille per A*s
 	int32_t u = ff + 5*e*256/1000 + trqI + di;    //kp 5 permille per A

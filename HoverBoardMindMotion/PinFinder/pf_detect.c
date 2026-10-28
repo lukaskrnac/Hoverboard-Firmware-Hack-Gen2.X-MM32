@@ -378,7 +378,7 @@ void Rotate(int32_t permille, uint32_t ms){
 	kvi("hall_steps_backward", b);
 	kvi("hall_errors", bad);
 	if(VBATPIN<PINCOUNT) kvmv("battery", VbatMv());
-	if(f+b<6) err("motor did not turn (more duty? hall pins?)");
+	if(f+b<6) err("motor did not turn (more duty? halls?)");
 	else if(bad*10>f+b) err("hall sequence errors");
 	else ok();
 }

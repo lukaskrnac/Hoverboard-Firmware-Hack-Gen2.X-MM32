@@ -113,6 +113,11 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
   brake, sine: ramp down then zero vector, FOC: speed loop); torque modes give zero current (FOC)
   or coast (block, sine). Position modes take the command as the target odometer (like the GD32's
   iOdom input) and hold it. When the remote goes silent they hold where they are.
+- **Block output:** in each commutation step the high side chops and the other phase's low side stays on
+  (`Inc/commutation.h`), so the current freewheels continuously: the wheel turns from ~5 % duty and the
+  speed is linear in the duty (bench: 0.87 rpm per permille above 5 %). Before, both chopped together and
+  the current collapsed in every off time (nothing below 20 % duty). The block speed loop measures on the
+  last hall interval below 60 rpm (like FOC): steady from 15 rpm, steps overshoot <= 2 %.
 - **Torque:**
   - FOC: measured phase current.
   - Block: a current loop on the bus shunt, which carries the phase current at the sample time in

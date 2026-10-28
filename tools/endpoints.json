@@ -306,13 +306,13 @@
    "id": 50,
    "type": "uint16",
    "access": "rw",
-   "unit": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 395"
+   "unit": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 355"
   },
   "hoverboard.config.speedd0": {
    "id": 51,
    "type": "uint16",
    "access": "rw",
-   "unit": "COM_SPEED feed forward: dead band permille duty, 0 = default 185"
+   "unit": "COM_SPEED feed forward: dead band permille duty, 0 = default 53"
   },
   "hoverboard.config.sinekp": {
    "id": 52,

@@ -55,11 +55,17 @@ static int32_t PosID(int32_t errF, int32_t ff, int32_t meas, int32_t dtms, int32
 //realspeed, a coasting wheel 0.33). realspeed lags ~3 intervals: below 60 rpm the loop limit-cycled on
 //it (0 -> 20 rpm: 115 % overshoot). With field weakening fastspeed again, faded in over its first 1 A:
 //there the loop swung +-13 rpm on realspeed (1.6 m/s^2 at 570 rpm with 5 A, 1.2 on fastspeed).
+//The same blend for the block speed loop (COM_SPEED): with the low side on for the step (commutation.h) the
+//wheel turns from ~5 % duty, and realspeed's lag limit-cycled it there (started from rest at 15-60 rpm it
+//swung between -12 and 140 rpm; the dead band of the old drive had hidden it).
+static int32_t LowSpeedMeas(void){
+	int32_t f = fastspeed, a = f<0 ? -f : f;
+	if(a<=60) return f;
+	if(a>=120) return realspeed;
+	return (f*(120-a)+realspeed*(a-60))/60;
+}
 static int32_t FocSpeedMeas(void){
-	int32_t f = fastspeed, a = f<0 ? -f : f, m;
-	if(a<=60) m = f;
-	else if(a>=120) m = realspeed;
-	else m = (f*(120-a)+realspeed*(a-60))/60;
+	int32_t f = fastspeed, m = LowSpeedMeas();
 	int32_t fw = -FocFieldWeakening();
 	if(fw>=1000) return f;
 	return (m*(1000-fw)+f*fw)/1000;
@@ -112,17 +118,19 @@ uint8_t hallpos(uint8_t forward){
 //bits stay), then the COM event: with CCPC set (TIM1_init) these registers are preloaded and switch
 //together at that event
 #define CCER_EN (TIM_CCER_CC1EN|TIM_CCER_CC1NEN|TIM_CCER_CC2EN|TIM_CCER_CC2NEN|TIM_CCER_CC3EN|TIM_CCER_CC3NEN)
-static void tim1Outputs(uint32_t mode, uint32_t en){
-	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|mode|mode<<8;
-	TIM1->CCMR2 = (TIM1->CCMR2&~TIM_CCMR2_OC3M)|mode;
+static void tim1Modes(uint32_t m1, uint32_t m2, uint32_t m3, uint32_t en){    //a mode per channel
+	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|m1|m2<<8;
+	TIM1->CCMR2 = (TIM1->CCMR2&~TIM_CCMR2_OC3M)|m3;
 	TIM1->CCER = (TIM1->CCER&~CCER_EN)|en;
 	TIM1->EGR = TIM_EventSource_COM;
 }
+static void tim1Outputs(uint32_t mode, uint32_t en){ tim1Modes(mode, mode, mode, en); }
 
-//block commutation (commutation.h)
+//block commutation (commutation.h): the high side chops, the low side stays on for the step (BlockOcMode)
 void commutate(void){//U,V,W(A,B,C)
 	static const uint16_t en[7] = BLOCK_CCER_INIT;
-	tim1Outputs(TIM_OCMode_PWM1, step<7 ? en[step] : 0);    //other steps: 0,0,0
+	uint32_t e = step<7 ? en[step] : 0;    //other steps: 0,0,0
+	tim1Modes(BlockOcMode(e, 0), BlockOcMode(e, 1), BlockOcMode(e, 2), e);
 }
 
 
@@ -325,7 +333,7 @@ void speedupdate(void){
 						SpeedPlant p;
 						SpeedParams(DRIVEMODE, &p);
 						//permille of full scale: duty (PWM_PERIOD) for block, modulation (32768) for sine
-						pwm = SpeedCtrl(spd,realspeed,&p)*(blk ? (int32_t)PWM_PERIOD : 32768)/1000;
+						pwm = SpeedCtrl(spd,blk ? LowSpeedMeas() : realspeed,&p)*(blk ? (int32_t)PWM_PERIOD : 32768)/1000;
 					}
 					break;
 				case CTRL_TORQUE:    //0.01 A; command 0 coasts

@@ -212,14 +212,6 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       (to 120, once 68 rpm) although the ADC ISR keeps running. Probably the stator current transient
       at the switch moving the hall switching points (armature reaction); check with a phase current
       probe, or ramp the sine modulation in over a few ms.
-- [ ] Block commutation needs 18.5 % duty before the wheel turns (sine: 1 %); it freewheels and only
-      coasts down. **Cause measured (2026-10-27, PinFinder `step`):** the high side and the other phase's
-      low side chop together (CCxNE alone follows OCxREF), so in the off time the current freewheels
-      through both body diodes against the bus voltage and collapses: discontinuous conduction. A held
-      block step at 8 % duty (2 V) gave 0.46 A, at 25 % (6 V) 1.2 A phase current, against V/R = 3-10 A;
-      the same voltage as complementary PWM on all phases gave the expected 2.9 A at 1 V. Fix: keep the
-      low side on for the whole step (forced active CCxN, chop only the high side) or switch the chopped
-      phase complementary (also brakes).
 - [ ] Host unit tests for the pure logic (CRC and frame layout against the web console's test
       vectors, SpeedCtrl() against the measured plant) and a CI build. Needs the logic split from
       the HAL-dependent code first.

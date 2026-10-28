@@ -15,6 +15,16 @@
 	TIM_CCER_CC2EN|TIM_CCER_CC1NEN,    /*6: -1,1,0*/ \
 }
 
+//Output compare mode of channel k (0..2) in a step: the channel with only its low side enabled is forced
+//active (with CCxE off, CCxN follows OCxREF itself: that low side stays on for the whole step), the others
+//PWM1 (the high side chops). Before, all three were PWM1: the low side chopped together with the high side,
+//in the off time the current freewheeled through two body diodes against the bus voltage and collapsed
+//every period (2 V: 0.46 A instead of ~3 A; 18.5 % duty before the wheel turned). Now it freewheels
+//through the low side that stays on and the other low side's body diode: continuous, no braking.
+static inline uint32_t BlockOcMode(uint32_t ccer, uint8_t k){
+	return (ccer>>(4*k)&(TIM_CCER_CC1EN|TIM_CCER_CC1NEN))==TIM_CCER_CC1NEN ? TIM_ForcedAction_Active : TIM_OCMode_PWM1;
+}
+
 //hall state C*4+B*2+A (hallpos(), 7-state backwards) -> step; 0 and 7 are not valid hall states
 #define HALL_TO_POS_INIT { 0, 3, 5, 4, 1, 2, 6, 0 }
 

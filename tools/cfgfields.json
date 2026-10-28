@@ -339,13 +339,13 @@
    "index": 50,
    "name": "speedkv",
    "kind": "num",
-   "meaning": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 395"
+   "meaning": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 355"
   },
   {
    "index": 51,
    "name": "speedd0",
    "kind": "num",
-   "meaning": "COM_SPEED feed forward: dead band permille duty, 0 = default 185"
+   "meaning": "COM_SPEED feed forward: dead band permille duty, 0 = default 53"
   },
   {
    "index": 52,
