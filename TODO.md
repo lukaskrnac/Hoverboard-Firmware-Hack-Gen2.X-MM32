@@ -165,9 +165,13 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       low pass, 4x slower: no change), the hall tracker gain (1/4..1/32 per edge at -4.5 A: 4.2-4.7), a frame
       shift proportional to I_d (k LSB per A along the motion: at 680 rpm / 9 A field weakening -1000..-1300
       halved the vibration and needed less I_d, but -1600 lost torque and tripped CURRENT_LIMIT_VIOLATION; at
-      300 rpm with forced I_d it made it worse). Next: a FOC trace (make TRACE=1, read over SWD with the
-      wheel stopped) of a -4.5 A run to see which of i_d, i_q, v_d, v_q, the angle oscillates first. Do not
-      run forced I_d below -5 A again (2 g of shaking). Never SWD while it runs (wedges the ST-Link).
+      300 rpm with forced I_d it made it worse). FOC trace (TRACE=1, every 4th period, captured by a UART
+      trigger, read over SWD stopped) at -4.5 A / 300 rpm: the tracker frame is smooth (+-0.8 deg el off a
+      line), the dq currents small (+-0.16 / 0.06 A), while the rotor swings ~+-7 deg el (+-25 rpm at ~50
+      Hz): the frame does not follow the rotor in that band and I_d sin(delta) with I_d < 0 is a negative
+      spring. Fix = a rotor angle with bandwidth above ~50 Hz: a back emf / flux observer fused with the
+      halls (sizeable). Until then fwimax <= ~5 A (README). Do not force I_d below -5 A again (2 g of
+      shaking); never SWD while it runs (wedges the ST-Link).
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %

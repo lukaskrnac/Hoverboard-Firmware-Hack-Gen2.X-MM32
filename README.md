@@ -128,10 +128,14 @@ Control 0–3 has the same meaning as the Gen2.x-GD32 firmware's iDrivingMode.
   - FOC: `fwimax`, the most negative d current, at most 90 % of the current limit. A controller sets
     the d current so the current loops keep 5 % voltage headroom. Each amp of d current saves
     omega*L of voltage (~0.37 V at 600 rpm on the bench motor, L ~0.46 mH). Bench wheel at 24 V with
-    `current_soft_max` 15 A: 524 rpm without, 623 rpm with 5 A, 749 rpm with 9 A (0.7-0.9 m/s^2,
-    unloaded). With 13 A at ~840 rpm it shakes and trips: the hall switching points move with that
-    much stator current (armature reaction) and the angle follows them. Keep `fwimax` at or below
-    ~9 A on this motor for now.
+    `current_soft_max` 15 A, 94 % modulation: 544 rpm without, 644 rpm with 5 A (0.4-0.7 m/s^2 unloaded,
+    also in partial field weakening and through steps in and out of it). Keep `fwimax` at or below ~5 A
+    on a hall sensored motor: a negative d current in a frame that is off the rotor by delta makes torque
+    I_d sin(delta) that pushes the rotor further off (a negative spring; a positive d current is the
+    stable spring of the position hold). Six hall edges per electrical turn cannot follow a ~50 Hz rotor
+    wobble, so from ~-4 A it sustains one: forced I_d at 300 rpm 0.8 m/s^2 at -3 A, 4.6 at -4.5, 14-21 at
+    -5.5..-6 A; with 9 A of field weakening 680 rpm shook at 2.8 m/s^2, 13 A tripped. Needs a rotor angle
+    that follows the wobble (a back emf / flux observer with the halls).
   - Sine: `fwadvance`, phase advance in degrees. Sine field weakening has no current control and is
     expensive; see `Inc/pinout.h`.
   - Above the speed the battery voltage allows, the back EMF is higher than the bus: a coast (gates
