@@ -646,6 +646,18 @@
    "name": "irmode",
    "kind": "num",
    "meaning": "foot sensors, 4 bits each (ir1 bits 0-3, ir2 4-7): level while covered 1 low / 2 high (default high), + 4 x input 1 floating / 2 pull-up / 3 pull-down"
+  },
+  {
+   "index": 104,
+   "name": "holdidle",
+   "kind": "num",
+   "meaning": "smart FOC position hold: d current at the target after holdidledelay, 0.1 A; pushed off the current rises again, full hold_current at 1.5 hall steps; 0/65535 = off (hold_current all the time)"
+  },
+  {
+   "index": 105,
+   "name": "holdidledelay",
+   "kind": "num",
+   "meaning": "smart hold: ms in the target's hall sector before the current falls to holdidle (~4.4 A/s); 0/65535 = 500"
   }
  ]
 }

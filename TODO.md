@@ -172,9 +172,6 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
       `main` deploys GitLab Pages). Try the console once in Firefox (WebSerial add-on, over http).
 
-- [ ] FOC position hold costs current all the time it holds (`hold_current`, default 4 A, ~7 W): drop it
-      after a while at the target (like a stepper's idle current) as far as the load allows. Sine/block
-      position still work on whole steps.
 - [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.

@@ -103,5 +103,7 @@
 	F(101, 1, "ir1") \
 	F(102, 1, "ir2") \
 	F(103, 0, "irmode") \
+	F(104, 0, "holdidle") \
+	F(105, 0, "holdidledelay") \
 
-#define CFG_FIELD_COUNT 102
+#define CFG_FIELD_COUNT 104

@@ -137,7 +137,7 @@ void DetectHall(int32_t mv){
 		if(stop) err("stopped");
 		else if(turns<TURNS) err("motor did not follow the field (more mV: detect hall <mV>)");
 		else if(inverted) err("halls fit only inverted (180 deg off): not supported");
-		else err(nc<3 ? "fewer than 3 hall pins found" : "no hall pin order fits the commutation");
+		else err(nc<3 ? "fewer than 3 hall pins found" : "no hall order fits the commutation");
 		return;
 	}
 	HALLAPIN = pick[0]; HALLBPIN = pick[1]; HALLCPIN = pick[2];
@@ -264,7 +264,7 @@ void DetectButton(uint32_t ms){
 	kvp("button", p);
 	kvi("released", from);
 	kvi("pressed", to);
-	if(to!=1) warn("reads 0 when pressed: the firmware expects 1");
+	if(to!=1) warn("reads 0 when pressed (expects 1)");
 	ok();
 }
 

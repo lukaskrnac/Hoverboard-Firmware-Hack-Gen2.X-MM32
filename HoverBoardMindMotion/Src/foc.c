@@ -107,6 +107,8 @@ static uint8_t spRun;
 static SpeedDeriv spD;    //velocity D
 
 static uint16_t holdA0;             //electrical angle of position 0 (mod 6 steps)
+static int32_t holdI;               //smart hold (HOLD_IDLE): the d current now, mA
+static uint32_t holdT;              //smart hold: ms of the last displacement (or the start)
 static int16_t holdAngle(int32_t p){    //electrical angle of a position: one electrical turn = 6 steps
 	int32_t m = p%(6*POS_FINE); if(m<0) m += 6*POS_FINE;
 	return (int16_t)(holdA0-(uint32_t)(m*65536/(6*POS_FINE)));
@@ -122,6 +124,8 @@ void FocHoldStart(int32_t target){
 	                      //braking current of the approach (5.6 A into a standing wheel)
 	focHoldSlip = 0;
 	intD = intQ = 0;
+	holdI = 1000000;    //the full hold current first (clamped below)
+	holdT = millis;
 	focHold = 1;
 	__enable_irq();
 }
@@ -377,6 +381,21 @@ void FocControl(void){
 		if(dr>8192&&holdIq<imax) holdIq++;    //rotor behind (lower angle): + q turns the angle up; 4.4 A/s
 		else if(dr<-8192&&holdIq>-imax) holdIq--;
 		int32_t ih = cfg(HOLD_CURRENT, 40)*100, ihm = IMAX()*9/10; if(ih>ihm) ih = ihm;    //hold_current
+		//smart hold: the full current holds ~7 W for as long as the wheel stands. In the target's hall sector
+		//(|dr| <= 30 deg el) for HOLD_IDLE_DELAY it falls to HOLD_IDLE (1 mA per control period, ~4.4 A/s);
+		//pushed off, it rises at once with the displacement: HOLD_IDLE at half a step (30 deg el), the full
+		//current at 1.5 steps (90 deg, where the hold counts as slipped and the position loop takes over).
+		//A steady load is carried by holdIq (q) either way.
+		int32_t idle = cfg(HOLD_IDLE, 0)*100;
+		if(idle&&idle<ih){
+			int32_t a = dr<0 ? -dr : dr, want = ih;
+			if(a>5461){ want = idle+(ih-idle)*(a-5461)/(16384-5461); holdT = millis; }
+			else if(millis-holdT>=(uint32_t)cfg(HOLD_IDLE_DELAY, 500)) want = idle;
+			if(want>ih) want = ih;
+			if(holdI>ih) holdI = ih;
+			holdI = want>=holdI ? want : holdI-1;
+			ih = holdI;
+		}
 		int32_t kp = KP(), ed = ih-id;
 		intD += KI()*(((int32_t)CTRL_ARR+18)/36)*ed/1000;
 		int32_t vd = kp*ed/1000+intD/1000;
