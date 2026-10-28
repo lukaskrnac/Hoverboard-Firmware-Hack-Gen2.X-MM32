@@ -162,10 +162,17 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       field weakening integrator (on the demanded voltage incl. the P terms) and the speed loop
       interact; a feed forward d current from the speed (and the integrator only trimming) is the
       next thing to try.
+      2026-10-28 re-measured (94 % limit, SK150C 24.5 V, 5 A): speed sd 4.0 / 3.3 / 4.2 rpm at 560 / 590 / 620
+      rpm (partial), 3.4 at 700 (full, 644 rpm reached), 1.9 at 450 (no field weakening): partial is no longer
+      worse than full. Vibration not measured (no accelerometer on the wheel now): re-check with it before
+      changing the controller.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
       modulation until now (2.5 A shown); fixed, they are valid to 95.3 %.
+      Probably the pwm period: the user saw ~100 W in sine at low speed after changing the pwm resolution.
+      With the control every period the isr overran its period from ~8.8 kHz and the sine angle stood still
+      (fixed 2026-10-28: the control at ~4.39 kHz whatever the pwm). Close when the user confirms.
 - [ ] At high current and speed (field weakening) the ST-Link and the FTDI drop off USB now and then
       (ground noise through the shared USB ground, the hub resets). Test scripts read over the bus
       there; an isolator on the SWD/UART link would help.
