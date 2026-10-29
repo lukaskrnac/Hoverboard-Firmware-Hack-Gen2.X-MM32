@@ -16,8 +16,8 @@
 //period) it rejected the true samples and fed the loop stale ones (I_q swung +-3 A, the wheel shook). A
 //straight line through the last two samples ran away on one accepted outlier (made-up 20 A trips).
 //Now the filter works on d / q (park()), which are nearly constant at any speed with the smooth tracker
-//angle: a period more than 3 A off the last accepted d / q is held at that, for up to 4 periods in a row,
-//then taken again (no lock on); after an angle jump it starts again. The phase currents for the trip and
+//angle: a period more than 3 A off the median of the last 3 accepted d / q is held at that median, for up to
+//4 periods in a row, then taken and the history starts from it; after an angle jump it starts again. The phase currents for the trip and
 //the bus current come from the filtered d / q, the trip one period later (after the angle). The offset
 //calibration (standing, zero vector) keeps a median of 9 per channel. A trip needs two periods in a row.
 //
@@ -60,7 +60,8 @@ static uint8_t calN, offValid, armedPeriods, tripN;
 #define HIST 9
 static int16_t hist1[HIST], hist2[HIST];    //raw samples per channel, ring
 static uint8_t histPos;
-static int32_t lastD, lastQ;          //last accepted d / q current, mA (glitch filter)
+static int32_t hD[3], hQ[3];          //last 3 accepted d / q currents, mA (glitch filter: their median)
+static uint8_t hPos;
 static int16_t lastThS;
 static uint8_t dqOk, rejDq;
 #define GLITCH_MA 3000                //mA
@@ -182,6 +183,11 @@ static void trace(int32_t id, int32_t iq, int32_t vd, int32_t vq, int16_t th, in
 #define TRACE_FREEZE() ((void)0)
 #endif
 volatile int16_t focTripI[3];    //phase currents of the sample that tripped, mA
+static int32_t median3(const int32_t* h){
+	int32_t a = h[0], b = h[1], c = h[2];
+	if(a>b){ int32_t t = a; a = b; b = t; }
+	return c<a ? a : (c>b ? b : c);
+}
 static int32_t median9(const int16_t* h){    //insertion sort of a copy
 	int16_t v[HIST];
 	for(uint8_t i=0;i<HIST;i++){
@@ -311,21 +317,29 @@ static void park(int32_t* id, int32_t* iq, int16_t thS){
 	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
 	int32_t d = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
 	int32_t q = (beta*sc.hCos>>15)-(alpha*sc.hSin>>15);
-	//glitch filter (see the top): against the last accepted d / q (nearly constant at any speed), held
-	//for up to 4 periods; it starts again after an angle jump (start, reversal, sector centre at low speed)
+	//glitch filter (see the top): against the median of the last 3 accepted d / q (nearly constant at any
+	//speed), held at that for up to 4 periods; it starts again after an angle jump (start, reversal, sector
+	//centre at low speed) and after the 4 (a real step). Against the last accepted sample alone, a glitch just
+	//under the threshold was taken and then the true samples were rejected as glitches for 4 periods: 1 ms of
+	//a 2.7 A wrong q current, the loop drove the real one 1.5 A off, a bump at speed (trace, 8 turns/s,
+	//2-4 per 10 s with bus traffic). The median ignores one accepted outlier.
 	int16_t dth = (int16_t)(thS-lastThS-HALL1.MoveDir*HALL1.IncAngle);
 	lastThS = thS;
-	if(!dqOk||dth>ANGLE_JUMP||dth<-ANGLE_JUMP){
+	int32_t mD = median3(hD), mQ = median3(hQ);
+	uint8_t restart = !dqOk||dth>ANGLE_JUMP||dth<-ANGLE_JUMP;
+	if(restart){
 		dqOk = 1; rejDq = 0;
-	}else if((d-lastD>GLITCH_MA||lastD-d>GLITCH_MA||q-lastQ>GLITCH_MA||lastQ-q>GLITCH_MA)&&rejDq<4){
-		d = lastD; q = lastQ; rejDq++; focGlitches++;
+	}else if((d-mD>GLITCH_MA||mD-d>GLITCH_MA||q-mQ>GLITCH_MA||mQ-q>GLITCH_MA)&&rejDq<4){
+		d = mD; q = mQ; rejDq++; focGlitches++;
 		alpha = (d*sc.hCos>>15)-(q*sc.hSin>>15);    //phase currents back (inverse park, Clarke)
 		beta = (d*sc.hSin>>15)+(q*sc.hCos>>15);
 		ia = alpha; ib = (-alpha+(beta*56756>>15))/2; ic = -ia-ib;    //56756 = sqrt(3) Q15
 	}else{
+		if(rejDq>=4) restart = 1;    //still off after 4: a real step, the history starts from it
 		rejDq = 0;
 	}
-	lastD = d; lastQ = q;
+	if(restart){ hD[0] = hD[1] = hD[2] = d; hQ[0] = hQ[1] = hQ[2] = q; }
+	else if(!rejDq){ hD[hPos] = d; hQ[hPos] = q; hPos = (uint8_t)((hPos+1)%3); }
 	*id = d; *iq = q;
 	int32_t trip = CurrentHardMax();
 	if(ia>trip||ia<-trip||ib>trip||ib<-trip||ic>trip||ic<-trip){
