@@ -1,4 +1,4 @@
-//Bit-banged I2C master (i2c.h). Both pins are general purpose open drain outputs for the whole transfer:
+//Bit-banged I2C master (i2c.h), PinFinder only (the main firmware: i2chw.c, the I2C1 peripheral). Both pins are general purpose open drain outputs for the whole transfer:
 //a line is released (the board's pull-up) or pulled low by BSRR / BRR, which are atomic, and read back
 //through IDR, so nothing here read-modify-writes a port's mode register while the interrupts run. SCL is
 //checked for clock stretching (bounded). An interrupt between two edges only makes a bit longer.
@@ -28,7 +28,7 @@ static void sclHi(void){    //released; waits while a slave stretches the clock 
 	dly();
 }
 
-void I2cPins(uint8_t sdaPin, uint8_t sclPin, uint8_t slow){
+uint8_t I2cPins(uint8_t sdaPin, uint8_t sclPin, uint8_t slow){
 	sdaIo = sdaPin; sclIo = sclPin;
 	half = slow ? 40 : 1;
 	sdaPort = portOf(sdaIo, &sdaBit);
@@ -37,6 +37,7 @@ void I2cPins(uint8_t sdaPin, uint8_t sclPin, uint8_t slow){
 	pinMode(sdaIo, OUTPUT_OD);
 	pinMode(sclIo, OUTPUT_OD);
 	dly();
+	return 1;
 }
 
 void I2cRelease(void){

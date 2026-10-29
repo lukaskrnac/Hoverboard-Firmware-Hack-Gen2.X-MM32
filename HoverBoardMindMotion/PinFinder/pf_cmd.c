@@ -95,7 +95,7 @@ static void pinCmd(const char* name, const char* mode, const char* arg){
 		return;
 	}
 	if(!PinFree(p)&&p!=LEDRPIN&&p!=LEDGPIN&&p!=LEDBPIN&&p!=LEDUPIN&&p!=LEDDPIN&&p!=BUZZERPIN&&p!=pinstorage[11]){
-		err("pin in use (SWD, uart, latch, hall...): read only");
+		err("pin in use: read only");
 		return;
 	}
 	uint32_t ms = optnum(arg);
@@ -140,7 +140,7 @@ void Command(char* line){
 		if(idx<0) err("unknown name"); else{ CfgPrint((uint8_t)idx); ok(); }
 	}
 	else if(!strcmp(c, "set")) setWord(a1, a2);
-	else if(!strcmp(c, "save")){ CfgSave(); note("saved"); ok(); }
+	else if(!strcmp(c, "save")){ HwCheck(); CfgSave(); note("saved"); ok(); }
 	else if(!strcmp(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
 	else if(!strcmp(c, "defaults")){ CfgDefaults(); note("defaults in RAM (save keeps them)"); ok(); }
 	else if(!strcmp(c, "detect")||!strcmp(c, "calibrate")){

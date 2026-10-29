@@ -63,7 +63,7 @@ void DetectImu(void){
 			//an unknown chip at a usual IMU / accelerometer address (clones answer with other ids): keep it
 			if(!known&&IMU_SDA==PIN_NONE&&((a&0xFE)==0x68||(a&0xFE)==0x6A||(a&0xFE)==0x18||(a&0xFE)==0x12)){
 				int16_t v = I2cReadReg(a, (a&0xFE)==0x68 ? 0x75 : ((a&0xFE)==0x12 ? 0x00 : 0x0F));
-				warn("unknown chip at an IMU address: kept (imuid = its id)");
+				warn("unknown chip at an IMU address: kept");
 				kvs("imu", "unknown");
 				IMU_SDA = sda; IMU_SCL = scl; IMU_ADDR = a; IMU_ID = (uint16_t)(v<0 ? 0 : v);
 			}
@@ -79,6 +79,7 @@ void DetectImu(void){
 	kvp("imuscl", IMU_SCL);
 	kvi("imuaddr", IMU_ADDR);
 	kvi("imuid", IMU_ID);
+	HwCheck();
 	ok();
 }
 
@@ -117,7 +118,7 @@ void CalImu(void){
 	good = good&&gravity(g0);
 	for(uint8_t k=0;k<3;k++){ prev[k] = g0[k]; n0 += g0[k]*g0[k]; d[k] = g0[k]; }
 	int8_t up = dominant(d);
-	note("tilt it forward (front down) 20-60 deg and hold");
+	note("tilt the front down 20-60 deg, hold");
 	for(uint8_t t=0;good&&!done&&t<150&&!aborted();t++){    //~30 s
 		good = gravity(g1);
 		//steady (within ~2 deg of the last reading) and turned more than ~15 deg across up

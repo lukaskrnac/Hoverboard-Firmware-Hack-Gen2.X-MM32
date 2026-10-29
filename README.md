@@ -248,8 +248,9 @@ https://youtu.be/hCaIlEKzI3A
 * FOC with two measured phase currents; pwm, speed, torque and position control for block, sine and FOC; field weakening
 ### Buzzer, charger and foot sensors
 * `buzzerpassive=2` for a buzzer without its own oscillator (a plain piezo or magnetic buzzer stays
-  silent on a steady level): it gets a 2.2 kHz square wave (the low battery alarm from the adc
-  interrupt, the melodies by busy waiting). Default: an active buzzer, switched on and off.
+  silent on a steady level): it gets a 2.2 kHz square wave from a timer output (TIM14/16/17 CH1 or
+  CH1N, `buzs` in `Src/hardware.c`); on a pin without one it stays silent (PinFinder warns). Default:
+  an active buzzer, a gpio switched on and off.
 * `charge=<pin>` (+ `chargelevel` 1 low / 2 high while connected, `chargepull` 1 none / 2 up / 3 down;
   PinFinder's `detect charger` sets all three): the charger state, debounced 50 ms, is reported over
   CANSimple in heartbeat byte 7 (bit 0; ODrive leaves the byte unused) and as the parameter
@@ -262,10 +263,12 @@ https://youtu.be/hCaIlEKzI3A
 ### IMU
 * The IMU found by PinFinder's `detect imu` (`imusda`, `imuscl`, `imuaddr`) is read when it has the
   InvenSense register map: address 0x68/0x69 (MPU-6050/6500/9250, ICM-206xx and clones; not
-  ICM-426xx or BMI160/270, which also sit at 0x68). Bit-banged I2C on any two pins (`Src/i2c.c`),
-  every 10 ms, one byte per main loop pass (~60 us each), +-4 g and +-1000 deg/s, 44 Hz low pass; a
-  chip that resets is set up again within a second.
-* CANSimple parameters 0x150-0x159: `hoverboard.imu.state` (0 none, 1 running, 2 no answer),
+  ICM-426xx or BMI160/270, which also sit at 0x68). The I2C1 peripheral, ~350 kHz, the 14 byte burst
+  by DMA (channels 2/3; the uart is on 4/5) every 10 ms (`Src/i2chw.c`): the pins must be I2C1 SDA/SCL
+  (`i2cs` in `Src/hardware.c`), else the IMU stays off (state 3; PinFinder warns). +-4 g and
+  +-1000 deg/s, 44 Hz low pass; a chip that resets is set up again within a second.
+* CANSimple parameters 0x150-0x159: `hoverboard.imu.state` (0 none, 1 running, 2 no answer, 3 pins
+  not I2C1),
   `accel_x/y/z` in m/s^2, `gyro_x/y/z` in deg/s (bias: the mean of the first 0.5 s standing still),
   `temperature` in C, `pitch` and `roll` in degrees. After PinFinder's `calibrate imu` the values are in
   the board's axes (ROS: X forward, Y left, Z up) and pitch / roll are zero at the calibrated level;
@@ -306,8 +309,8 @@ python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
 |---|---|
 | `info` | chip id, uid, master/slave (latch), debugger attached, VDD, battery, uart |
 | `list`, `get <name>`, `set <name> <value\|pin\|none>` | config words, names as `tools/mm32config.py` (`tools/cfgfields.py`) |
-| `save`, `revert`, `defaults` | write to flash / reload / start from the defaults (RAM) |
-| `detect hall [mV]` | turns the field open loop in 12 directions per electrical turn (complementary PWM, 1 V phase amplitude, raised if the rotor does not follow); the pins whose level follows the rotor are the halls, A/B/C is the assignment for which the main firmware's commutation leads the rotor by 60..120 deg everywhere |
+| `save`, `revert`, `defaults` | write to flash / reload / start from the defaults (RAM); `save` first checks the pins against the main firmware's peripherals (below) |
+| `detect hall [mV]` | turns the field open loop in 12 directions per electrical turn (complementary PWM, 1 V phase amplitude, raised if the rotor does not follow); the pins whose level follows the rotor are the halls, A/B/C is the assignment for which the main firmware's commutation leads the rotor by 60..120 deg everywhere; `halltimer` 2 / 3 = the timer that measures the speed, 0 = the halls are not wired to CH1-CH3 of one timer (warning) |
 | `detect vbat [V\|mV]` | battery pin: the one closest to the measured voltage (36.5 or 36500; without: the only one reading 20..45 V), and with the voltage the divider in 0.001 (`vbatgain`); on failure the old pin stays (`vbat_kept`) |
 | `detect current [mV] [shunt mOhm]` | phase current pins, their phase and sign (`iphasea/b`, `iphasecfg`: correlation with each phase's current while a static field turns), then the bus current pin and `itotaldivider` / `itotalzero` (sampled in the middle of an active vector against the phase currents: the pin that rises steadily over 8 levels). With the shunt value from its marking (R003 = 3 mOhm) the divider is exact and `iphasegain` is calibrated from it |
 | `calibrate hall [mV]` | hall edge angles: the field turns 2 electrical turns forward and back in 1 deg steps, each edge is the mean of both directions -> `hallang1..6` (the main firmware uses them instead of its built-in table, +-30 deg around fixed centres) |
@@ -325,6 +328,14 @@ python3 tools/pinfinder.py info "detect hall" "detect vbat 36500" save
 | `scan <k> <mV> <pin>` | hold field direction k (0-11) and sample a pin at 32 points of the pwm period |
 | `rotate <permille> [ms]` | hall commutation test as the main firmware does it; counts forward/backward hall steps |
 | `poweroff` | |
+
+PinFinder finds the pins in software (gpio reads, bit-banged I2C, a gpio square wave). The main
+firmware uses the peripherals, so a pin wired elsewhere on the pcb works in PinFinder and not in the
+main firmware. After `detect hall`, `detect imu`, the buzzer choice and at every `save` PinFinder
+checks the pins against the datasheet tables in `Src/hardware.c` and warns (the pins are still kept):
+halls not on CH1, CH2, CH3 of TIM2 or TIM3 (`halltimer=0`: no speed measurement), IMU pins not I2C1
+SDA/SCL, a passive buzzer on a pin without a TIM14/16/17 output. The uart needs no check: PinFinder
+finds it by a loop-back through the uart peripheral itself.
 
 A browser page for the same, over Web Serial: `pinfinder.html` in the
 [web console](https://gitlab.com/ailife8881/remoteuartbus-online) (needs `tools/cfgfields.json`, written by

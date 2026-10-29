@@ -21,18 +21,24 @@
 #define TIMCOUNT 21
 #define UARTCOUNT 9
 #define TIMBKCOUNT 4
+#define I2CCOUNT 12
+#define BUZCOUNT 11
 #elif defined(MCU_NO_UART2)
 #define PINCOUNT 33
 #define ADCCOUNT 10
-#define TIMCOUNT 14
+#define TIMCOUNT 21
 #define UARTCOUNT 4
 #define TIMBKCOUNT 4
+#define I2CCOUNT 12
+#define BUZCOUNT 9
 #else
 #define PINCOUNT 33
 #define ADCCOUNT 10
-#define TIMCOUNT 14
+#define TIMCOUNT 21
 #define UARTCOUNT 10
 #define TIMBKCOUNT 4
+#define I2CCOUNT 12
+#define BUZCOUNT 9
 #endif
 
 
@@ -89,8 +95,10 @@ typedef struct{
 typedef struct{
   uint8_t io;
   uint8_t af;
-  uint8_t tim2;
+  uint8_t tc;    //HT_TIM2 (else TIM3) | channel 0..2 (CH1..CH3): the hall XOR input needs CH1, CH2, CH3 of one timer
 }MM32TIM23;
+#define HT_TIM2 4
+#define HT(tim2, ch) ((tim2)*HT_TIM2+(ch)-1)
 typedef struct{
   uint8_t io;
   uint8_t af;
@@ -101,6 +109,17 @@ typedef struct{
   uint8_t io;
   uint16_t af;
 }MM32TIMBK;
+typedef struct{    //I2C1 pins (the IMU)
+  uint8_t io;
+  uint8_t af;
+  uint8_t scl;    //1 SCL, 0 SDA
+}MM32I2C;
+typedef struct{    //timer outputs for the passive buzzer's square wave: TIM14 / TIM16 / TIM17 CH1 or CH1N
+  uint8_t io;
+  uint8_t af;
+  uint8_t tim;    //BZ_TIM14 / BZ_TIM16 / BZ_TIM17, + BZ_N for the CH1N output
+}MM32BUZ;
+enum{ BZ_TIM14, BZ_TIM16, BZ_TIM17, BZ_N = 4 };
 
 
 //pin capability tables for the selected MCU, hardware.c
@@ -108,6 +127,8 @@ extern const MM32ADC adcs[ADCCOUNT];
 extern const MM32TIM23 halltims[TIMCOUNT];
 extern const MM32UART uarts[UARTCOUNT];
 extern const MM32TIMBK ocps[TIMBKCOUNT];
+extern const MM32I2C i2cs[I2CCOUNT];
+extern const MM32BUZ buzs[BUZCOUNT];
 
 void pinMode(uint8_t io,uint8_t state);
 uint8_t digitalRead(uint8_t io);

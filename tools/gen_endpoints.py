@@ -67,7 +67,7 @@ RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning 
     (0x144, "hoverboard.controller.pos_derivative_gain", "float", "rw", "(turns/s)/(turns/s): position D on trajectory speed - wheel speed; default 0 (off)"),
     (0x145, "hoverboard.controller.vel_derivative_gain", "float", "rw", "Nm/(turns/s^2): FOC velocity D on the measured speed (20 ms filter); default 0 (off)"),
     (0x142, "axis0.config.motor.current_control_bandwidth", "float", "rw", "rad/s: sets the current loop gains kp = L*bw, ki = R*bw (reads back kp / L); default gains ~870"),
-    (0x150, "hoverboard.imu.state", "uint8", "r", "0 no IMU configured (imusda/imuscl/imuaddr 0x68/0x69), 1 running, 2 no answer"),
+    (0x150, "hoverboard.imu.state", "uint8", "r", "0 no IMU configured (imusda/imuscl/imuaddr 0x68/0x69), 1 running, 2 no answer, 3 pins not I2C1 SDA/SCL (pcb)"),
     (0x151, "hoverboard.imu.accel_x", "float", "r", "m/s^2 (+-4 g), 100 Hz, board axes after calibrate imu (X forward, Y left, Z up; else the chip's); NaN unless running"),
     (0x152, "hoverboard.imu.accel_y", "float", "r", "m/s^2"),
     (0x153, "hoverboard.imu.accel_z", "float", "r", "m/s^2"),

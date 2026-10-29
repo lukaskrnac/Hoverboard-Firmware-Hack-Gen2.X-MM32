@@ -1,5 +1,5 @@
 //IMU (imu.h). The chip is read in the main loop every 10 ms: accel, temperature and gyro in one burst from
-//0x3B (14 bytes, big endian) over the bit-banged I2C (i2c.c), one byte per main loop pass. Ranges
+//0x3B (14 bytes, big endian) over I2C1 by DMA (i2chw.c), started and polled from the main loop. Ranges
 //+-4 g and +-1000 deg/s, 44 Hz low pass. Once a second PWR_MGMT_1 is checked: a chip that was reset
 //(supply dip) is set up again. Bench board: a clone at 0x69 (WHO_AM_I 0x2E instead of 0x68) with the
 //MPU-6050 register map (accel offsets at 0x06, self test at 0x0D-0x10).
@@ -15,6 +15,7 @@
 #define REG_ACCEL_CONFIG 0x1C
 #define REG_DATA 0x3B
 #define REG_PWR_MGMT_1 0x6B
+#define REG_PWR_MGMT_2 0x6C            //standby bits per axis: all 0
 #define PWR_RUN 0x01               //awake, clock from the X gyro's PLL
 #define ACC_LSB_G 8192.0f          //+-4 g
 #define GYRO_LSB_DPS 32.8f         //+-1000 deg/s
@@ -28,7 +29,7 @@ static float acc[3], rate[3], bsum[3], bias[3], pitch0, roll0, pitch, roll;    /
 
 static uint8_t setup(void){
 	uint8_t a = (uint8_t)IMU_ADDR;
-	return I2cWriteReg(a, REG_PWR_MGMT_1, PWR_RUN)&&I2cWriteReg(a, REG_CONFIG, 0x03)
+	return I2cWriteReg(a, REG_PWR_MGMT_1, PWR_RUN)&&I2cWriteReg(a, REG_PWR_MGMT_2, 0)&&I2cWriteReg(a, REG_CONFIG, 0x03)
 	       &&I2cWriteReg(a, REG_GYRO_CONFIG, 0x10)&&I2cWriteReg(a, REG_ACCEL_CONFIG, 0x08);
 }
 
@@ -44,7 +45,7 @@ void ImuInit(void){
 		pitch0 = Atan2Deg(-b[0], b[2]);
 		roll0 = Atan2Deg(b[1], b[2]);
 	}
-	I2cPins((uint8_t)IMU_SDA, (uint8_t)IMU_SCL, 0);
+	if(!I2cPins((uint8_t)IMU_SDA, (uint8_t)IMU_SCL, 0)){ imuState = IMU_NOT_I2C1; return; }
 	I2cUnstick();
 	imuState = setup() ? IMU_RUNNING : IMU_NO_ANSWER;
 }
@@ -79,8 +80,8 @@ static void update(void){
 
 void ImuPoll(void){
 	static uint8_t b[14];
-	if(imuState==IMU_OFF) return;
-	uint8_t s = I2cPoll();    //one byte of the running read per main loop pass
+	if(imuState==IMU_OFF||imuState==IMU_NOT_I2C1) return;
+	uint8_t s = I2cPoll();    //the running read (DMA)
 	if(s==I2C_BUSY) return;
 	if(s==I2C_DONE){
 		for(uint8_t k=0;k<7;k++) imuRaw[k] = (int16_t)(b[2*k]<<8|b[2*k+1]);

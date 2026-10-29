@@ -20,7 +20,6 @@ volatile uint8_t poweron=0;
 static uint16_t vrefint;    //internal 1.2V reference conversion, filtered (below)
 static volatile uint32_t adcticks;    //adc interrupts since boot (one per control period, pinout.h)
 volatile uint8_t realdir=0;
-static uint8_t buzzLevel;
 volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILIMIT)
 
 //Bus current in sine on a board without phase current pins. At the control sample (the counter's zero) all
@@ -122,10 +121,6 @@ void ADC1_COMP_IRQHandler(void){
 				//phase currents (if the board has the pins); itotal from them: the shunt reads ~0 at this
 				//sample time (all low sides on)
 				FocMeasure();
-			}
-			if(buzzTone||buzzLevel){    //passive buzzer: half the pwm frequency, 2.2 kHz
-				buzzLevel = buzzTone&&!buzzLevel;
-				digitalWrite(BUZZERPIN, buzzLevel);
 			}
 			avgvbat();
 			avgItotal();

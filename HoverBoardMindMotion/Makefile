@@ -25,7 +25,7 @@ BUILD   := $(if $(filter SPIN05,$(MCU)),build,build/$(shell echo $(MCU) | tr A-Z
 TARGET  := $(BUILD)/hoverboard
 LDSCRIPT := Device/MM32SPIN0x/Source/mm32spin05.ld
 
-SRC := $(wildcard Src/*.c) \
+SRC := $(filter-out Src/i2c.c,$(wildcard Src/*.c)) \
        $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
        Device/MM32SPIN0x/Source/system_mm32spin05.c \
        Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c

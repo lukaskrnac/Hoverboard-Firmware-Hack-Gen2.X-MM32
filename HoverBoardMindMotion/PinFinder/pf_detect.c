@@ -63,7 +63,7 @@ void DetectHall(int32_t mv){
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		if(PinFree(p)) pinMode((uint8_t)p, INPUT_PULLUP);    //open collector hall outputs
 	}
-	note("motor turns slowly; keep the wheel free, any key stops");
+	note("motor turns; keep the wheel free");
 	uint8_t turns = 0, stop = 0;
 	for(uint8_t n=0;n<16&&turns<TURNS&&!stop;n++){
 		uint16_t pat[PINCOUNT];
@@ -135,8 +135,8 @@ void DetectHall(int32_t mv){
 	if(stop||turns<TURNS||best<0){
 		HALLAPIN = old[0]; HALLBPIN = old[1]; HALLCPIN = old[2];
 		if(stop) err("stopped");
-		else if(turns<TURNS) err("motor did not follow the field (more mV: detect hall <mV>)");
-		else if(inverted) err("halls fit only inverted (180 deg off): not supported");
+		else if(turns<TURNS) err("motor did not follow (more mV)");
+		else if(inverted) err("halls fit only inverted: not supported");
 		else err(nc<3 ? "fewer than 3 hall pins found" : "no hall order fits the commutation");
 		return;
 	}
@@ -145,17 +145,28 @@ void DetectHall(int32_t mv){
 	kvp("hallb", HALLBPIN);
 	kvp("hallc", HALLCPIN);
 	kvi("lead90", best);    //directions at the ideal 90 deg lead (of up to 6 off the hall edges)
-	//speed measurement: the main firmware captures the hall edges with TIM2 or TIM3 (initialize.c)
-	int8_t tim[3] = { -1, -1, -1 };
-	for(uint8_t i=0;i<TIMCOUNT;i++){
-		for(uint8_t h=0;h<3;h++){
-			if(halltims[i].io==pick[h]) tim[h] = (int8_t)halltims[i].tim2;
-		}
-	}
-	if(tim[0]<0||tim[1]<0||tim[2]<0||tim[0]!=tim[1]||tim[1]!=tim[2]){
-		warn("hall pins not on one timer: no speed measurement");
-	}
+	HwCheck();
 	ok();
+}
+
+//PinFinder finds pins in software (gpio reads, bit-banged I2C, a gpio square wave); the main firmware uses
+//the peripherals, so a pin wired elsewhere on the pcb (datasheet AF tables, hardware.c) works here and not
+//there: hall speed = CH1-CH3 of TIM2 or TIM3 (HallTimEntries), the IMU = I2C1 SDA / SCL, a passive buzzer =
+//a TIM14 / TIM16 / TIM17 output. After the detections and at save.
+static uint8_t onI2c(uint16_t p, uint8_t scl){
+	for(uint8_t i=0;i<I2CCOUNT;i++) if(i2cs[i].io==p&&i2cs[i].scl==scl) return 1;
+	return 0;
+}
+
+void HwCheck(void){
+	uint8_t e[3];
+	if(HALLAPIN<PINCOUNT&&HALLBPIN<PINCOUNT&&HALLCPIN<PINCOUNT){
+		int8_t t = HallTimEntries(e);
+		kvi("halltimer", t<0 ? 0 : 3-t);    //2 / 3, 0 none
+		if(t<0) warn("halls not on CH1-3 of TIM2/3: no speed");
+	}
+	if(IMU_SDA<PINCOUNT&&!(onI2c(IMU_SDA, 0)&&onI2c(IMU_SCL, 1))) warn("imu pins not I2C1 SDA/SCL: no imu");
+	if(BUZZERPIN<PINCOUNT&&BUZZER_PASSIVE==2&&BuzzerEntry()<0) warn("passive buzzer pin: no timer, silent");
 }
 
 //---------------------------------------------------------------- battery voltage
@@ -196,8 +207,8 @@ void DetectVbat(int32_t expect_mv){
 		ShowAdc();
 		kvp("vbat_kept", VBATPIN);    //unchanged
 		err(expect_mv>0 ? "no pin within 20 % of that voltage" :
-		    inrange ? "several pins look like the battery: give the voltage (detect vbat 36.5)"
-		            : "no pin reads 20..45 V: give the voltage (detect vbat 36.5)");
+		    inrange ? "several battery pins: give volts (detect vbat 36.5)"
+		            : "no pin at 20..45 V: give volts (detect vbat 36.5)");
 		return;
 	}
 	VBATPIN = best;
@@ -257,7 +268,7 @@ static uint16_t waitChange(uint16_t also, uint32_t ms, uint8_t* from, uint8_t* t
 void DetectButton(uint32_t ms){
 	uint8_t from, to;
 	if(!ms) ms = 15000;
-	note("press and hold the power button (any key cancels)");
+	note("press and hold the power button");
 	uint16_t p = waitChange(BUTTONPIN, ms, &from, &to);
 	if(p==PIN_NONE){ err("no pin changed"); return; }
 	BUTTONPIN = p;
@@ -287,7 +298,7 @@ static uint8_t userInput(uint16_t* pin, uint32_t ms, uint8_t* level, uint8_t* pu
 
 void DetectCharger(uint32_t ms){
 	uint8_t level, pull;
-	note("plug in the charger (start unplugged; any key cancels)");
+	note("plug in the charger (any key cancels)");
 	if(!userInput(&CHARGEPIN, ms, &level, &pull)) return;
 	CHARGE_LEVEL = level;
 	CHARGE_PULL = pull;
@@ -302,7 +313,7 @@ void DetectIr(uint32_t ms){
 	uint16_t mode = 0;
 	for(uint8_t k=0;k<2;k++){
 		uint8_t level, pull;
-		note(k ? "now cover the other one" : "cover one infrared foot sensor (any key cancels)");
+		note(k ? "now cover the other one" : "cover one infrared foot sensor");
 		if(!userInput(&IR_PIN(k), ms, &level, &pull)) return;
 		mode = (uint16_t)(mode|(level|pull<<2)<<(4*k));
 		kvp(k ? "ir2" : "ir1", IR_PIN(k));
@@ -317,7 +328,7 @@ void DetectIr(uint32_t ms){
 void StepHold(uint8_t s, int32_t mv, uint32_t ms){
 	if(s>=101&&s<=112) FieldVector((uint8_t)(s-101), mv>0 ? mv : 1000);
 	else if(s>=1&&s<=6) BlockStep(s, DutyForMv(mv>0 ? mv : 2000));
-	else{ err("step 1..6, or 101..112 = field direction 0..11"); return; }
+	else{ err("step 1..6 or 101..112"); return; }
 	Wait(ms ? ms : 300);
 	uint8_t h = HallState();
 	//current at the end of the hold: averaged triggered samples of the shunt and phase current pins
@@ -446,8 +457,8 @@ static uint8_t debuggerAttached(void){
 //Releases the free pins one at a time; before each the pin is saved as LATCHPIN. If the board switches
 //off, it was the latch: the next start holds it. If all pins pass, the board has no latch (slave board).
 void LatchFind(void){
-	if(debuggerAttached()) warn("debugger attached: if it powers the MCU, no latch found");
-	note("release the button; the board switches off at the latch: switch it on again");
+	if(debuggerAttached()) warn("debugger attached: may power the MCU");
+	note("release button; board turns off at the latch: turn it on again");
 	Wait(2000);
 	holdAll = 1;
 	uint16_t keep = LATCHPIN;
@@ -471,7 +482,7 @@ void LatchFind(void){
 	master = 0;
 	releasePins();
 	kvp("latch", PIN_NONE);
-	note("still powered: no latch (slave, or debugger supply)");
+	note("still powered: no latch (slave?)");
 	ok();
 }
 
@@ -485,7 +496,7 @@ void PowerOff(void){
 	}
 	Wait(1500);
 	LatchHold();
-	err("still powered (no latch, button held, or debugger supply)");
+	err("still powered (no latch, button held, debugger)");
 }
 
 //---------------------------------------------------------------- info
@@ -544,7 +555,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	uint32_t mask = freeAdcMask();
 	int32_t zero[16], v[16];
 	static int16_t d[12][16];
-	note("a few A of static current; the wheel may move a little");
+	note("a few A static current; wheel may move");
 	FieldVector(0, 0);    //all phases at 50 %: no current, low sides on at the sample
 	Wait(50);
 	sampleAvg(mask, 1, zero, 16);
@@ -581,11 +592,11 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	uint8_t n = (pin[0]!=PIN_NONE)+(pin[1]!=PIN_NONE)+(pin[2]!=PIN_NONE);
 	if(n<2){
 		IPHASEAPIN = IPHASEBPIN = PIN_NONE;
-		note("no phase current pins: no FOC, sine uses the bus current");
+		note("no phase current pins: no FOC");
 	}else{
 		uint8_t a = pin[0]!=PIN_NONE ? 0 : 1, b = pin[2]!=PIN_NONE ? 2 : 1;    //pairs A,B / B,C / A,C
 		if(a==0&&pin[1]!=PIN_NONE&&b==2&&amp[1]>amp[2]) b = 1;
-		if(sign[a]!=sign[b]){ err("phase current pins of opposite sign (one polarity bit)"); return; }
+		if(sign[a]!=sign[b]){ err("phase current pins of opposite sign"); return; }
 		IPHASEAPIN = pin[a];
 		IPHASEBPIN = pin[b];
 		IPHASE_CFG = (uint16_t)((a==0&&b==1 ? 0 : a==1 ? 1 : 2)|(sign[a]>0 ? 4 : 0));

@@ -146,7 +146,7 @@ static void ledKey(int c){
 	pinMode((uint8_t)sel, INPUT);    //saved pins stay off: easy to see which LEDs are left
 	nl();
 	kvp(CfgName(w), sel);
-	if(w==8) kvi("buzzerpassive", BUZZER_PASSIVE);
+	if(w==8){ kvi("buzzerpassive", BUZZER_PASSIVE); HwCheck(); }
 	ledNext(1);
 }
 
@@ -247,7 +247,7 @@ void TuiKey(int c){
 	case 'k': heading("speed constants"); CalKv("block", 0); CalKv("sine", 0); after(); break;
 	case 'g': heading("IMU mounting"); CalImu(); after(); break;
 	case 'd': lineStart("detect current 1000 "); out("  (+ shunt mOhm if known, e.g. 3)"); break;
-	case 's': CfgSave(); note("saved"); after(); break;
+	case 's': HwCheck(); CfgSave(); note("saved"); after(); break;
 	case 'r': if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); draw(); break;
 	case 'i': heading("info"); Info(); after(); break;
 	case '?': heading("commands (c)"); Command((char[]){"help"}); after(); break;

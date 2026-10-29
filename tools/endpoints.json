@@ -996,7 +996,7 @@
    "id": 336,
    "type": "uint8",
    "access": "r",
-   "unit": "0 no IMU configured (imusda/imuscl/imuaddr 0x68/0x69), 1 running, 2 no answer"
+   "unit": "0 no IMU configured (imusda/imuscl/imuaddr 0x68/0x69), 1 running, 2 no answer, 3 pins not I2C1 SDA/SCL (pcb)"
   },
   "hoverboard.imu.accel_x": {
    "id": 337,

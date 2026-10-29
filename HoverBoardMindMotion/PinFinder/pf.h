@@ -76,6 +76,7 @@ void CfgDefaults(void);
 
 //pf_detect.c: the detections; each prints results and ends with ok() / err()
 void DetectHall(int32_t mv);
+void HwCheck(void);                     //warnings: detected pins the main firmware's peripherals cannot use
 void DetectVbat(int32_t expect_mv);
 void DetectCurrent(int32_t mv, int32_t shunt_uohm);
 void ScanWindow(uint8_t k, int32_t mv, uint16_t pin);        //phase current pins, then the bus current pin and its calibration

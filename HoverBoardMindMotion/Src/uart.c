@@ -2,7 +2,8 @@
 //byte; the main loop takes the bytes with SerialGetByte(). Transmit: DMA from a frame buffer.
 //(Before: a 1 byte DMA buffer with an interrupt per byte and the frame parser in that interrupt, and
 //replies sent byte by byte with busy waiting: fine at 19200, not at 115200+.)
-//DMA channels: UART1 TX 2, RX 3; UART2 TX 4, RX 5 (no remapping).
+//DMA channels: TX 4, RX 5 for either uart (UART1's requests remapped there, SYSCFG): 2 and 3 are the only
+//channels of I2C1 (the IMU, i2c.c).
 #include "hal_uart.h"
 #include "pinout.h"
 #include "uart.h"
@@ -25,8 +26,12 @@ void SerialInit(void){
 	UART_TypeDef* u = uarten==1 ? UART1 : UART2;
 	uartReg = u;
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-	dmaRx = uarten==1 ? DMA1_Channel3 : DMA1_Channel5;
-	dmaTx = uarten==1 ? DMA1_Channel2 : DMA1_Channel4;
+	if(uarten==1){
+		RCC->APB2ENR |= RCC_APB2ENR_EXTI;    //bit 0: SYSCFG (and EXTI)
+		SYSCFG->CFGR |= SYSCFG_CFGR_UART1TX_DMA_RMP|SYSCFG_CFGR_UART1RX_DMA_RMP;
+	}
+	dmaRx = DMA1_Channel5;
+	dmaTx = DMA1_Channel4;
 	dmaRx->CCR = 0;
 	dmaRx->CPAR = (u32)&u->RDR;
 	dmaRx->CMAR = (u32)rxRing;

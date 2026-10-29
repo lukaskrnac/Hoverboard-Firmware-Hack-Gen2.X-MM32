@@ -37,9 +37,7 @@ void io_init(void){
 	if(BUTTONPIN<PINCOUNT){
 		pinMode(BUTTONPIN, INPUT);
 	}
-	if(BUZZERPIN<PINCOUNT){
-		pinMode(BUZZERPIN, OUTPUT);
-	}
+	BuzzerInit();
 	static const uint8_t pull[] = { INPUT, INPUT, INPUT_PULLUP, INPUT_PULLDOWN };    //0 / 1 floating, 2 up, 3 down
 	if(CHARGEPIN<PINCOUNT){
 		uint32_t p = cfgOrDefault(CHARGE_PULL, 1);
@@ -50,56 +48,92 @@ void io_init(void){
 	}
 }
 
+//The buzzer: an active one (own oscillator) on a gpio output, a passive one (BUZZER_PASSIVE) gets a 2.2 kHz
+//square wave from a timer output (BuzzerEntry(); BuzzerSet() switches the pin between that and gpio low).
+//A passive buzzer on a pin without one of those timers stays silent (PinFinder warns at the detection).
+static uint8_t buzTimer;    //1 = the passive buzzer's timer runs
+
+int8_t BuzzerEntry(void){    //the buzs entry of BUZZERPIN, -1 none
+	for(uint8_t i=0;i<BUZCOUNT;i++) if(buzs[i].io==BUZZERPIN) return (int8_t)i;
+	return -1;
+}
+
+void BuzzerInit(void){
+	if(BUZZERPIN>=PINCOUNT) return;
+	digitalWrite(BUZZERPIN, 0);
+	pinMode(BUZZERPIN, OUTPUT);
+	int8_t e = BuzzerEntry();
+	if(!cfgBool(BUZZER_PASSIVE, 0)||e<0) return;
+	uint8_t t = buzs[e].tim&3;
+	TIM_TypeDef* tim = (TIM_TypeDef*)(TIM14_BASE+0x400u*t);    //TIM14, TIM16, TIM17 are 0x400 apart
+	RCC->APB2ENR |= RCC_APB2ENR_TIM14<<t;                       //enable bits 16, 17, 18
+	tim->PSC = SystemCoreClock/1000000-1;    //1 us
+	tim->ARR = 454;                          //2.2 kHz
+	tim->CCR1 = 227;
+	tim->CCMR1 = TIM_OCMode_PWM1|TIM_CCMR1_OC1PE;
+	tim->CCER = (buzs[e].tim&BZ_N) ? TIM_CCER_CC1NEN : TIM_CCER_CC1EN;
+	if(t) tim->BDTR = TIM_BDTR_MOEN;         //TIM16 / TIM17: main output enable (TIM14 has no BDTR)
+	tim->EGR = TIM_EGR_UG;
+	tim->CR1 = TIM_CR1_CEN;
+	pinModeAF(BUZZERPIN, buzs[e].af);
+	buzTimer = 1;
+}
+
+void BuzzerSet(uint8_t on){
+	if(BUZZERPIN>=PINCOUNT) return;
+	if(cfgBool(BUZZER_PASSIVE, 0)) pinMode(BUZZERPIN, on&&buzTimer ? OUTPUT_AF : OUTPUT);    //gpio: low
+	else digitalWrite(BUZZERPIN, on);
+}
+
 void HALL_Init(void){
 	pinMode(HALLAPIN, INPUT);
 	pinMode(HALLBPIN, INPUT);
 	pinMode(HALLCPIN, INPUT);
 }
 
-uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
-	uint8_t tim2=1;    //no hall pin on a timer input: speed sensing will not work, but keep it deterministic
-	for(uint8_t i=0;i<TIMCOUNT;i++){
-		if(halltims[i].io==HALLAPIN||halltims[i].io==HALLBPIN||halltims[i].io==HALLCPIN){
-			pinModeAF(halltims[i].io,halltims[i].af);
-			tim2=halltims[i].tim2;
+//The timer XORs its CH1, CH2 and CH3 inputs (TI1S): the hall pins A, B, C must be on those three channels of
+//one timer, in any order (a pin can be on several channels: halltims has an entry for each). The halltims
+//entries of A, B, C in e; returns 1 TIM2, 0 TIM3, -1 if the pins are wired to no such combination.
+int8_t HallTimEntries(uint8_t* e){
+	int8_t h = 0;    //backtracking over the entries of A (h 0), B, C (pinstorage 0-2)
+	e[0] = 0xFF;
+	while(h>=0){
+		uint8_t i = ++e[h];
+		if(i>=TIMCOUNT){ h--; continue; }
+		if(halltims[i].io!=pinstorage[h]) continue;
+		uint8_t c = halltims[i].tc, fits = 1;
+		for(int8_t k=0;k<h;k++){    //the same timer, another channel
+			uint8_t d = (uint8_t)(c^halltims[e[k]].tc);
+			if(d&HT_TIM2||!(d&3)) fits = 0;
 		}
+		if(!fits) continue;
+		if(h==2) return (int8_t)(c>>2);
+		e[++h] = 0xFF;
 	}
-	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStruct;
-	TIM_ICInitTypeDef  TIM_ICInitStruct;
+	return -1;
+}
 
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-	TIM_TimeBaseStructInit(&TIM_TimeBaseStruct);
-	TIM_TimeBaseStruct.TIM_Period = arr;
-	TIM_TimeBaseStruct.TIM_Prescaler = psc;
-	//Setting Clock Segmentation
-	//input filter clock 18 MHz: with the filter below a spike shorter than ~14 us is ignored
-	TIM_TimeBaseStruct.TIM_ClockDivision = TIM_CKD_DIV4;
-	TIM_TimeBaseStruct.TIM_RepetitionCounter = 0;
-	///TIM Upward Counting Mode
-	TIM_TimeBaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_TimeBaseInit(tim2 ? TIM2 : TIM3, &TIM_TimeBaseStruct);
-
-	TIM_ICStructInit(&TIM_ICInitStruct);
-	TIM_ICInitStruct.TIM_Channel = TIM_Channel_1;
-	TIM_ICInitStruct.TIM_ICPolarity = TIM_ICPolarity_Rising;
-	TIM_ICInitStruct.TIM_ICSelection = TIM_ICSelection_TRC;
-	TIM_ICInitStruct.TIM_ICPrescaler = TIM_ICPSC_DIV1;
-	//fDTS/32, 8 samples (~14 us): a switching spike on a hall line made two captures within a
-	//microsecond, the edge was measured as 0 us (speed 0 in the angle tracker: a freeze, then an
-	//80 deg jump, a 20 A trip with field weakening at 600 rpm)
-	TIM_ICInitStruct.TIM_ICFilter = 0xF;
-	TIM_ICInit(tim2 ? TIM2 : TIM3, &TIM_ICInitStruct);
-	TIM_ITConfig(tim2 ? TIM2 : TIM3, TIM_IT_CC1, ENABLE);
-
-	TIM_SelectHallSensor(tim2 ? TIM2 : TIM3,ENABLE);
-	TIM_UpdateRequestConfig(tim2 ? TIM2 : TIM3,TIM_UpdateSource_Regular);
-	TIM_SelectInputTrigger(tim2 ? TIM2 : TIM3, TIM_TS_TI1F_ED);
-	TIM_SelectSlaveMode(tim2 ? TIM2 : TIM3, TIM_SlaveMode_Reset);
-	TIM_SelectMasterSlaveMode(tim2 ? TIM2 : TIM3, TIM_MasterSlaveMode_Enable);
-
-	TIM_Cmd(tim2 ? TIM2 : TIM3, ENABLE);
-	//NVIC_Configure(tim2 ? TIM2_IRQn : TIM3_IRQn, 1);
+uint8_t HALLTIM_Init(u32 arr, u16 psc){    //hall sensor hardware speed sensing
+	uint8_t e[3];
+	int8_t t = HallTimEntries(e);
+	uint8_t tim2 = t!=0;    //no valid combination: speed sensing will not work, but keep it deterministic
+	for(uint8_t h=0;h<3&&t>=0;h++) pinModeAF(halltims[e[h]].io, halltims[e[h]].af);
+	//register writes, the values of the vendor HAL calls this replaced (TIM_TimeBaseInit, TIM_ICInit, ...)
+	RCC->APB1ENR |= RCC_APB1ENR_TIM2|RCC_APB1ENR_TIM3;
+	TIM_TypeDef* tim = tim2 ? TIM2 : TIM3;
+	tim->ARR = arr;
+	tim->PSC = psc;
+	tim->EGR = TIM_EGR_UG;
+	//IC1 = TRC (the XOR of CH1-CH3, TI1S), rising. Filter fDTS/32, 8 samples (~14 us; input filter clock
+	//18 MHz: CKD/4): a switching spike on a hall line made two captures within a microsecond, the edge was
+	//measured as 0 us (speed 0 in the angle tracker: a freeze, then an 80 deg jump, a 20 A trip with field
+	//weakening at 600 rpm)
+	tim->CCMR1 = 0xFu<<4|TIM_CCMR1_CC1S_TRC;
+	tim->CCER = TIM_CCER_CC1EN;
+	tim->DIER = TIM_DIER_CC1I;    //(the interrupt is not enabled in the NVIC)
+	tim->CR2 = TIM_CR2_TI1S;
+	tim->SMCR = TIM_SMCR_TS_TI1F_ED|TIM_SMCR_SMS_RESET|TIM_SMCR_MSM;    //every hall edge resets the counter
+	tim->CR1 = TIM_CR1_CKD_DIV4|TIM_CR1_URS|TIM_CR1_CEN;    //up, 1 us ticks
 	return tim2;
 }
 

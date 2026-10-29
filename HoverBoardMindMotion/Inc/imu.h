@@ -5,7 +5,7 @@
 
 //IMU with the InvenSense register map (MPU-6050 / 6500 / 9250, ICM-206xx and clones; I2C 0x68 / 0x69) on
 //the configured pins (imusda, imuscl, imuaddr: PinFinder detect imu). imu.c
-enum{ IMU_OFF = 0, IMU_RUNNING = 1, IMU_NO_ANSWER = 2 };
+enum{ IMU_OFF = 0, IMU_RUNNING = 1, IMU_NO_ANSWER = 2, IMU_NOT_I2C1 = 3 };    //3: the pins are not I2C1 SDA / SCL
 extern volatile uint8_t imuState;
 extern volatile int16_t imuRaw[7];    //accel x y z, temperature, gyro x y z (chip units, ranges below)
 

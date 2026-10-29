@@ -36,7 +36,6 @@ volatile int pwm=0;
 volatile int realspeed=0;
 volatile uint8_t  wState = STATE_LED_BATTLEVEL;    //battery LEDs until the remote sends a state
 static uint8_t flicker=0;
-volatile uint8_t buzzTone;    //passive buzzer: the adc isr makes the tone
 volatile uint8_t charging;    //charger connected (CHARGEPIN, debounced)
 volatile uint8_t footPads;    //infrared foot sensors covered: bit k = IR_PIN(k) (debounced)
 static uint8_t chargeRaw;
@@ -65,23 +64,12 @@ static void DelayFed(uint32_t ms){
 	}
 }
 
-//buzzer on for ms (then off). An active buzzer (own oscillator) is switched on; a passive one (BUZZER_PASSIVE)
-//gets a square wave, here by busy waiting (the adc isr is not running yet at the melodies)
+//buzzer on for ms (then off): BuzzerSet() (initialize.c: an active buzzer on, a passive one gets the timer's
+//2.2 kHz)
 static void Beep(uint32_t ms){
-	if(cfgBool(BUZZER_PASSIVE, 0)){
-		uint32_t load = SysTick->LOAD+1, last = SysTick->VAL, half = SystemCoreClock/4400, n = half;
-		uint8_t lvl = 0;
-		for(uint32_t t=millis;millis-t<ms;){    //2.2 kHz: toggles every SystemCoreClock/4400 SysTick counts
-			uint32_t v = SysTick->VAL, d = last>=v ? last-v : last+load-v;
-			last = v;
-			if(d>=n){ lvl = !lvl; digitalWrite(BUZZERPIN, lvl); n = half; } else n -= d;
-			IWDG_ReloadCounter();
-		}
-	}else{
-		digitalWrite(BUZZERPIN, 1);
-		DelayFed(ms);
-	}
-	digitalWrite(BUZZERPIN, 0);
+	BuzzerSet(1);
+	DelayFed(ms);
+	BuzzerSet(0);
 }
 
 static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured pins are ignored)
@@ -204,9 +192,9 @@ s32 main(void){
 			}
 		}
 		if(BUZZERPIN<PINCOUNT){    //low battery alarm
+			static uint8_t alarm;
 			uint8_t on = (lowbatcount>=10||lowbatperm)&&flicker;
-			if(cfgBool(BUZZER_PASSIVE, 0)) buzzTone = on;    //the adc isr toggles the pin
-			else digitalWrite(BUZZERPIN, on);
+			if(on!=alarm){ alarm = on; BuzzerSet(on); }
 		}
 		if(CHARGEPIN<PINCOUNT){    //charger connected, 50 ms debounce
 			uint8_t c = digitalRead(CHARGEPIN)==(cfgOrDefault(CHARGE_LEVEL, 2)==2);
