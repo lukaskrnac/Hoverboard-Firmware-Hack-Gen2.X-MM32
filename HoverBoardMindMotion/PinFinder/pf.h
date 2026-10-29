@@ -77,6 +77,7 @@ const char* CfgName(uint8_t idx);       //0: unnamed word
 uint8_t CfgIsPin(uint8_t idx);
 void CfgPrint(uint8_t idx);             //one result line
 uint8_t CfgChanged(void);               //differs from the saved record
+uint8_t CfgWordChanged(uint8_t idx);    //this word differs from the saved record
 void CfgMarkSaved(void);
 void CfgSave(void);
 void CfgDefaults(void);

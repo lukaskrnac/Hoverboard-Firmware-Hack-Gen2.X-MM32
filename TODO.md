@@ -27,8 +27,9 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       "<= 20 V = off"; off sets `batempty` 0, `batfull` stays (regeneration limit). Tested in headless Chrome.
 - [ ] **P3 TUI**: done: one screen with the pin map (unsaved changes yellow), VDD/battery, menu, LED
       screen, test motor screen, command line = agent commands, plain text without ANSI. Open: per item
-      help (`?` shows the command list only), "how found" per pin (detected/manual/default), a screen
-      for the remaining config words. Done 2026-10-30: detect all (`a`) runs hall, current, battery, button
+      help (`?` shows the command list only), "how found" per pin (detected/manual/default). Done 2026-10-30:
+      `w` shows every named non-pin word in 3 columns (unset `-`), unsaved words yellow there and in the pin
+      map (per word now; it was every set word once anything changed). detect all (`a`) runs hall, current, battery, button
       (master), charger, IMU, then a summary (ok / FAILED / skipped by a key), then the LED screen; Esc stops
       the rest (at the next step that reads keys). Bench: hall, current, IMU ok; battery FAILED (two pins near
       the bus voltage: it asks for volts), button / charger skipped.

@@ -82,6 +82,10 @@ void CfgPrint(uint8_t idx){
 	nl();
 }
 
+uint8_t CfgWordChanged(uint8_t idx){
+	return saved[idx]!=pinstorage[idx];
+}
+
 uint8_t CfgChanged(void){
 	return memcmp(saved, pinstorage, sizeof(saved))!=0;
 }

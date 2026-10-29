@@ -43,7 +43,7 @@ static void mapCell(uint8_t idx){
 	const char* n = CfgName(idx);
 	out(n);
 	for(uint8_t k=zlen(n);k<9;k++) outc(' ');
-	if(CfgChanged()&&pinstorage[idx]!=0xFFFF) color(33);
+	if(CfgWordChanged(idx)) color(33);    //unsaved
 	if(CfgIsPin(idx)){
 		out(PinName(pinstorage[idx]));
 		for(uint8_t k=(uint8_t)strlen(PinName(pinstorage[idx]));k<8;k++) outc(' ');
@@ -52,6 +52,26 @@ static void mapCell(uint8_t idx){
 		out("     ");
 	}
 	color(0);
+}
+
+static void after(void);
+static void words(void){    //the named config words that are not pins, 3 columns; unsaved changes yellow
+	heading("config words (set <name> <value> on the command line c)");
+	uint8_t col = 0;
+	for(uint8_t i=0;i<128;i++){
+		const char* n = CfgName(i);
+		if(!n||CfgIsPin(i)) continue;
+		out(" ");
+		out(n);
+		for(uint8_t k=zlen(n);k<14;k++) outc(' ');
+		if(CfgWordChanged(i)) color(33);
+		if(pinstorage[i]==0xFFFF) out("-     ");
+		else{ outi(pinstorage[i]); for(uint16_t v=pinstorage[i],k=1;k<6;k++,v/=10) if(v<10) outc(' '); }
+		color(0);
+		if(++col==3){ col = 0; nl(); }
+	}
+	if(col) nl();
+	after();
 }
 
 static void draw(void){
@@ -81,7 +101,7 @@ static void draw(void){
 	out(" 1 hall  2 LEDs/buzzer  3 battery  4 button  5 charger"); nl();
 	out(" 6 latch  7 slave id  8 test motor  9 power off  a all"); nl();
 	out(" calibrate: h hall  p poles  m R/L  k kv  d current  g imu"); nl();
-	out(" c command  s save  r revert  i info  ? help  @ agent"); nl();
+	out(" c command  w words  s save  r revert  i info  ? help  @ agent"); nl();
 	out("> ");
 }
 
@@ -264,6 +284,7 @@ void TuiKey(int c){
 	case '9': PowerOff(); after(); break;
 	case 'a': detectAll(); break;
 	case 'c': lineStart(""); break;
+	case 'w': words(); break;
 	case 'h': heading("hall edge angles"); CalHall(0); after(); break;
 	case 'p': heading("pole count"); CalPoles(0); after(); break;
 	case 'm': heading("phase resistance and inductance"); CalRL(0); after(); break;
