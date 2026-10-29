@@ -10,6 +10,9 @@
 #include "hal_tim.h"
 #include "hal_conf.h"
 #include <math.h>
+
+#define TRIP_RETRY_MS 300     //a phase current trip clears by itself after this (CANSimple, below)
+#define TRIP_WINDOW_MS 2000   //the third trip within this disarms until Clear_Errors
 #include "hallhandle.h"
 #include "foc.h"
 #include "inputmode.h"
@@ -150,10 +153,28 @@ void speedupdate(void){
 		//armed: v1 frames arm and disarm with state bit 64, CANSimple with the axis state (a v1 master
 		//cannot set that). A disarm by error (Estop) holds for both until Clear_Errors.
 		uint8_t idle = cmdSource==1 ? (wState & STATE_DISABLE)!=0 : axisState==AXIS_IDLE;
-		//a phase current trip disarms a CANSimple axis until Clear_Errors (ODrive). Clearing it by itself
-		//at command 0 re-armed while the set point was still high (VEL_RAMP): the wheel shot off. v1
-		//masters have no Clear_Errors: there the trip still clears at command 0.
-		if(focTrip&&cmdSource==2) axisDisarm |= ERR_CURRENT_LIMIT_VIOLATION;
+		//a phase current trip (CANSimple): the gates off, CURRENT_LIMIT_VIOLATION active and the set points
+		//following the wheel (held, below) for TRIP_RETRY_MS, then it clears by itself and the controllers
+		//start again from the wheel's speed (VEL_RAMP ramps on from there; clearing it at command 0 instead
+		//re-armed with the set point still high: the wheel shot off). The third trip within TRIP_WINDOW_MS
+		//disarms the axis until Clear_Errors (ODrive), as every trip did: a wheel that stopped for good on one
+		//trip (a bench supply in current limit, the bus at 17 V) was worse than a 0.3 s coast. v1 masters have
+		//no Clear_Errors: there the trip clears at command 0 (below).
+		{
+			static uint32_t tripAt, tripFirst;
+			static uint8_t trips, inTrip;
+			if(!focTrip||cmdSource!=2) inTrip = 0;    //cleared otherwise (Clear_Errors, command 0, disarmed)
+			else if(!inTrip){
+				inTrip = 1;
+				tripAt = millis;
+				if(millis-tripFirst>TRIP_WINDOW_MS){ tripFirst = millis; trips = 0; }
+				trips++;
+			}
+			if(inTrip){
+				if(trips>=3) axisDisarm |= ERR_CURRENT_LIMIT_VIOLATION;
+				else if(millis-tripAt>=TRIP_RETRY_MS){ FocClearTrip(); inTrip = 0; }
+			}
+		}
 		//a disarm by error leaves the axis IDLE (ODrive): Clear_Errors alone switched the gates back on
 		//with the old set point; now the master arms again (Set_Axis_State CLOSED_LOOP_CONTROL)
 		if(axisDisarm) axisState = AXIS_IDLE;
