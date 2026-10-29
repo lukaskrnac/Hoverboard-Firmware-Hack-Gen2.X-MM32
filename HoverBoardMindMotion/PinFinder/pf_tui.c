@@ -173,17 +173,40 @@ static void rotateKey(int c){
 	out("      ");
 }
 
+//every detection in a row; a key stops the running one (skipped), Esc the rest too. A summary of what
+//passed, failed or was skipped at the end (a failed step used to scroll past), then the LED screen.
 static void detectAll(void){
-	heading("hall sensors");
-	DetectHall(0);
-	heading("battery voltage");
-	DetectVbat(0);
-	if(master){
-		heading("power button");
-		DetectButton(0);
+	static const char* const names[6] = { T("hall sensors"), T("current sensing"), T("battery voltage"),
+		T("power button"), T("charger (any key skips)"), T("IMU") };
+	uint8_t run = 0, good = 0, skip = 0, esc = 0;
+	for(uint8_t k=0;k<6&&!esc;k++){
+		if(k==3&&!master) continue;
+		heading(names[k]);
+		failed = 0;
+		abortKey = 0;
+		switch(k){
+			case 0: DetectHall(0); break;
+			case 1: DetectCurrent(0, 0); break;
+			case 2: DetectVbat(0); break;
+			case 3: DetectButton(0); break;
+			case 4: DetectCharger(0); break;
+			default: DetectImu(); break;
+		}
+		run |= (uint8_t)(1<<k);
+		if(!failed) good |= (uint8_t)(1<<k);
+		else if(abortKey) skip |= (uint8_t)(1<<k);    //stopped by a key
+		esc = abortKey==0x1b;
 	}
-	heading("charger (skip with any key)");
-	DetectCharger(0);
+	heading("summary");
+	for(uint8_t k=0;k<6;k++){
+		if(!(run>>k&1)) continue;
+		uint8_t g = good>>k&1, sk = skip>>k&1;
+		color(g ? 32 : (sk ? 33 : 31));
+		out(g ? "  ok      " : (sk ? "  skipped " : "  FAILED  "));
+		color(0);
+		out(names[k]); nl();
+	}
+	if(esc){ note("stopped (Esc)"); after(); return; }
 	ledStart();
 }
 

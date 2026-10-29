@@ -31,6 +31,8 @@ void nl(void);
 void color(uint8_t c);                  //TUI with ANSI: 0 reset, 31 red, 32 green, 33 yellow, 36 cyan, 1 bold
 int inbyte(void);                       //-1: nothing received
 uint8_t aborted(void);                  //a key / line arrived: stop the running operation (consumes it)
+extern uint8_t failed;                  //set by err(): clear it, run a detection, read it
+extern int abortKey;                    //the key aborted() consumed (0x1b: Esc)
 void kv(const char* key);               //starts a result line; the value follows, then nl()
 void kvi(const char* key, int32_t v);
 void kvp(const char* key, uint16_t pin);

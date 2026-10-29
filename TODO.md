@@ -28,7 +28,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] **P3 TUI**: done: one screen with the pin map (unsaved changes yellow), VDD/battery, menu, LED
       screen, test motor screen, command line = agent commands, plain text without ANSI. Open: per item
       help (`?` shows the command list only), "how found" per pin (detected/manual/default), a screen
-      for the remaining config words, detect-all ordering when a step fails.
+      for the remaining config words. Done 2026-10-30: detect all (`a`) runs hall, current, battery, button
+      (master), charger, IMU, then a summary (ok / FAILED / skipped by a key), then the LED screen; Esc stops
+      the rest (at the next step that reads keys). Bench: hall, current, IMU ok; battery FAILED (two pins near
+      the bus voltage: it asks for volts), button / charger skipped.
 - [x] **P4 Web GUI config tool**: `pinfinder.html` in the console repo (remoteuartbus-online 'console'
       branch): detections with progress/Stop, pin map + all words (`tools/cfgfields.json`, copied there),
       RAM edits marked until Save, Revert, test motor, pin actions, export/import JSON, command line.

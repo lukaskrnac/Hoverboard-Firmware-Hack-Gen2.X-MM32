@@ -5,6 +5,8 @@
 #include "main.h"
 
 uint8_t agent;
+uint8_t failed;    //err() since the caller cleared it
+int abortKey;      //the key that stopped the last operation (aborted())
 uint8_t ansi;
 static UART_TypeDef* U;
 
@@ -97,6 +99,7 @@ int inbyte(void){
 uint8_t aborted(void){
 	int c = inbyte();
 	if(c<0) return 0;
+	abortKey = c;
 	while(c>=0&&c!='\n'&&c!='\r'){    //the rest of an agent's "abort" line
 		uint32_t t = millis;
 		while((c = inbyte())<0&&millis-t<20);
@@ -176,6 +179,7 @@ void ok(void){
 }
 
 void err(const char* s){
+	failed = 1;
 	if(agent){
 		out("err ");
 	}else{
