@@ -80,23 +80,9 @@ static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured 
 
 s32 main(void){
 	DELAY_Init();
-	if(!restorecfg()&&EEPROMEN){    //if data in eeprom is not valid, do not boot up
-		RCC->AHBENR |= RCC_AHBENR_GPIOA|RCC_AHBENR_GPIOB|RCC_AHBENR_GPIOC|RCC_AHBENR_GPIOD;    //(RCC_AHBPeriphClockCmd x 4)
-		while(1){
-			for(uint8_t i=0;i<33;i++){
-				if(i!=10&&i!=11){
-					pinMode(i, INPUT_PULLUP);
-				}
-			}
-			DELAY_Ms(1000);
-			for(uint8_t i=0;i<33;i++){
-				if(i!=10&&i!=11){
-					pinMode(i, INPUT_PULLDOWN);
-				}
-			}
-			DELAY_Ms(1000);
-		}
-	}
+	//no valid config (hall / uart pins unknown): do not boot, nothing driven (PinFinder writes one). It
+	//toggled every pin between pull-up and pull-down each second (inherited, unused).
+	if(!restorecfg()&&EEPROMEN) while(1);
 
 	ConfigMigrate();
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;

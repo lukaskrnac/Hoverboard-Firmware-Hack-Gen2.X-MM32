@@ -263,6 +263,7 @@ void adc_Init(void){
 	ADC_ExternalTrigConvCmd(ADC1,ENABLE);
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_VoltReference, 0, ADC_SampleTime_7_5Cycles);
 	ADC_VrefintCmd(ENABLE);
+	ADC1->ADCHS |= ADC_CHSR_CHT;    //the internal temperature sensor (channel 14, after the pins in the scan: busLead unchanged)
 	ADC_Cmd(ADC1, ENABLE);
 	//the battery, bus shunt and (both) phase current pins that have an adc channel: analog, in the scan
 	uint8_t phases = IPHASEAPIN<PINCOUNT&&IPHASEBPIN<PINCOUNT;

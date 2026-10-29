@@ -143,7 +143,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         within 3 deg of the normal angles, main firmware block / sine / FOC at +-4 turns/s and position moves as on
         the normal board. Not tried on a board with really inverted halls.
       - Not wanted (user 2026-10-30): WS2812, master/slave UART (the firmware is addressed, no master/slave), NTC
-        (boards have none; the MCU's internal sensor is planned), more light outputs (5 is the most there is).
+        (boards have none). Done 2026-10-30: the MCU's internal sensor (channel 14 in the scan) as Get_Temperature's fet
+        temperature (motor NaN); bench 42.3 C idle, 43.7 after 30 s FOC at 8 turns/s; sample time 7.5..239.5 cycles
+        read alike. Room: the unconfigured-boot pin toggling (inherited, unused) removed; a board without a config
+        just stops. No derating / over-temperature limit yet., more light outputs (5 is the most there is).
       - E-stop: detectable like the button (a person presses it); only if boards have one.
       - Hall edge positions at 30 deg resolution come out of `detect hall` already (12 directions); the
         hall angle calibration (P5) can refine them.

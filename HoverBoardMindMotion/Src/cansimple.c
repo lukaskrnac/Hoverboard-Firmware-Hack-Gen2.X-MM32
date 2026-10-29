@@ -11,7 +11,7 @@
 //Supported: Get_Version, Heartbeat, Estop, Get_Error, RxSdo/TxSdo (cansimple_sdo.c), Set_Axis_State,
 //Get_Encoder_Estimates, Set_Controller_Mode, Set_Input_Pos/Vel/Torque, Set_Limits, Set_Traj_Vel_Limit,
 //Set_Traj_Accel_Limits, Get_Iq,
-//Get_Temperature (NaN: no sensor), Reboot (action 1 save_configuration only: a reset releases the power
+//Get_Temperature (fet = the MCU's internal sensor, motor NaN), Reboot (action 1 save_configuration only: a reset releases the power
 //latch), Get_Bus_Voltage_Current, Clear_Errors, Set_Absolute_Position, Set_Pos_Gain, Set_Vel_Gains,
 //Get_Torques, Get_Powers. Extension: 0x1E Set_Input_Voltage (float, fraction of the maximum, for
 //VOLTAGE_CONTROL; unused in CANSimple).
@@ -153,8 +153,9 @@ static uint8_t getMsg(uint8_t cmd, uint8_t* d){
 			wrF(d, set); wrF(d+4, meas);
 			return 8;
 		}
-		case CMD_GET_TEMPERATURE:
-			wrF(d, __builtin_nanf("")); wrF(d+4, __builtin_nanf(""));
+		case CMD_GET_TEMPERATURE:    //fet: the MCU's internal sensor (the boards have no thermistor), motor: none
+			wrF(d, (float)McuTemp()/10.0f);
+			wrF(d+4, __builtin_nanf(""));
 			return 8;
 		case CMD_GET_BUS_VOLTAGE_CURRENT:
 			wrF(d, (float)fvbat/100.0f); wrF(d+4, (float)BusCurrent()/100.0f);

@@ -53,6 +53,14 @@ static void sort3(int32_t* v){    //ascending
 	if(v[0]>v[1]){ t = v[0]; v[0] = v[1]; v[1] = t; }
 }
 static void adcTrigger(uint32_t src){ ADC1->ADCR = (ADC1->ADCR&~ADC_CR_TRGSEL)|src; }
+//MCU temperature, 0.1 C (DS_MM32SPIN05 table 39 note 5: 25 + (value * VDDA - offset * 3300) / (4096 * 4.801 mV/C),
+//offset per chip at 0x1FFFF7F6). The 0.6 us sample is enough here: 7.5..239.5 cycles read alike (43.2..43.4 C).
+int32_t McuTemp(void){
+	if(!vrefint) return 0;
+	//uV: value * 1.2 V * 4096 / vrefint / 4096, offset * 3.3 V / 4096 (= * 103125 / 128); 32 bit up to 4095 counts
+	int32_t uv = (int32_t)(ADC1->ADDR14&0xFFF)*120000/vrefint*10-(int32_t)(*(volatile uint16_t*)0x1FFFF7F6&0xFFF)*103125/128;
+	return 250+uv*10/4801;
+}
 void BusSampleCheck(void){
 	if(busPending&&millis-busT>2){ busPending = 0; adcTrigger(ADC_CR_T1_TRIG); }
 }
