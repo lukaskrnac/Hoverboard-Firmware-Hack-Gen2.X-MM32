@@ -284,11 +284,11 @@ void gpioAF(GPIO_TypeDef* gpio, uint8_t pin, uint8_t af){    //as GPIO_PinAFConf
 }
 
 //io >= PINCOUNT (65535: not configured) is ignored / reads 0
-void pinMode(uint8_t io,uint8_t state){
+void pinMode(uint16_t io,uint8_t state){
 	if(io<PINCOUNT) gpioMode(ports[pins[io]>>4], pins[io]&15, state);
 }
 
-void pinModeAF(uint8_t io,uint8_t af){
+void pinModeAF(uint16_t io,uint8_t af){
 	if(io<PINCOUNT) gpioAF(ports[pins[io]>>4], pins[io]&15, af);
 }
 
@@ -296,18 +296,18 @@ uint8_t PinPortBit(uint8_t io){    //port (0 = A) << 4 | pin number
 	return io<PINCOUNT ? pins[io] : 0xFF;
 }
 
-uint8_t digitalRead(uint8_t io){
+uint8_t digitalRead(uint16_t io){
 	if(io>=PINCOUNT) return 0;
 	return (uint8_t)((ports[pins[io]>>4]->IDR>>(pins[io]&15))&1);
 }
 
-void digitalWrite(uint8_t io, uint8_t state){
+void digitalWrite(uint16_t io, uint8_t state){
 	if(io>=PINCOUNT) return;
 	GPIO_TypeDef* g = ports[pins[io]>>4];
 	if(state) g->BSRR = 1u<<(pins[io]&15); else g->BRR = 1u<<(pins[io]&15);
 }
 
-uint16_t analogRead(uint8_t io){    //the last conversion of the pin's channel; 0 without one (channels 0-9)
+uint16_t analogRead(uint16_t io){    //the last conversion of the pin's channel; 0 without one (channels 0-9)
 	for(uint8_t i=0;i<ADCCOUNT;i++){
 		if(adcs[i].io==io){
 			return adcs[i].channel<=ADC_Channel_9 ? (uint16_t)(&ADC1->ADDR0)[adcs[i].channel] : 0;

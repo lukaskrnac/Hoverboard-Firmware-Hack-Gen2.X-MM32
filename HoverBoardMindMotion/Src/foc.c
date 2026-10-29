@@ -47,10 +47,11 @@ static int32_t modMax = 30802, sampleMax = 31200;
 
 static int32_t cfg(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }    //0 and 65535 (an unset word) = default
 #define GAIN()   cfg(IPHASE_GAIN, 515)    //0.1 mA per adc count
-#define IMAX_CFG() (cfg(FOC_IMAX, 100)*100) //mA, current_soft_max as set
+static __attribute__((noinline)) int32_t cfgMax(uint16_t v, int32_t def, int32_t max){ int32_t x = cfgOrDefault(v, def); return x>max ? max : x; }
+#define IMAX_CFG() (cfgMax(FOC_IMAX, 100, 1000)*100) //mA, current_soft_max as set (<= 100 A)
 #define IMAX()   CurrentImax()              //mA, the limit in use (below the pullback limit)
 #define KP()     cfg(CUR_KP, 400)         //mV per A
-#define KI()     cfg(CUR_KI, 300)         //V per A*s
+#define KI()     cfgMax(CUR_KI, 300, 3000)    //V per A*s (32 bit integrator steps up to ~3700)
 
 static volatile u32* adc1;    //result registers of the two current pins
 static volatile u32* adc2;
@@ -120,7 +121,8 @@ static int16_t holdAngle(int32_t p){    //electrical angle of a position: one el
 
 void FocHoldStart(int32_t target){
 	__disable_irq();
-	int32_t m = (iOdom*POS_FINE)%(6*POS_FINE); if(m<0) m += 6*POS_FINE;
+	int32_t m = iOdom%6; if(m<0) m += 6;    //(iOdom*POS_FINE wrapped after 2^23 steps: 2^32 is no multiple of 6)
+	m *= POS_FINE;
 	holdA0 = (uint16_t)(HALL1.CWAngleTab[HALL1.PreRaw]+(uint32_t)(m*65536/(6*POS_FINE)));    //centre of this sector
 	focHoldPos = hallPosFine;
 	holdTarget = target;
@@ -210,7 +212,7 @@ int32_t FocIqSetpoint(void){    //mA, motor frame (voltage mode: the limit in th
 }
 
 int32_t CurrentHardMax(void){    //mA: phase current trip (ODrive current_hard_max)
-	int32_t t = cfgOrDefault(CUR_TRIP, 0)*100;
+	int32_t t = cfgMax(CUR_TRIP, 0, 2000)*100;    //<= 200 A: the phase currents are 32 bit safe to ~260 A (park())
 	if(!t){ t = IMAX_CFG()*2; if(t<15000) t = 15000; }    //default: twice the limit, at least 15 A
 	return t;
 }
@@ -325,9 +327,10 @@ void FocMeasure(void){
 //at the sample (the output angle has a lead for the pwm)
 static void park(int32_t* id, int32_t* iq, int16_t thS){
 	Trig_Components sc = MCM_Trig_Functions(thS);
-	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
-	int32_t d = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
-	int32_t q = (beta*sc.hCos>>15)-(alpha*sc.hSin>>15);
+	//products on mA/4: 32 bit to ~260 A (in mA they overflowed from 65 A, a railed adc reads ~130 A)
+	int32_t alpha = ia, beta = ((ib-ic)>>2)*INV_SQRT3_Q15>>13;
+	int32_t d = ((alpha>>2)*sc.hCos>>13)+((beta>>2)*sc.hSin>>13);
+	int32_t q = ((beta>>2)*sc.hCos>>13)-((alpha>>2)*sc.hSin>>13);
 	int32_t trip = CurrentHardMax(), soft = CurrentPullback();    //soft: the loop pulls the current back (FocControl)
 	int32_t pk = ia<0 ? -ia : ia, t2 = ib<0 ? -ib : ib, t3 = ic<0 ? -ic : ic;
 	if(t2>pk) pk = t2;
@@ -349,9 +352,9 @@ static void park(int32_t* id, int32_t* iq, int16_t thS){
 		dqOk = 1; rejDq = 0;
 	}else if(offLast&&offPrev&&rejDq<4&&pk<soft){    //never above the soft limit: a real runaway stays visible
 		d = lastD; q = lastQ; rejDq++; focGlitches++;
-		alpha = (d*sc.hCos>>15)-(q*sc.hSin>>15);    //phase currents back (inverse park, Clarke)
-		beta = (d*sc.hSin>>15)+(q*sc.hCos>>15);
-		ia = alpha; ib = (-alpha+(beta*56756>>15))/2; ic = -ia-ib;    //56756 = sqrt(3) Q15
+		alpha = ((d>>2)*sc.hCos>>13)-((q>>2)*sc.hSin>>13);    //phase currents back (inverse park, Clarke)
+		beta = ((d>>2)*sc.hSin>>13)+((q>>2)*sc.hCos>>13);
+		ia = alpha; ib = (-alpha+((beta>>2)*56756>>13))/2; ic = -ia-ib;    //56756 = sqrt(3) Q15
 	}else{
 		if(rejDq>=4) restart = 1;    //still off after 4: a real step, taken
 		rejDq = 0;
@@ -438,12 +441,13 @@ void FocControl(void){
 		}
 		if(focOver){ ih = 0; intD = 0; focFoldbacks++; }    //soft limit (see park())
 		int32_t kp = KP(), ed = ih-id;
-		intD += KI()*(((int32_t)CTRL_ARR+18)/36)*ed/1000;
+		if(ed>20000) ed = 20000; else if(ed<-20000) ed = -20000;    //as below: 32 bit products
+		intD += KI()*(((int32_t)CTRL_ARR+18)/36)/8*ed/125;
 		int32_t vd = kp*ed/1000+intD/1000;
 		if(vd>vmax){ intD -= (vd-vmax)*1000; vd = vmax; } else if(vd<-vmax){ intD -= (vd+vmax)*1000; vd = -vmax; }
 		intQ = 0; fwId = 0; qSat = 0;
 		focIdNow = ih;
-		int32_t vq = holdIq*cfg(MOTOR_R, 300)/1000;    //mV (cfg() read 65535 as 65 Ohm until it took 65535 as default)
+		int32_t vq = holdIq*cfgMax(MOTOR_R, 300, 10000)/1000;    //(<= 10 Ohm: 32 bit)    //mV (cfg() read 65535 as 65 Ohm until it took 65535 as default)
 		if(vq>vmax/2) vq = vmax/2; else if(vq<-vmax/2) vq = -vmax/2;
 		ipark1.Ds = vd*5676/v; ipark1.Qs = vq*5676/v; ipark1.Theta = th;
 		IPARK_MACRO1(&ipark1);
@@ -463,7 +467,7 @@ void FocControl(void){
 	int32_t idRef = hallAngleSure ? focIdRef+fwId : 0, iqRef;
 	if(idRef>imax) idRef = imax; else if(idRef<-imax) idRef = -imax;
 	focIdNow = idRef;
-	int32_t iqmax = fwId ? MCM_Sqrt(imax*imax-idRef*idRef) : imax;    //the total current stays within the limit
+	int32_t iqmax = fwId ? MCM_Sqrt((imax/10)*(imax/10)-(idRef/10)*(idRef/10))*10 : imax;    //the total current stays within the limit (10 mA: 32 bit)
 	if(focVoltMode){
 		iqRef = focVCmd>0 ? -iqmax : iqmax;    //the voltage limit below sets the voltage; this the current limit
 	}else{
@@ -481,7 +485,7 @@ void FocControl(void){
 	int32_t ed = idRef-id, eq = iqRef-iq;
 	if(ed>20000) ed = 20000; else if(ed<-20000) ed = -20000;
 	if(eq>20000) eq = 20000; else if(eq<-20000) eq = -20000;
-	int32_t kp = KP(), kiTs = KI()*(((int32_t)CTRL_ARR+18)/36);    //Ts in us: the control period
+	int32_t kp = KP(), kiTs8 = KI()*(((int32_t)CTRL_ARR+18)/36)/8;    //Ts in us: the control period; /8: kiTs*ed in 32 bit
 	int32_t kv = cfg(SINE_KV, 242);
 	//back emf feed forward and decoupling from realspeed (6 hall intervals), not fastspeed (the last one):
 	//the hall intervals jitter with the phase current (+-3 % at no load, +-20 % with field weakening at
@@ -495,7 +499,7 @@ void FocControl(void){
 	int32_t wL = spdFF*(int32_t)WINDINGS/2*(cfg(PHASE_L, 460)*10472/10000)/10000;    //phase_inductance, uH
 	int32_t vdDec = wL*iqRef/1000, vqDec = -wL*idRef/1000;    //mV
 
-	int32_t di = kiTs*ed/1000, diq = kiTs*eq/1000;
+	int32_t di = kiTs8*ed/125, diq = kiTs8*eq/125;
 	intD += di; intQ += diq;
 	int32_t vd = kp*ed/1000+intD/1000+vdDec;
 	int32_t vq = kp*eq/1000+intQ/1000+vff+vqDec;
@@ -514,6 +518,14 @@ void FocControl(void){
 	if(focVoltMode){
 		int32_t vc = -(int32_t)focVCmd*vmax/1000;    //electrical frame: the command is negated
 		if(vc>0){ if(vc<qhi) qhi = vc; }else{ if(vc>qlo) qlo = vc; }
+		//regeneration limit (as the current modes above): a q voltage on the far side of the back emf
+		//brakes (the loop drives to qlo for a positive command, to qhi for a negative one); with the bus
+		//above BAT_FULL both bounds stay on the motoring side of it (no braking current)
+		if(BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL){
+			int32_t e = vff<-vqmax ? -vqmax : (vff>vqmax ? vqmax : vff);
+			if(realspeed>0){ if(qhi>e) qhi = e; if(qlo>e) qlo = e; }
+			else if(realspeed<0){ if(qhi<e) qhi = e; if(qlo<e) qlo = e; }
+		}
 	}
 	if(vq>qhi){ if(diq>0) intQ -= diq; vq = qhi; qSat = -1; }    //electrical frame: q = -focIqRef
 	else if(vq<qlo){ if(diq<0) intQ -= diq; vq = qlo; qSat = 1; }
@@ -614,6 +626,8 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 		int32_t am = meas<0 ? -meas : meas, g = am<=60 ? 100 : (am>=200 ? 30 : 100-(am-60)/2);    //percent*3
 		kp = kp*g/30; ki = ki*g/30;
 	}
+	if(kp>1000) kp = 1000;    //kp*e*256 in 32 bit (e <= 2000 rpm)
+	if(ki>1000) ki = 1000;
 	int32_t di = ki*e*256/1000*dt;
 	int32_t u = kp*e*256+spI+di;
 	//no integration into a current the voltage cannot drive (q voltage on its limit): at top speed the

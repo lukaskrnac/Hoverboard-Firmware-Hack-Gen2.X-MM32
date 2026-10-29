@@ -113,7 +113,7 @@ extern uint8_t pwmDiv;
 #define CTRL_ARR ((uint32_t)TIM1->ARR*pwmDiv)
 #define SLAVE_ID pinstorage[38]
 #define WINDINGS pinstorage[39]
-#define INVERT_LOWSIDE pinstorage[40]
+#define INVERT_LOWSIDE pinstorage[40]    //1: low side gate drive inverted; anything else (0, unset 65535) not
 #define SOFT_ILIMIT pinstorage[41]    //A, averaged bus current that switches the gates off, 0 = off
 #define AWDG pinstorage[42]    //adc counts above the zero offset, hardware (adc watchdog) gate trip, 0 = off
 #define DRIVEMODE pinstorage[44]

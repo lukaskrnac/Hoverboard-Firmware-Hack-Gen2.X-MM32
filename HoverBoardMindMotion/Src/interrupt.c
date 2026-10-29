@@ -21,6 +21,16 @@ static uint16_t vrefint;    //internal 1.2V reference conversion, filtered (belo
 static volatile uint32_t adcticks;    //adc interrupts since boot (one per control period, pinout.h)
 volatile uint8_t realdir=0;
 volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILIMIT)
+//hardware current limit (the adc watchdog AWDG, or a comparator on the break input OCPPIN): each break
+//keeps the gates off for HWOC_HOLD control periods (with AOE set the timer re-armed them at the next
+//update: a short circuit was chopped every period, never stopped). Only the break input counts: a hit
+//adds HWOC_HIT to a score that falls by 1 per control period, ~10 hits in 100 ms set hwOcFault
+//(speedupdate(): ERR_DRV_FAULT); the adc watchdog never sets a fault (its samples see switching noise)
+#define HWOC_HOLD 2
+#define HWOC_HIT 44
+volatile uint8_t hwOcFault;
+static uint8_t hwOcHold;
+static uint16_t hwOcScore;
 
 //Bus current in sine on a board without phase current pins. At the control sample (the counter's zero) all
 //low sides conduct and the shunt reads ~0. In centre aligned pwm the switch state depends on the counter
@@ -44,7 +54,9 @@ static volatile uint32_t busT;
 static int32_t busI[2];              //0.01 A, the last sample of each window
 static int32_t shuntCurrent(int32_t a){    //an adc reading of the shunt -> 0.01 A (0 below the zero)
 	int32_t raw = a-(int32_t)itotaloffset, zero = cfgOrDefault(ITOTAL_ZERO, 0);
-	return raw>0&&vrefint ? (int32_t)ITOTAL_DIVIDER*(raw*100+zero)*120/vrefint/100 : 0;
+	//divider * mV-ish / 100, divided first: the product in one went negative above ~144 A at divider 333
+	int32_t x = raw>0&&vrefint ? (raw*100+zero)*120/vrefint : 0;
+	return x>0 ? (int32_t)((uint32_t)ITOTAL_DIVIDER*(uint32_t)x/100u) : 0;
 }
 static void sort3(int32_t* v){    //ascending
 	int32_t t;
@@ -79,7 +91,12 @@ void ADC1_COMP_IRQHandler(void){
 		//the shunt (3rd in the scan) lands on an edge, ~80 A equivalent spikes (each one a break, the gates off
 		//for 2 periods, the current loop restarting from 0 V against the back-EMF: a 7 A kick). There only the
 		//conversion inside an active vector (CC4, busPending, see busv below) counts.
-		if(busPending||!(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK&&FocAvailable())) TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
+		if(busPending||!(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK&&FocAvailable())){
+			TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
+			gatesOutput(0);    //AOE off too: the gates stay off until the control step (HWOC_HOLD) arms them
+			TIM1->SR = ~TIM_SR_BI;    //no hit (only the break input counts)
+			hwOcHold = HWOC_HOLD+1;
+		}
   }
 	if(RESET != ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
 		if(busPending){    //the CC4 sample inside an active vector: the bus current, then back to the control sample
@@ -119,15 +136,16 @@ void ADC1_COMP_IRQHandler(void){
 					break;
 				}
 			}
+			TIM1->SR = ~TIM_SR_BI;    //break events before this (start-up) do not count
 			poweron++;
 		}else{
 			//integer math only: this runs every pwm period, with soft-float double math the isr took 45% cpu (gcc).
 			//VDD = 1.2V*4096/vrefint, so DIVIDER*adc*VDD*100/4096 (unit 0.01) = DIVIDER*adc*120/vrefint.
-			//32 bit is enough for dividers below 4369.
+			//32 bit is enough for dividers below 4369 (larger ones are clamped).
 			if(vrefint){
-				uint32_t vg = VBAT_GAIN;    //0.001: gain*adc*120/1000 = gain*adc/25*3 (32 bit)
-				int32_t vb = (int32_t)(vg&&vg!=0xFFFF ? vg*analogRead(VBATPIN)/25u*3u/vrefint
-				                                      : (uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
+				uint32_t vg = VBAT_GAIN, vd = VBAT_DIVIDER, a = analogRead(VBATPIN);    //gain 0.001: gain*adc*120/1000 = gain*adc/25*3
+				if(vd>4368) vd = 4368;
+				int32_t vb = (int32_t)(vg&&vg!=0xFFFF ? vg*a/25u*3u/vrefint : vd*a*120u/vrefint);
 				//and the bus voltage channel's own glitches (bus traffic couples into the adc): a reading 1/12 off
 				//the last is held for up to 3 periods (a real change, regeneration, takes far longer)
 				static uint8_t vbHeld;
@@ -154,8 +172,14 @@ void ADC1_COMP_IRQHandler(void){
 			//SOFT_ILIMIT in A against the 64 sample average (~15 ms): one adc count of a direct shunt is
 			//~0.3 A and the raw value spikes on switching noise. Fast faults are the adc watchdog's job (AWDG).
 			overcurrent = SOFT_ILIMIT&&fitotal>(int32_t)SOFT_ILIMIT*100;
+			if(TIM1->SR&TIM_SR_BI){    //a break event since the last period (adc watchdog or break input)
+				TIM1->SR = ~TIM_SR_BI;
+				hwOcHold = HWOC_HOLD;
+				if((hwOcScore += HWOC_HIT)>=10*HWOC_HIT){ hwOcFault = 1; hwOcScore = 0; }
+			}else if(hwOcHold) hwOcHold--;
+			if(hwOcScore) hwOcScore--;
 			//the only place the gates are switched while running
-			gatesOutput(!(gatesoff||coastreq||overcurrent||(foc ? FocHoldOff() : sine&&focTrip)));
+			gatesOutput(!(gatesoff||coastreq||overcurrent||hwOcHold||(foc ? FocHoldOff() : sine&&focTrip)));
 			HALL1.CMDDIR = -dir;
 			HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
 			if(COMMUTATION(DRIVEMODE)==COMMUT_SINE){
@@ -165,6 +189,7 @@ void ADC1_COMP_IRQHandler(void){
 				//field weakening: a command beyond the linear range (32000, SINE_VOLT 800..1000 permille)
 				//becomes phase advance in the direction of motion, up to FW_ADVANCE degrees at 40000
 				int32_t fw = cfgOrDefault(FW_ADVANCE, 0);
+				if(fw>90) fw = 90;    //degrees; (q-32000)*fw*182 in 32 bit up to ~1470
 				if(q>32000){ adv = fw ? (q-32000)*fw*182/8000 : 0; q = 32000; if(adv>fw*182) adv = fw*182; }
 				else if(q<-32000){ adv = fw ? (q+32000)*fw*182/8000 : 0; q = -32000; if(adv<-fw*182) adv = -fw*182; }
 				ipark1.Ds = 0;

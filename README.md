@@ -85,6 +85,14 @@ Two protocols on the same UART (one baud, config field `baud` in units of 100: 1
   `curpull` (pullback, default 3/4 of the trip: above it the current loop pulls the current back, no error)
   < `current_hard_max` (the trip: the current rose past the pullback anyway, a loss of control). A Set_Axis_State also hands the gates to CANSimple; until
   then (boot) they follow the v1 state bit.
+  Hardware current limit: the adc watchdog (`awdg`) and the break input (`ocppin`, a comparator) switch the
+  gates off for 2 control periods per event (never a fault from the adc watchdog: its samples see
+  switching noise); ~10 break input events in 100 ms are DRV_FAULT (0x20), disarming like the other errors.
+  v1 masters (no Clear_Errors): DRV_FAULT, SPINOUT_DETECTED and DC_BUS_OVER_REGEN_CURRENT keep the gates off
+  until command 0 or the disarm bit (64), as CURRENT_LIMIT_VIOLATION.
+  Config words are range checked (writes out of range are refused, a stored one falls back to its default at
+  boot): baud 1200..2000000, node id 0..62 (63 is the broadcast), poles 2..200, pins a pin number or unset.
+  A config save switches the gates off while the flash is written (the control isr stops meanwhile).
 - **v1 frames** (start `/`): the original Gen2.x RemoteUartBus, unchanged.
 
 The boards are controlled over the RemoteUartBus protocol, see

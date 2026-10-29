@@ -2,9 +2,9 @@
 
 Current layout (2026-10-30): one 1 KB page at 0x08007C00, 8 slots of 128 bytes. A save writes a pair:
 the extension record (words 64-127, EXT_MAGIC at its word 32) and then the main record (words 0-63, MAGIC
-at word 32) in the next slot; when fewer than two blank slots are left the page is erased first. The newest
-main record is the slot before the first blank one (the last slot when the page is full), its extension
-the slot before it.
+at word 32) in the next slot, each record's magic written last; when fewer than two blank slots are left
+the page is erased first. The newest main record is the last slot with the main magic before the first
+blank one (a save cut short by a power loss leaves a slot without it), its extension the slot before it.
 
 Old layout (until 2026-10-30): two pages at 0x08007800, 16 slots used round, the newest record the slot
 before the first blank one (with wrap). read() still reads it, so flashing a new image keeps the config of
@@ -42,9 +42,10 @@ def parse_new(page):
     """(main slot, 128 words) of a 1 KB page in the current layout, or (None, None)"""
     n = len(page) // SLOT
     first = next((i for i in range(n) if _blank(page, i)), n)
-    if first == 0:
+    # the newest slot with the main magic (the firmware writes it last: a save cut short has none)
+    main = next((i for i in range(first - 1, -1, -1) if _words(page, i)[32] == MAGIC), None)
+    if main is None:
         return None, None
-    main = first - 1
     return main, _pair(page, main, main - 1 if main > 0 else None)
 
 

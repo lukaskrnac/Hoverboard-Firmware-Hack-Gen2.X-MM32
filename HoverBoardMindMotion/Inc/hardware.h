@@ -130,11 +130,12 @@ extern const MM32TIMBK ocps[TIMBKCOUNT];
 extern const MM32I2C i2cs[I2CCOUNT];
 extern const MM32BUZ buzs[BUZCOUNT];
 
-void pinMode(uint8_t io,uint8_t state);
-uint8_t digitalRead(uint8_t io);
-uint16_t analogRead(uint8_t io);
-void digitalWrite(uint8_t io, uint8_t state);
-void pinModeAF(uint8_t io,uint8_t af);
+//io: a config word (16 bit: 0x0100 is no pin, not PA0)
+void pinMode(uint16_t io,uint8_t state);
+uint8_t digitalRead(uint16_t io);
+uint16_t analogRead(uint16_t io);
+void digitalWrite(uint16_t io, uint8_t state);
+void pinModeAF(uint16_t io,uint8_t af);
 uint8_t PinPortBit(uint8_t io);    //port (0 = A) << 4 | pin number, 0xFF for io >= PINCOUNT
 void gpioMode(GPIO_TypeDef* gpio, uint8_t pin, uint8_t mode);    //by port and pin number (pins outside the table)
 void gpioAF(GPIO_TypeDef* gpio, uint8_t pin, uint8_t af);

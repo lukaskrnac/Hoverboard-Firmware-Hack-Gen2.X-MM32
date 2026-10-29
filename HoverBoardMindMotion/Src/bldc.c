@@ -139,11 +139,12 @@ void speedupdate(void){
 		//armed: v1 frames arm and disarm with state bit 64, CANSimple with the axis state (a v1 master
 		//cannot set that). A disarm by error (Estop) holds for both until Clear_Errors.
 		uint8_t idle = cmdSource==1 ? (wState & STATE_DISABLE)!=0 : axisState==AXIS_IDLE;
+		uint8_t ft = focTrip;    //read once: a trip set by the isr after this is not cleared unseen (below)
 		//a phase current trip disarms a CANSimple axis until Clear_Errors (ODrive): it only comes when the
 		//pullback limit (foc.c, CurrentPullback) could not pull the current back, a loss of control. Clearing it
 		//by itself at command 0 re-armed while the set point was still high (VEL_RAMP): the wheel shot off. v1
 		//masters have no Clear_Errors: there the trip still clears at command 0.
-		if(focTrip&&cmdSource==2) axisDisarm |= ERR_CURRENT_LIMIT_VIOLATION;
+		if(ft&&cmdSource==2) axisDisarm |= ERR_CURRENT_LIMIT_VIOLATION;
 		//a disarm by error leaves the axis IDLE (ODrive): Clear_Errors alone switched the gates back on
 		//with the old set point; now the master arms again (Set_Axis_State CLOSED_LOOP_CONTROL)
 		if(axisDisarm) axisState = AXIS_IDLE;
@@ -170,15 +171,22 @@ void speedupdate(void){
 			else spin = 0;
 		}else spin = 0;
 		if(spin>=25) trip |= ERR_SPINOUT_DETECTED;
-		if(trip&&cmdSource==2) axisDisarm |= trip;    //(IDLE from the next pass; the gates are off now)
-		gatesoff = lowbatperm || axisDisarm || idle || hot || (charging&&cfgBool(CHARGE_LOCK, 0));
+		if(hwOcFault){ hwOcFault = 0; trip |= ERR_DRV_FAULT; }    //repeated breaks of the break input (interrupt.c)
+		//CANSimple: disarm until Clear_Errors (IDLE from the next pass; the gates are off now). v1 masters
+		//cannot clear errors: the gates stay off until command 0 or a disarm (state bit 64), as the phase
+		//current trip (soft over-current and over-temperature clear by themselves, below)
+		static uint32_t v1Trip;
+		if(cmdSource==2||idle||(speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)) v1Trip = 0;
+		if(trip&&cmdSource==2) axisDisarm |= trip;
+		else v1Trip |= trip&(ERR_SPINOUT_DETECTED|ERR_DC_BUS_OVER_REGEN_CURRENT|ERR_DRV_FAULT);
+		gatesoff = lowbatperm || axisDisarm || v1Trip || idle || hot || (charging&&cfgBool(CHARGE_LOCK, 0));
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage
 		uint8_t overvolt = BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL+3000;
 		axisErrors = (lowbatperm ? ERR_DC_BUS_UNDER_VOLTAGE : 0)|(overvolt ? ERR_DC_BUS_OVER_VOLTAGE : 0)|
-		             trip|(focTrip ? ERR_CURRENT_LIMIT_VIOLATION : 0);
-		if((speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)||gatesoff){
+		             trip|v1Trip|(ft ? ERR_CURRENT_LIMIT_VIOLATION : 0);
+		if(ft&&((speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)||gatesoff)){
 			FocClearTrip();    //zero command, or disarmed (the only way in position mode: its command is a target)
 		}
 		//position: the command is the target odometer (hall steps, like the Gen2.x-GD32 iOdom input);
@@ -368,7 +376,8 @@ void speedupdate(void){
 						int32_t v = vbat>1000 ? vbat : 2400;
 						SpeedPlant p;
 						SpeedParams(SINE_SPEED, &p);
-						int32_t mv = tq*10*cfgOrDefault(MOTOR_R, 300)/1000+fastspeed*5774/p.kv;
+						int32_t r = cfgOrDefault(MOTOR_R, 300);
+						int32_t mv = tq*(r>5000 ? 5000 : r)/100+fastspeed*5774/p.kv;    //(tq*10*r/1000 in 32 bit)
 						pwm = mv*5676/v+(tq>0 ? 1 : -1)*p.d0*32768/1000;
 						if(pwm>32000) pwm = 32000; else if(pwm<-32000) pwm = -32000;
 					}
@@ -448,7 +457,7 @@ void BlockBrake(uint8_t on){
 
 //TIM1 main output enable for all six gates. AOEN goes with MOEN: with automatic output enable set,
 //the timer sets MOEN again at the next update event and a software "off" lasts only one pwm period.
-void gatesOutput(uint8_t on){
+__attribute__((noinline)) void gatesOutput(uint8_t on){
 	if(on){
 		TIM1->BDTR |= TIM_BDTR_AOEN|TIM_BDTR_MOEN;
 	}else{

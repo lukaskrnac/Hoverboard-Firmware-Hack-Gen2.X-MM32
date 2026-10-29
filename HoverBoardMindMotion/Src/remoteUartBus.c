@@ -95,6 +95,12 @@ static uint32_t iTimeLastRx = 0;
 
 
 static void AnswerMaster(void);
+//a v1 command in the drive mode's range (as the CANSimple inputs): pwm permille and rpm +-1000; torque
+//(0.01 A) and position (hall steps) as sent. Beyond 1000 permille the voltage ramp ran past full scale.
+static int32_t v1Speed(int16_t v){
+	if(CONTROL(DRIVEMODE)>=CTRL_TORQUE) return v;
+	return v>1000 ? 1000 : (v<-1000 ? -1000 : v);
+}
 static uint8_t bConfigSave = 0;
 
 static void ApplyConfig(const SerialServer2HoverConfig* pData){
@@ -107,7 +113,8 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 		BAT_EMPTY = pData->fBattEmpty * 1000;
 	}
 	SetDriveMode(pData->iDriveMode);    //ignored if not supported
-	if (pData->iSlaveNew >= 0 && pData->iSlaveNew <= 63)    //-1: keep; the new id answers from now on, saved below
+	if (pData->iSlaveNew >= 0 && pData->iSlaveNew <= 62)    //63: the CANSimple broadcast
+	       //-1: keep; the new id answers from now on, saved below
 		SLAVE_ID = (uint16_t)pData->iSlaveNew;
 	bConfigSave = 1;
 }
@@ -141,7 +148,15 @@ void RemoteUpdate(void){
 	}
 	if (bConfigSave && speed == 0 && realspeed == 0)    //save only with the wheel stopped
 	{
+		//the motor paused while the flash is written: erasing / programming stalls the code fetch, the
+		//control isr (in flash) stops for up to ~25 ms with the last pwm (a FOC position hold, armed) driving
+		//uncontrolled. Gates off and the isr masked; it arms them again at its next period, the current loop
+		//from zero (FocControl: integrators reset while the gates are off)
+		NVIC_DisableIRQ(ADC_COMP_IRQn);
+		gatesOutput(0);
 		SaveConfig();
+		NVIC_ClearPendingIRQ(ADC_COMP_IRQn);
+		NVIC_EnableIRQ(ADC_COMP_IRQn);
 		bConfigSave = 0;
 	}
 }
@@ -217,7 +232,7 @@ static void feedV1(uint8_t cRead){
 				case 0:
 				{
 					SerialServer2Hover* pData = (SerialServer2Hover*) aReceiveBuffer;
-					speed = pData->iSpeed;
+					speed = v1Speed(pData->iSpeed);
 					wState = pData->wState;
 					if(wState&STATE_SHUTOFF) powerOffReq = 1;    //the power button's shutdown (boards with a latch)
 					break;
@@ -225,7 +240,7 @@ static void feedV1(uint8_t cRead){
 				case 1:
 				{
 					SerialServer2HoverMaster* pData = (SerialServer2HoverMaster*) aReceiveBuffer;
-					speed = pData->iSpeed;
+					speed = v1Speed(pData->iSpeed);
 					wState = pData->wState;
 					if(wState&STATE_SHUTOFF) powerOffReq = 1;
 					break;

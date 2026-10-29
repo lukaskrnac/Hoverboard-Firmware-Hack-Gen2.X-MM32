@@ -255,7 +255,7 @@
    "index": 36,
    "name": "baud",
    "kind": "num",
-   "meaning": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200)"
+   "meaning": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200); 12..20000, else 1152"
   },
   {
    "index": 37,
@@ -267,19 +267,19 @@
    "index": 38,
    "name": "slaveid",
    "kind": "num",
-   "meaning": "RemoteUartBus slave id"
+   "meaning": "RemoteUartBus slave id, 0..62 (63 = CANSimple broadcast)"
   },
   {
    "index": 39,
    "name": "windings",
    "kind": "num",
-   "meaning": "motor poles"
+   "meaning": "motor poles, 2..200 (else 30)"
   },
   {
    "index": 40,
    "name": "invlowside",
    "kind": "num",
-   "meaning": "1 = low side gate drive inverted"
+   "meaning": "1 = low side gate drive inverted, anything else (0, unset) not"
   },
   {
    "index": 41,

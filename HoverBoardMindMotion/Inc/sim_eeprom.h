@@ -36,6 +36,7 @@
 /// @{
 uint8_t ConfigLoad(void);     //newest record with a valid magic -> pinstorage (+ extension record)
 uint8_t restorecfg(void);     //ConfigLoad() and the hall + uart pins are set
+uint8_t ConfigWordValid(uint32_t w, uint32_t v);    //a config word's value in its range (ConfigMigrate, writes)
 void ConfigMigrate(void);     //older layouts (CFG_VERSION) to the current one
 void SaveConfig(void);    //extension record, then the main record (1 KB page at 0x08007C00)
 /// @}

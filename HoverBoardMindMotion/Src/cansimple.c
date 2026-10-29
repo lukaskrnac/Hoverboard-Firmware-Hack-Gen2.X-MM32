@@ -28,6 +28,7 @@
 #include "interrupt.h"
 #include "inputmode.h"
 #include "imu.h"
+#include "sim_eeprom.h"
 
 #define START 0xA5
 #define BROADCAST 0x3F
@@ -368,7 +369,7 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 			if(write) TORQUE_CONST = toWord(f*1000.0f);
 			*val = kt; return 1;
 		case EP_POLE_PAIRS:
-			if(write) WINDINGS = toWord(f*2.0f);
+			if(write&&ConfigWordValid(39, toWord(f*2.0f))) WINDINGS = toWord(f*2.0f);
 			*val = (float)WINDINGS/2.0f; return 1;
 		case EP_PHASE_RESISTANCE:    //Ohm <- mOhm
 			if(write) MOTOR_R = toWord(f*1000.0f);
@@ -383,10 +384,10 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 			if(write) BAT_FULL = toWord((f-3.0f)*1000.0f);
 			*val = (float)BAT_FULL/1000.0f+3.0f; return 1;
 		case EP_NODE_ID:
-			if(write) SLAVE_ID = toWord(f);
+			if(write&&ConfigWordValid(38, toWord(f))) SLAVE_ID = toWord(f);
 			*val = (float)SLAVE_ID; return 1;
 		case EP_UART_BAUDRATE:    //baud <- baud/100 (after a restart)
-			if(write) BAUD = toWord(f/100.0f);
+			if(write&&ConfigWordValid(36, toWord(f/100.0f))) BAUD = toWord(f/100.0f);
 			*val = (float)BAUD*100.0f; return 1;
 	}
 	return 0;
@@ -406,7 +407,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 		if(isInt) r = (uint32_t)pv; else wrF((uint8_t*)&r, pv);
 	}else if(ep<128){
 		if(write){
-			if(ep==MAGICNUM_POS||ep==63||ep==EXT_MAGIC_POS) return 0;
+			if(ep==MAGICNUM_POS||ep==63||ep==EXT_MAGIC_POS||!ConfigWordValid(ep, v)) return 0;
 			if(ep==44) SetDriveMode((uint8_t)v); else pinstorage[ep] = (uint16_t)v;
 		}
 		r = pinstorage[ep];

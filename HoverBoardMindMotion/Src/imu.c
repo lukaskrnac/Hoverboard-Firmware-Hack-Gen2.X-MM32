@@ -41,7 +41,9 @@ void ImuInit(void){
 	if(IMU_SDA>=PINCOUNT||IMU_SCL>=PINCOUNT||(IMU_ADDR&0xFE)!=0x68) return;    //not configured / another map
 	//at 0x68 / 0x69 too, with other register maps (imuid from PinFinder): ICM-42605 / 42688, BMI160 / 270
 	if(IMU_ID==0x42||IMU_ID==0x47||IMU_ID==0xD1||IMU_ID==0x24) return;
-	if(ImuAxes(IMU_MOUNT, ax)){    //the level: gravity at rest (calibrate imu) is zero pitch and roll
+	//the level: gravity at rest (calibrate imu) is zero pitch and roll; not calibrated (unset words, read as
+	//-1 each: ~135 deg) the chip's own level
+	if(ImuAxes(IMU_MOUNT, ax)&&!(IMU_REST(0)==0xFFFF&&IMU_REST(1)==0xFFFF&&IMU_REST(2)==0xFFFF)){
 		int16_t r[3] = { (int16_t)IMU_REST(0), (int16_t)IMU_REST(1), (int16_t)IMU_REST(2) };
 		float b[3];
 		ImuToBoard(ax, r, b);
