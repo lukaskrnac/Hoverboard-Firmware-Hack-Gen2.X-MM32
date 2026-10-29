@@ -182,6 +182,11 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       at 600 not at 750, 0 A nowhere: not a mechanical resonance. Field weakening now capped at 8 mA per rpm
       (smooth at any fwimax, ~647 rpm at 24 V instead of a shaking 680-733 with 9 A). More speed at the same
       voltage still needs a rotor angle that follows the wobble (observer).
+      2026-10-29, rigid mount: forced I_d no longer shakes the frame (300 rpm -4.5 A 0.49 m/s^2 = the 0 A level,
+      was 3.1), but the rotor still wobbles: speed sd 1.2 -> 9.7 rpm, Iq sd 0.02 -> 0.31 A (old mount: 11.6 rpm);
+      520 rpm: -4.5 A calm (8.7 mA/rpm), -6 A sd 9.8 rpm (11.5 mA/rpm). The boundary is the same as on the loose
+      mount (it only made it loud): the 8 mA/rpm cap stays. Field weakening with it: 0.31-0.48 m/s^2 steady
+      (was 0.6-0.9), transitions 0.46-0.75, ~646 rpm at 24 V.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
