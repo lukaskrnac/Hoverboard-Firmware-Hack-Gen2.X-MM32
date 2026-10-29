@@ -87,6 +87,7 @@ static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : de
 #define TRAJ_VEL pinstorage[31]         //TRAP_TRAJ: velocity limit 0.01 turns/s, default 200 (2.0)
 #define TRAJ_ACCEL pinstorage[35]       //TRAP_TRAJ: 0.01 turns/s^2, default 50 (0.5)
 #define TRAJ_DECEL pinstorage[43]       //TRAP_TRAJ: 0.01 turns/s^2, default 50 (0.5)
+#define CUR_PULLBACK pinstorage[106]    //phase current pullback limit (no error), 0.1 A; 0/65535 = 3/4 of the trip
 #define CUR_TRIP pinstorage[27]      //phase current trip (current_hard_max), 0.1 A; 0/65535 = 2 x focimax, >= 15 A
 #define TORQUE_CONST pinstorage[26]  //Nm per A x 1000 (CANSimple torque units); 0/65535 = 8.27 / sine kv
 #define OCPPIN pinstorage[23]

@@ -105,5 +105,6 @@
 	F(103, 0, "irmode") \
 	F(104, 0, "holdidle") \
 	F(105, 0, "holdidledelay") \
+	F(106, 0, "curpull") \
 
-#define CFG_FIELD_COUNT 104
+#define CFG_FIELD_COUNT 105

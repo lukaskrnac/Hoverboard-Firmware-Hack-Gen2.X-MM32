@@ -626,6 +626,12 @@
    "access": "rw",
    "unit": "smart hold: ms in the target's hall sector before the current falls to holdidle (~4.4 A/s); 0/65535 = 500"
   },
+  "hoverboard.config.curpull": {
+   "id": 106,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current pullback limit 0.1 A: above it the current loop pulls the current back, no error; it only trips (curtrip, CURRENT_LIMIT_VIOLATION) if the current rises anyway; kept between focimax and curtrip; 0/65535 = 3/4 of curtrip"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",

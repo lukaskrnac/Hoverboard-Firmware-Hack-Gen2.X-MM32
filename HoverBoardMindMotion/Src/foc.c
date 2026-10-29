@@ -47,7 +47,8 @@ static int32_t modMax = 30802, sampleMax = 31200;
 
 static int32_t cfg(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }    //0 and 65535 (an unset word) = default
 #define GAIN()   cfg(IPHASE_GAIN, 515)    //0.1 mA per adc count
-#define IMAX()   (cfg(FOC_IMAX, 100)*100) //mA
+#define IMAX_CFG() (cfg(FOC_IMAX, 100)*100) //mA, current_soft_max as set
+#define IMAX()   CurrentImax()              //mA, the limit in use (below the pullback limit)
 #define KP()     cfg(CUR_KP, 400)         //mV per A
 #define KI()     cfg(CUR_KI, 300)         //V per A*s
 
@@ -78,6 +79,8 @@ static int32_t iqAcc, idAcc;
 static uint8_t sampleOk;           //this period's phase currents are valid
 static int32_t itotalPhase;        //the last bus current from them (sine above MOD_MAX keeps it)
 volatile uint8_t focTrip;
+static uint8_t focOver, overN;    //phase current above the soft limit (3/4 of the trip), 2 periods
+volatile uint16_t focFoldbacks;    //periods the soft limit pulled the current back (diagnostic, no error)
 static volatile int32_t focIqRef;  //mA, motor frame
 static volatile int16_t focVCmd;   //permille, motor frame; voltage mode if nonzero
 static volatile uint8_t focVoltMode;
@@ -208,8 +211,22 @@ int32_t FocIqSetpoint(void){    //mA, motor frame (voltage mode: the limit in th
 
 int32_t CurrentHardMax(void){    //mA: phase current trip (ODrive current_hard_max)
 	int32_t t = cfgOrDefault(CUR_TRIP, 0)*100;
-	if(!t){ t = IMAX()*2; if(t<15000) t = 15000; }    //default: twice the limit, at least 15 A
+	if(!t){ t = IMAX_CFG()*2; if(t<15000) t = 15000; }    //default: twice the limit, at least 15 A
 	return t;
+}
+
+//the three phase current limits stay in order whatever the configuration: current_soft_max (the loops' limit)
+//< pullback (above it the current loop pulls the current back, no error; park()) < current_hard_max (the
+//trip: the current rose anyway, a loss of control)
+int32_t CurrentPullback(void){    //mA
+	int32_t h = CurrentHardMax(), p = cfgOrDefault(CUR_PULLBACK, 0)*100;
+	if(!p) p = h*3/4;
+	if(p>h*9/10) p = h*9/10;
+	return p;
+}
+int32_t CurrentImax(void){    //mA
+	int32_t i = IMAX_CFG(), c = CurrentPullback()*9/10;
+	return i<c ? i : c;
 }
 
 uint8_t FocSensing(void){    //phase currents measured (FOC, or sine on a board with the current pins)
@@ -311,6 +328,10 @@ static void park(int32_t* id, int32_t* iq, int16_t thS){
 	int32_t alpha = ia, beta = (ib-ic)*INV_SQRT3_Q15>>15;
 	int32_t d = (alpha*sc.hCos>>15)+(beta*sc.hSin>>15);
 	int32_t q = (beta*sc.hCos>>15)-(alpha*sc.hSin>>15);
+	int32_t trip = CurrentHardMax(), soft = CurrentPullback();    //soft: the loop pulls the current back (FocControl)
+	int32_t pk = ia<0 ? -ia : ia, t2 = ib<0 ? -ib : ib, t3 = ic<0 ? -ic : ic;
+	if(t2>pk) pk = t2;
+	if(t3>pk) pk = t3;
 	//glitch filter (see the top): a period more than 3 A off both of the last two accepted d / q (nearly
 	//constant at any speed) is held at the last, for up to 4 periods; it starts again after an angle jump
 	//(start, reversal, sector centre at low speed). Against the last accepted sample alone, a glitch just
@@ -326,7 +347,7 @@ static void park(int32_t* id, int32_t* iq, int16_t thS){
 	uint8_t offPrev = d-prevD>GLITCH_MA||prevD-d>GLITCH_MA||q-prevQ>GLITCH_MA||prevQ-q>GLITCH_MA;
 	if(restart){
 		dqOk = 1; rejDq = 0;
-	}else if(offLast&&offPrev&&rejDq<4){
+	}else if(offLast&&offPrev&&rejDq<4&&pk<soft){    //never above the soft limit: a real runaway stays visible
 		d = lastD; q = lastQ; rejDq++; focGlitches++;
 		alpha = (d*sc.hCos>>15)-(q*sc.hSin>>15);    //phase currents back (inverse park, Clarke)
 		beta = (d*sc.hSin>>15)+(q*sc.hCos>>15);
@@ -338,8 +359,14 @@ static void park(int32_t* id, int32_t* iq, int16_t thS){
 	if(restart){ prevD = lastD = d; prevQ = lastQ = q; }
 	else if(!rejDq){ prevD = lastD; prevQ = lastQ; lastD = d; lastQ = q; }
 	*id = d; *iq = q;
-	int32_t trip = CurrentHardMax();
-	if(ia>trip||ia<-trip||ib>trip||ib<-trip||ic>trip||ic<-trip){
+	//above the pullback limit two periods in a row: FocControl pulls the current back (no error); still rising
+	//to the trip level (CurrentHardMax) means the loop lost control: the gates go off, CURRENT_LIMIT_VIOLATION
+	pk = ia<0 ? -ia : ia; t2 = ib<0 ? -ib : ib; t3 = ic<0 ? -ic : ic;
+	if(t2>pk) pk = t2;
+	if(t3>pk) pk = t3;
+	if(pk>soft){ if(overN<2) overN++; }else overN = 0;
+	focOver = overN>=2;
+	if(pk>trip){
 		if(++tripN>=2){
 			focTrip = 1;
 			focTripI[0] = (int16_t)ia; focTripI[1] = (int16_t)ib; focTripI[2] = (int16_t)ic;
@@ -408,6 +435,7 @@ void FocControl(void){
 			holdI = want>=holdI ? want : holdI-1;
 			ih = holdI;
 		}
+		if(focOver){ ih = 0; intD = 0; focFoldbacks++; }    //soft limit (see park())
 		int32_t kp = KP(), ed = ih-id;
 		intD += KI()*(((int32_t)CTRL_ARR+18)/36)*ed/1000;
 		int32_t vd = kp*ed/1000+intD/1000;
@@ -444,6 +472,10 @@ void FocControl(void){
 		//braking current (electrical frame: braking = iqRef with the sign of realspeed). In the main loop
 		//on the 7 ms average it came late: braking from 900 rpm pumped a bench supply to 34 V first.
 		if(BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL&&((iqRef>0&&realspeed>0)||(iqRef<0&&realspeed<0))) iqRef = 0;
+	}
+	if(focOver){    //soft limit: no current asked this period, the integrators start again: kp drives it down
+		idRef = iqRef = 0; intD = intQ = 0; fwId = 0;
+		focFoldbacks++;
 	}
 	int32_t ed = idRef-id, eq = iqRef-iq;
 	if(ed>20000) ed = 20000; else if(ed<-20000) ed = -20000;

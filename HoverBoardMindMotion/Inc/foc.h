@@ -29,6 +29,8 @@ void FocSpeedReset(void);
 void FocClearTrip(void);
 int32_t FocIqSetpoint(void);         //mA
 int32_t CurrentHardMax(void);        //mA, phase current trip
+int32_t CurrentPullback(void);       //mA, above it the current is pulled back (no error)
+int32_t CurrentImax(void);           //mA, the current limit in use (current_soft_max, below the pullback)
 
 extern volatile int32_t focIdRef;     //d current reference, mA (field weakening, tests over SWD)
 extern volatile int16_t focId, focIq; //measured, mA

@@ -78,10 +78,11 @@ Two protocols on the same UART (one baud, config field `baud` in units of 100: 1
   configuration word and runtime value as a parameter (RxSdo/TxSdo, ids in `tools/endpoints.json`).
   Host libraries: `tools/cansimple_uart.py` (Python) and the web console's `protocol.js`.
   Arming as in ODrive: Set_Axis_State CLOSED_LOOP_CONTROL (8) arms, IDLE (1) switches the gates off.
-  An error that disarms (Estop, VELOCITY_LIMIT_VIOLATION) leaves the axis IDLE: after Clear_Errors the
-  master arms again. A phase current trip (CURRENT_LIMIT_VIOLATION) coasts the wheel for 0.3 s (the error
-  active meanwhile), then clears by itself and the controllers restart from the wheel's speed; the third
-  trip within 2 s disarms like the others. A Set_Axis_State also hands the gates to CANSimple; until
+  An error that disarms (Estop, CURRENT_LIMIT_VIOLATION, VELOCITY_LIMIT_VIOLATION) leaves the axis IDLE:
+  after Clear_Errors the master arms again. Three phase current limits, always in this order (the firmware
+  keeps them so, the web console refuses settings that break it): `current_soft_max` (the loops' limit) <
+  `curpull` (pullback, default 3/4 of the trip: above it the current loop pulls the current back, no error)
+  < `current_hard_max` (the trip: the current rose past the pullback anyway, a loss of control). A Set_Axis_State also hands the gates to CANSimple; until
   then (boot) they follow the v1 state bit.
 - **v1 frames** (start `/`): the original Gen2.x RemoteUartBus, unchanged.
 

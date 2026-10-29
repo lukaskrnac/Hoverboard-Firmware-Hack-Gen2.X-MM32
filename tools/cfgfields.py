@@ -93,6 +93,7 @@ FIELDS = {
     100: ("imurestz", "num", "IMU gravity when level, chip z"),
     104: ("holdidle", "num", "smart FOC position hold: d current at the target after holdidledelay, 0.1 A; pushed off the current rises again, full hold_current at 1.5 hall steps; 0/65535 = off (hold_current all the time)"),
     105: ("holdidledelay", "num", "smart hold: ms in the target's hall sector before the current falls to holdidle (~4.4 A/s); 0/65535 = 500"),
+    106: ("curpull", "num", "phase current pullback limit 0.1 A: above it the current loop pulls the current back, no error; it only trips (curtrip, CURRENT_LIMIT_VIOLATION) if the current rises anyway; kept between focimax and curtrip; 0/65535 = 3/4 of curtrip"),
     101: ("ir1", "pin", "infrared foot sensor 1 (PinFinder detect ir; irmode)"),
     102: ("ir2", "pin", "infrared foot sensor 2"),
     103: ("irmode", "num", "foot sensors, 4 bits each (ir1 bits 0-3, ir2 4-7): level while covered 1 low / 2 high (default high), + 4 x input 1 floating / 2 pull-up / 3 pull-down"),
