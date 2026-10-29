@@ -187,6 +187,14 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       520 rpm: -4.5 A calm (8.7 mA/rpm), -6 A sd 9.8 rpm (11.5 mA/rpm). The boundary is the same as on the loose
       mount (it only made it loud): the 8 mA/rpm cap stays. Field weakening with it: 0.31-0.48 m/s^2 steady
       (was 0.6-0.9), transitions 0.46-0.75, ~646 rpm at 24 V.
+      Knocks with field weakening (2026-10-29, 24 V, pwmres 8192, fwimax 9 A): 12-25 short spikes (2-7 m/s^2) per
+      15 s at 10-10.8 turns/s; none at 9 turns/s; none at 36 V without field weakening at the same speeds; none
+      at 8192 below base speed (pwmres 2048: some at 5-6 turns/s). Not: the pullback (0), tracker snaps at speed
+      (0), the angle going unsure (0), reversals at speed (0), the sample window (modMax from 3.4 to 6 us: no
+      change), a tighter glitch threshold while the references stand still (no change). Seen in the trace
+      (frozen by the phone's spike / in-firmware triggers): single-period d/q readings 1.5-2.5 A off (often
+      +q -d), taken by the 3 A glitch filter; the loop answers with ~1 V for a period; the angles are clean.
+      Experiment code: scratch fw/knock_experiments.patch, fw/knockcatch.py, fw/trknock.py.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
