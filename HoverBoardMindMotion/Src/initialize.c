@@ -12,10 +12,7 @@
 //normal io
 void io_init(void){
 	//enable gpio clock
-	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA, ENABLE);
-	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOB, ENABLE);
-	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOC, ENABLE);
-	RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOD, ENABLE);
+	RCC->AHBENR |= RCC_AHBENR_GPIOA|RCC_AHBENR_GPIOB|RCC_AHBENR_GPIOC|RCC_AHBENR_GPIOD;    //(RCC_AHBPeriphClockCmd x 4)
 	if(LEDRPIN<PINCOUNT){
 		pinMode(LEDRPIN, OUTPUT);
 	}

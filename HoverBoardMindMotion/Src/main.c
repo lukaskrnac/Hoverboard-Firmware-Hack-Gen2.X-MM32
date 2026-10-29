@@ -81,10 +81,7 @@ static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured 
 s32 main(void){
 	DELAY_Init();
 	if(!restorecfg()&&EEPROMEN){    //if data in eeprom is not valid, do not boot up
-		RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOA, ENABLE);
-		RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOB, ENABLE);
-		RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOC, ENABLE);
-		RCC_AHBPeriphClockCmd(RCC_AHBENR_GPIOD, ENABLE);
+		RCC->AHBENR |= RCC_AHBENR_GPIOA|RCC_AHBENR_GPIOB|RCC_AHBENR_GPIOC|RCC_AHBENR_GPIOD;    //(RCC_AHBPeriphClockCmd x 4)
 		while(1){
 			for(uint8_t i=0;i<33;i++){
 				if(i!=10&&i!=11){
