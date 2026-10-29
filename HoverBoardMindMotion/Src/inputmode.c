@@ -151,8 +151,17 @@ int32_t InputPos(int32_t target, int32_t ffRpm, int32_t dtms, int32_t* velFf){
 		if(m==IM_POS_FILTER){    //ODrive: ki = 2 * bandwidth, kp = ki^2 / 4 (critically damped)
 			float ki = 2.0f*centi(INPUT_FILTER_BW, 200), kp = 0.25f*ki*ki;
 			float acc = -kp*rel-ki*inVelSp;
+			//and no faster than the position loop can follow: 3/4 of its accel_limit (POS_ACCEL), vel_limit,
+			//and the speed it can still stop from at that rate. Unlimited, a half turn at bandwidth 4 asked
+			//for 32 turns/s^2 against the loop's 20: the wheel fell 40 steps behind, caught up at 233 rpm
+			//(the set point ~90) and overshot the target by 3.6-4.4 steps. Small moves stay the plain filter.
+			float am = centi(POS_ACCEL, 2000)*spt*0.75f, vm = (float)cfgOrDefault(POS_RPM, 300)*spt/60.0f;
+			if(acc>am) acc = am; else if(acc<-am) acc = -am;
 			accSp = acc;
 			inVelSp += dt*acc;
+			float vb = sqrtF(2.0f*am*(rel<0 ? -rel : rel));
+			if(vb<vm&&(inVelSp>0)==(rel<0)) vm = vb;    //towards the target: the braking curve
+			if(inVelSp>vm) inVelSp = vm; else if(inVelSp<-vm) inVelSp = -vm;
 			rel += dt*inVelSp;
 		}else{
 			rel = 0; accSp = 0;
