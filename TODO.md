@@ -213,7 +213,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       current trip. Bench: 0 knocks at 6/7/8 turns/s and 40 s at the top (8.35), peak 1.1-1.5 instead of 6.4 m/s^2.
       Open: a shunt sample that is real in those modes (an active-vector CC4 sample, as busv does) would bring the
       hardware limit back.
-- [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
+- [x] Sine drawing a lot of current (confirmed fixed by the user 2026-10-29; seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
       modulation until now (2.5 A shown); fixed, they are valid to 95.3 %.
