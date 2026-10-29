@@ -688,6 +688,18 @@
    "name": "regenmax",
    "kind": "num",
    "meaning": "regenerated bus current limit, 0.1 A (from the phase currents): DC_BUS_OVER_REGEN_CURRENT; 0/65535 = off"
+  },
+  {
+   "index": 109,
+   "name": "spinelec",
+   "kind": "num",
+   "meaning": "spinout detection (FOC): electrical power above this, W, ...; 0/65535 = 10"
+  },
+  {
+   "index": 110,
+   "name": "spinmech",
+   "kind": "num",
+   "meaning": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
   }
  ]
 }

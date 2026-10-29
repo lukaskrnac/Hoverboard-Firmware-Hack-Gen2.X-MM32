@@ -151,11 +151,25 @@ void speedupdate(void){
 		//regenerated current above regenmax (dc_max_negative_current; signed only from the phase currents),
 		//the MCU above templimit (the boards have no thermistor; 5 C hysteresis for v1 masters, which cannot
 		//clear errors). They disarm a CANSimple axis until Clear_Errors; overtemperature stops v1 masters too.
-		static uint8_t hot;
+		//The temperature over the limit for 0.5 s (250 passes): single readings glitch at high current (a hard
+		//speed step tripped it at ~40 C), a real temperature does not change that fast.
+		static uint8_t hot, hotN;
 		int32_t tl = cfgOrDefault(TEMP_LIMIT, 85)*10, tc = McuTemp();
-		if(tc>tl) hot = 1; else if(tc<tl-50) hot = 0;
+		if(tc<=tl) hotN = 0; else if(hotN<250) hotN++;
+		if(hotN>=250) hot = 1; else if(tc<tl-50) hot = 0;
 		uint32_t trip = (hot ? ERR_INVERTER_OVER_TEMP : 0)|(overcurrent ? ERR_DC_BUS_OVER_CURRENT : 0)|
 		                (fitotal<-(int32_t)cfgOrDefault(REGEN_MAX, 6553)*10 ? ERR_DC_BUS_OVER_REGEN_CURRENT : 0);
+		//spinout (ODrive): FOC draws power (electrical > SPIN_ELEC W) while I_q * kt * speed says it brakes
+		//(mechanical < -SPIN_MECH W) for 50 ms: the rotor angle is wrong (hall angles, a slipped tracker).
+		//Both signed only with the phase currents. Bus power: vbat * the phase-derived bus current.
+		static uint8_t spin;
+		if(COMMUTATION(DRIVEMODE)==COMMUT_FOC&&FocSensing()&&!gatesoff){
+			float pe = (float)fvbat*(float)BusCurrent()*1e-4f;
+			float pm = (float)focIqF*1e-3f*TorqueConstant()*(float)realspeed*(6.2831853f/60.0f);
+			if(pe>(float)cfgOrDefault(SPIN_ELEC, 10)&&pm<-(float)cfgOrDefault(SPIN_MECH, 10)){ if(spin<25) spin++; }
+			else spin = 0;
+		}else spin = 0;
+		if(spin>=25) trip |= ERR_SPINOUT_DETECTED;
 		if(trip&&cmdSource==2) axisDisarm |= trip;    //(IDLE from the next pass; the gates are off now)
 		gatesoff = lowbatperm || axisDisarm || idle || hot || (charging&&cfgBool(CHARGE_LOCK, 0));
 		uint8_t coast = 0, brake = 0;

@@ -30,6 +30,7 @@ extern const uint8_t hall_to_pos[8];
 #define ERR_VELOCITY_LIMIT_VIOLATION 0x8000u
 #define ERR_WATCHDOG_TIMER_EXPIRED   0x1000000u
 #define ERR_ESTOP_REQUESTED          0x2000000u
+#define ERR_SPINOUT_DETECTED         0x4000000u
 #define POS_FINE 256    //position set points and estimate: 1/256 hall step (90 steps per turn: 0.016 deg)
 int32_t PosGain(void);    //position gain, 0.1 rpm per hall step (POS_KP or the drive mode's default)
 extern volatile int32_t posCmd;    //CANSimple position target, 1/POS_FINE hall step

@@ -110,5 +110,7 @@
 	F(106, 0, "curpull") \
 	F(107, 0, "templimit") \
 	F(108, 0, "regenmax") \
+	F(109, 0, "spinelec") \
+	F(110, 0, "spinmech") \
 
-#define CFG_FIELD_COUNT 109
+#define CFG_FIELD_COUNT 111

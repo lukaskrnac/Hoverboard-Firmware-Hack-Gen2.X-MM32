@@ -339,7 +339,15 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.
 - [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
-      measured, see hallhandle.c), calibration_current / motor calibration, spinout detection.
+      measured, see hallhandle.c), calibration_current / motor calibration (PinFinder calibrates instead).
+      Spinout detection done 2026-10-30: FOC with phase currents, electrical power (vbat x the signed bus
+      current) > spinelec W (word 109, default 10) while Iq*kt*speed < -spinmech W (word 110, default 10) for 50 ms
+      -> SPINOUT_DETECTED (0x4000000), disarm. Bench: hall angles 180 deg off (flash config, 3 A) -> the wheel ran
+      backwards, tripped within 0.27 s; no trip in hard +-8 turns/s steps, field weakening at 10, position moves.
+      Over-temperature now needs 0.5 s over the limit: a single temperature reading glitched at high current
+      and tripped it at ~40 C in a hard step. A PASSTHROUGH reversal +8 -> -8 turns/s on the bench supply
+      (overvoltage at the same time) trips CURRENT_LIMIT_VIOLATION: the known hard reversal item, FOC path
+      unchanged today.
       Done 2026-10-30 (config words, endpoints hoverboard.config.*): softocp exceeded disarms a CANSimple axis
       (DC_BUS_OVER_CURRENT, as dc_max_positive_current); regenmax (word 108, 0.1 A) -> DC_BUS_OVER_REGEN_CURRENT
       (signed bus current only from the phase currents); templimit (word 107, C, default 85) -> INVERTER_OVER_TEMP,

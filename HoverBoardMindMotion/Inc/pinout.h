@@ -54,6 +54,8 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define TX_PUSHPULL pinstorage[94]       //2: uart TX push-pull (one board on the line), else open drain
 #define TEMP_LIMIT pinstorage[107]       //MCU temperature limit, C (INVERTER_OVER_TEMP, gates off); 0/65535 = 85
 #define REGEN_MAX pinstorage[108]        //regenerated bus current limit, 0.1 A (DC_BUS_OVER_REGEN_CURRENT); 0/65535 = off
+#define SPIN_ELEC pinstorage[109]        //spinout: electrical power above it (W) ...; 0/65535 = 10
+#define SPIN_MECH pinstorage[110]        //... while the mechanical power is below minus this (W); 0/65535 = 10
 #define HALL_INVERT pinstorage[95]       //2: the three hall signals inverted (detect hall), else as read
 static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : def); }
 

@@ -656,6 +656,18 @@
    "access": "rw",
    "unit": "regenerated bus current limit, 0.1 A (from the phase currents): DC_BUS_OVER_REGEN_CURRENT; 0/65535 = off"
   },
+  "hoverboard.config.spinelec": {
+   "id": 109,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "spinout detection (FOC): electrical power above this, W, ...; 0/65535 = 10"
+  },
+  "hoverboard.config.spinmech": {
+   "id": 110,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",
