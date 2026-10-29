@@ -35,6 +35,9 @@ static uint8_t setup(void){
 
 void ImuInit(void){
 	imuState = IMU_OFF;
+#ifdef FOC_TRACE
+	return;    //make TRACE=1 (a debug build): no IMU, for the room the trace needs
+#endif
 	if(IMU_SDA>=PINCOUNT||IMU_SCL>=PINCOUNT||(IMU_ADDR&0xFE)!=0x68) return;    //not configured / another map
 	//at 0x68 / 0x69 too, with other register maps (imuid from PinFinder): ICM-42605 / 42688, BMI160 / 270
 	if(IMU_ID==0x42||IMU_ID==0x47||IMU_ID==0xD1||IMU_ID==0x24) return;

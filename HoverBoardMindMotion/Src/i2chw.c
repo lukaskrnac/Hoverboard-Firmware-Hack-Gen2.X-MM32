@@ -108,9 +108,7 @@ uint8_t I2cPoll(void){
 	}
 	if(millis-startT>3){    //a 15 byte read takes ~0.5 ms: bus held, or the peripheral stuck
 		busy = 0;
-		dmaOff();
-		I2C1->ENR = 0;
-		I2C1->ENR = 1;
+		dmaOff();    //(the next begin() disables and enables the peripheral)
 		return I2C_FAIL;
 	}
 	return I2C_BUSY;
@@ -129,8 +127,7 @@ void I2cReadAsync(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t n){
 	begin(addr, (uint8_t)(n+1), buf, n);
 }
 
-uint8_t I2cRead(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t n){
-	if(sdaIo>=PINCOUNT) return 0;
+uint8_t I2cRead(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t n){    //(imu.c calls these only after I2cPins() succeeded)
 	I2cReadAsync(addr, reg, buf, n);
 	return wait();
 }
@@ -141,7 +138,6 @@ int16_t I2cReadReg(uint8_t addr, uint8_t reg){
 }
 
 uint8_t I2cWriteReg(uint8_t addr, uint8_t reg, uint8_t v){
-	if(sdaIo>=PINCOUNT) return 0;
 	cmd[0] = reg;
 	cmd[1] = v;
 	begin(addr, 2, 0, 0);

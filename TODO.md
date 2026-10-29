@@ -203,6 +203,16 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       turns/s with field weakening (was 12-25 per 15 s), 0 at pwmres 2048 / 5-6 turns/s (was 3 per 30 s).
       Room for it: the 512 byte sine table replaced by 65 entries + linear interpolation (error 3.6 instead of
       201 / 32768; low speed FOC 0.29-0.36 m/s^2, sine 0.05-0.20, was 0.39-0.59 / 0.19-0.49).
+      STILL knocking at pwmres 2048 above base speed (user, web UI at max; 2026-10-29): 13-23 per 15 s at 8 turns/s
+      (none at 8192). FOUND: the adc watchdog on the bus shunt (hardocp 300 counts = ~80 A at 3 mOhm) fired on
+      every knock (12 hits = 12 knocks, 0 at 7 turns/s), the break cleared MOE, the loop restarted with zero
+      integrators against ~10 V of back-EMF: a 7 A kick (trace: two periods missing, looked like a 20 deg angle
+      jump). The shunt is sampled in the zero vector, where it carries no current; at 17.6 kHz and ~76 %
+      modulation the window is a few us and the shunt (3rd in the scan) lands on a switching edge. Now the
+      watchdog only breaks in block mode and sine without phase pins; sine/FOC with phase pins rely on the phase
+      current trip. Bench: 0 knocks at 6/7/8 turns/s and 40 s at the top (8.35), peak 1.1-1.5 instead of 6.4 m/s^2.
+      Open: a shunt sample that is real in those modes (an active-vector CC4 sample, as busv does) would bring the
+      hardware limit back.
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
@@ -253,7 +263,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       2048 (17.6 kHz) +7.4 / +13.2, 6-12 kHz +4 / +12, the rest at 17.6 kHz. Below 1 kHz all alike (the motor).
       2048 costs the modulation limit (76 % instead of 94 %). The bench board runs 2048 (user's choice, 2026-10-29:
       top 7.25 turns/s = 435 rpm at 24 V without field weakening); the firmware default stays 8192.
-- [ ] Flash (2026-10-29, hardware I2C/buzzer + PinFinder pin checks): main SPIN05 30568 of 30720 B, SPIN25 30708 (12 B free), F031 30544; PinFinder SPIN05 30632, SPIN25 30660, F031 30608 (PinFinder messages shortened for it). After the sine table: main SPIN05 30276, SPIN25 30392; PinFinder SPIN05 30688, SPIN25 30720. Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash (2026-10-29, hardware I2C/buzzer + PinFinder pin checks): main SPIN05 30564 of 30720 B, SPIN25 30704 (16 B free), F031 30540; PinFinder SPIN05 30632, SPIN25 30660, F031 30608 (PinFinder messages shortened for it). After the sine table: main SPIN05 30276, SPIN25 30392; PinFinder SPIN05 30688, SPIN25 30720. Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.

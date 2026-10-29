@@ -52,7 +52,13 @@ void TIM1_BRK_UP_TRG_COM_IRQHandler(void){
 void ADC1_COMP_IRQHandler(void){
 	if(ADC_GetFlagStatus(ADC1, ADC_IT_AWD) != RESET) {
     ADC_ClearFlag(ADC1, ADC_IT_AWD);
-		TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
+		//sine / FOC with phase current pins sample the shunt in the zero vector (all low sides on), where it
+		//carries no current: there the watchdog only saw switching noise. At pwmres 2048 near full modulation
+		//the window is a few us and the shunt, 3rd in the scan, lands on an edge: ~80 A equivalent spikes, a
+		//break, the gates off for 2 periods and the current loop restarting from 0 V against ~10 V of back-EMF,
+		//a 7 A kick (the knocks with field weakening, 12 per 10 s at 8 turns/s, each one a watchdog hit). The
+		//phase current trip (curtrip) covers those modes.
+		if(!(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK&&FocAvailable())) TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
   }
 	if(RESET != ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
 		if(busPending){    //the CC4 sample inside an active vector: the bus current, then back to the control sample
