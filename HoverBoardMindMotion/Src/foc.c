@@ -311,9 +311,9 @@ void FocMeasure(void){
 	}
 	//sine above that: the low side time is too short for a valid sample. (It was MOD_MAX: at the sine's
 	//top speed (95 %) the bus current and I_d / I_q read the value from the acceleration, 2.5 A / 3.5 A
-	//instead of 0.4 / 0.7.)
+	//instead of 0.4 / 0.7.) itotal stays the shunt's, sampled in the active vectors (interrupt.c busv; it
+	//was itotalPhase, frozen at its last valid value from ~10 turns/s with field advance up)
 	if(sine&&(pwm>SAMPLE_MAX||pwm<-SAMPLE_MAX)){
-		itotal = itotalPhase;
 		dqOk = 0;
 		return;
 	}

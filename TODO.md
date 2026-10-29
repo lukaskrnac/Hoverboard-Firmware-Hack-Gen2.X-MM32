@@ -139,7 +139,15 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
 ## Next
 
-- [ ] Bus current in sine mode on boards **without** phase current pins: done 2026-10-28 (interrupt.c): after
+- [x] Bus current reading (2026-10-30): in sine above SAMPLE_MAX (the phase samples invalid, ~10 turns/s up
+      with field advance) itotal froze at its last phase value (user: "it doesn't read current any more");
+      it now stays the shunt's active-vector reading (busv runs in sine always). That showed the bench's
+      shunt calibration 2.5x high (detect current's 333 / 495). Fitted against the supply's meter in sine at
+      11-16 turns/s: itotaldivider 120, itotalzero 419 (blockcal.py's zero): board 0.68 / 1.26 / 2.16 A vs
+      supply 0.72 / 1.26 / 2.22 A; block 5 turns/s 0.12 vs 0.16 A. Saved on the bench board. Open: PinFinder's
+      `detect current` bus divider is ~2.8x high (it derives it from the phase currents); fix it to fit
+      against the phase currents in the active vectors the same way, or against a known load.
+- [ ] (old note) Bus current in sine mode on boards **without** phase current pins: done 2026-10-28 (interrupt.c): after
       each control step the adc trigger moves to TIM1 CC4 in the middle of one of the two active vector windows
       (alternating), a short second isr run reads the shunt there and sets the trigger back to TRGO; bus current
       = (window 1 x I1 + window 2 x I2) / period; windows < 6 us count 0; SysTick restores the trigger if a
@@ -222,6 +230,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       compare registers have no preload, so the values the control step writes act at once, also in the period
       of the CC4 sample, while its window came from the values read at the isr's start (~12 deg el earlier at
       10 turns/s). Now from the new values: 0 hits at sine 10 / 10.5 and FOC 8.3 turns/s (30 s each).
+      Sine top speed with field advance is ~16 turns/s at 24 V; no watchdog hits at 11-18 turns/s commanded.
 - [x] Sine drawing a lot of current (confirmed fixed by the user 2026-10-29; seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %

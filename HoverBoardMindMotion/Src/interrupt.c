@@ -130,9 +130,9 @@ void ADC1_COMP_IRQHandler(void){
 				itotal = shuntCurrent(analogRead(ITOTALPIN));
 			}
 			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC, sine = COMMUTATION(DRIVEMODE)==COMMUT_SINE;
-			//sine without phase current pins: the bus current from the active vectors (above); with phase pins
-			//(itotal from them, FocMeasure()) the same samples for the adc watchdog
-			uint8_t busv = (foc||sine)&&(AWDG||!FocAvailable())&&ITOTALPIN<PINCOUNT&&(TIM1->BDTR&TIM_BDTR_MOEN);
+			//sine: the bus current from the active vectors (above; with phase pins FocMeasure() replaces it while
+			//their samples are valid, below the top modulation); FOC: the same samples for the adc watchdog
+			uint8_t busv = (sine||(foc&&AWDG))&&ITOTALPIN<PINCOUNT&&(TIM1->BDTR&TIM_BDTR_MOEN);
 			sort3(cc);
 			if(busv) itotal = ((cc[1]-cc[0])*busI[0]+(cc[2]-cc[1])*busI[1])/(int32_t)PWM_PERIOD;
 			else busI[0] = busI[1] = 0;
