@@ -93,8 +93,11 @@ boards from a browser through a USB-UART adapter.
 
 Several boards can share one bus: master TX to every board's RX, every board's TX to the master RX.
 The boards drive TX open drain, so the master RX needs a pull-up (FT232R adapters have one; ESP32:
-`pinMode(RX, INPUT_PULLUP)` after `Serial.begin()`). State bit 64 disarms a board (gates off), bits
-1–32 set the LEDs.
+`pinMode(RX, INPUT_PULLUP)` after `Serial.begin()`). The pull-up's slow rising edges limit the baud:
+115200 works, 230400 already failed with an FT232R's pull-up (7 of 500 replies). One board alone on the
+line can drive TX push-pull (config `txpushpull=2`): tested to 921600 baud (`baud=9216`). Never with
+several boards on one line: push-pull TXs would drive against each other. State bit 64 disarms a board
+(gates off), bits 1–32 set the LEDs.
 
 you can also use a ESP32 to control the hacked hoverboard
 

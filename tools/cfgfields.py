@@ -86,6 +86,7 @@ FIELDS = {
     91: ("hallang5", "num", "hall state 5 edge"),
     92: ("hallang6", "num", "hall state 6 edge"),
     93: ("vbatgain", "num", "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"),
+    94: ("txpushpull", "num", "uart TX push-pull: 2 = on (one board alone on the line, fast edges above 230400 baud), 1/0/65535 = open drain (shared bus line, needs a pull-up)"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
     97: ("imumount", "num", "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"),
     98: ("imurestx", "num", "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"),

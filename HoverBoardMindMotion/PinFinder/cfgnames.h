@@ -95,6 +95,7 @@
 	F(91, 0, "hallang5") \
 	F(92, 0, "hallang6") \
 	F(93, 0, "vbatgain") \
+	F(94, 0, "txpushpull") \
 	F(96, 0, "extmagic") \
 	F(97, 0, "imumount") \
 	F(98, 0, "imurestx") \
@@ -107,4 +108,4 @@
 	F(105, 0, "holdidledelay") \
 	F(106, 0, "curpull") \
 
-#define CFG_FIELD_COUNT 105
+#define CFG_FIELD_COUNT 106

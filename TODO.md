@@ -298,8 +298,9 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
       measured, see hallhandle.c), calibration_current / motor calibration, dc_max_positive/negative_current
       (bus current limits; the regeneration limit is by voltage, `batfull`), spinout detection.
-- [ ] Bus line above 230400 baud: the open-drain TX needs a stronger pull-up (or push-pull for a
-      single board: config option).
+- [x] Bus line above 115200 baud (2026-10-30): config `txpushpull` (word 94, 2 = on) drives TX push-pull for
+      one board alone on the line. Bench (FT232R): open drain 115200 500/500, 230400 7/500, 460800 0/500;
+      push-pull 460800 and 921600 500/500. Open: the web console's copy of cfgfields.json (console repo).
 
 ## Later
 

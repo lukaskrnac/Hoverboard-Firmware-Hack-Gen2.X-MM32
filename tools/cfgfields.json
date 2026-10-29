@@ -600,6 +600,12 @@
    "meaning": "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"
   },
   {
+   "index": 94,
+   "name": "txpushpull",
+   "kind": "num",
+   "meaning": "uart TX push-pull: 2 = on (one board alone on the line, fast edges above 230400 baud), 1/0/65535 = open drain (shared bus line, needs a pull-up)"
+  },
+  {
    "index": 96,
    "name": "extmagic",
    "kind": "num",

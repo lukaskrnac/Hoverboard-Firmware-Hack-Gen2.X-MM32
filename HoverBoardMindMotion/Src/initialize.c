@@ -239,9 +239,10 @@ uint8_t UART_GPIO_Init(void){
 		if(n>best){ best=n; uart=u; t=ut; r=ur; }
 	}
 	if(t<UARTCOUNT){
-		//open drain: several boards share one RemoteUartBus line, the master's rx must have a pull-up
+		//open drain: several boards share one RemoteUartBus line, the master's rx must have a pull-up. Its
+		//rising edges limit the baud (above 230400 with the usual pull-ups): txpushpull for one board alone
 		pinModeAF(uarts[t].io,uarts[t].af);
-		pinMode(uarts[t].io, OUTPUT_AF_OD);
+		pinMode(uarts[t].io, cfgBool(TX_PUSHPULL, 0) ? OUTPUT_AF : OUTPUT_AF_OD);
 	}
 	if(r<UARTCOUNT){
 		pinModeAF(uarts[r].io,uarts[r].af);
