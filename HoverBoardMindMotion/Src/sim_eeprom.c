@@ -1,224 +1,52 @@
-////////////////////////////////////////////////////////////////////////////////
-/// @file    sim_eeprom.c
-/// @author  AE TEAM
-/// @brief   THIS FILE PROVIDES SIM-EEPROM FUNCTIONS.
-////////////////////////////////////////////////////////////////////////////////
-
-// Define to prevent recursive inclusion
-#define _SIM_EEPROM_C_
-
-// Files includes
+//Board configuration in flash: one 1 KB page at 0x08007C00 (the linker script keeps it out of the image),
+//8 slots of 128 bytes. A save writes a pair: the extension record (words 64-127, EXT_MAGIC at its word 32),
+//then the main record (words 0-63, MAGIC_NUMBER at word 32) in the next slot; with fewer than two blank
+//slots left the page is erased first (every 4th save; a power cut in that ~25 ms loses the config: the
+//firmware then shows the no-config fault, PinFinder writes a new one). The newest main record is the slot
+//before the first blank one (the last when the page is full), its extension the slot before it. Same in
+//tools/mm32cfgstore.py. Until 2026-10-30 it was the vendor's sim-EEPROM over 2 KB at 0x08007800 (16 slots
+//used round): code space now, mm32flash.py moves an old configuration into the new page.
 #include "hal_conf.h"
 #include "sim_eeprom.h"
 #include "pinout.h"
 #include "bldc.h"
 
-#define M8(adr)  (*((vu8  *) (adr)))
-#define M16(adr) (*((vu16 *) (adr)))
+#define CFG_BASE 0x08007C00u
+#define CFG_SLOTS 8u
+#define SLOT 128u
+#define SLOT_ADDR(i) (CFG_BASE+(i)*SLOT)
 
-
-#define BASED_FLASH_SECTOR_ADDRESS   0x08007800
-////////////////////////////////////////////////////////////////////////////////
-/// @addtogroup MM32_Example_Layer
-/// @{
-
-////////////////////////////////////////////////////////////////////////////////
-/// @addtogroup SIM_EEPROM
-/// @{
-
-////////////////////////////////////////////////////////////////////////////////
-/// @addtogroup SIM_EEPROM_Exported_Constants
-/// @{
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  Erases a specified FLASH page.
-/// @note   This function can be used for all MM32 devices.
-/// @param  Page_Address: The page address to be erased.
-/// @retval None.
-////////////////////////////////////////////////////////////////////////////////
-static void FLASH_SIM_EraseEE(u32 pageAddress)
-{
-    FLASH_Unlock();
-    FLASH_ErasePage(pageAddress);
-    FLASH_Lock();
-}
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  Programs a buffer at a specified address.
-/// @note   This function can be used for all MM32 devices.
-/// @param *buf: the pointer of the buffer to be programmed.
-/// @param  addr: specifies the address to be programmed.
-/// @param  len: the number of bytes in the buffer.
-///         This parameter can only be even.
-/// @retval None.
-////////////////////////////////////////////////////////////////////////////////
-static void FLASH_SIM_ProgramEE(u16* buf, u32 addr, u16 len)
-{
-    u16 i;
-    FLASH_Unlock();
-    for ( i = 0; i < len / 2; i++) {
-        FLASH_ProgramHalfWord(addr, *buf);
-        addr += 2;
-        buf++;
-    }
-    FLASH_Lock();
+static uint8_t slotBlank(uint32_t i){
+	const uint32_t* p = (const uint32_t*)SLOT_ADDR(i);
+	for(uint8_t k=0;k<SLOT/4;k++) if(p[k]!=0xFFFFFFFFu) return 0;
+	return 1;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  Determine if the data that at the ptr address with the length is len
-///         is empty.
-/// @note   This function can be used for all MM32 devices.
-/// @param *ptr: the pointer of the starting address.
-/// @param  len: the number of bytes.
-///         This parameter can only be even.
-/// @retval True presents the data is empty,
-///         false presents the data has been written.
-////////////////////////////////////////////////////////////////////////////////
-static u8 FLASH_SIM_FindEmpty(u32 ptr, u16 len)
-{
-    u16 i, readdata;
-    u8  ret = 1;
-    for (i = 0; i < (len / 2); i++) {
-        readdata = M16(ptr + i * 2);
-        if ( readdata != 0xffff) {
-            ret = 0;
-            break;
-        }
-    }
-    return ret;
+static uint32_t firstBlank(void){    //CFG_SLOTS: the page is full
+	uint32_t i = 0;
+	while(i<CFG_SLOTS&&!slotBlank(i)) i++;
+	return i;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  Locate the writable area on the specified address.
-/// @note   This function can be used for all MM32 devices.
-/// @param  pageAddress: specifies the beginning of the EEprom.
-///         The EEprom can be some continuously pages in the flash.
-/// @param  len: the number of bytes to be written.
-///         This parameter can only be even.
-/// @retval the pointer of the starting address.
-////////////////////////////////////////////////////////////////////////////////
-static u32 FLASH_SIM_WriteLocate(u32 pageAddress, u16 len)
-{
-    u16 i;
-    u32 ptr = pageAddress;
-    if( (pageAddress % 2 ) != 0) {
-        while(1);
-    }
-    if((0x800 % len) != 0)
-        while(1);
-
-    for (i = 0; i < (0x0800 / len); i++) {
-        ptr = (pageAddress + i * len);
-        if (FLASH_SIM_FindEmpty(ptr, len) == 1) {
-            break;
-        }
-    }
-    if(i == (0x0800 / len))
-        ptr = 0;
-    return ptr;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  Programs a buffer at a specified address.
-/// @note   This function can be used for all MM32 devices.
-/// @param *buf: the pointer of the buffer to be programmed.
-/// @param  pageAddress: specifies the beginning of the EEprom.
-///         The EEprom can be some continuously pages in the flash.
-/// @param  len: the number of bytes in the buffer.
-///         This parameter can only be even.
-/// @retval None.
-////////////////////////////////////////////////////////////////////////////////
-static void FLASH_SIM_WriteEE(u16* buf, u32 pageAddress, u16 len)
-{
-    u32 ptr = FLASH_SIM_WriteLocate(pageAddress, len);
-    if (ptr == 0) {
-        FLASH_SIM_EraseEE(pageAddress + 0x000);
-        FLASH_SIM_EraseEE(pageAddress + 0x400);
-        FLASH_SIM_ProgramEE(buf, pageAddress, len);
-    }
-    else {
-        if (ptr == (pageAddress + 0x0400 - len)) {
-            FLASH_SIM_EraseEE(pageAddress + 0x400);
-            FLASH_SIM_ProgramEE(buf, (u32)ptr, len);
-        }
-        else if (ptr == (pageAddress + 0x0800 - len)) {
-            FLASH_SIM_EraseEE(pageAddress + 0x000);
-            FLASH_SIM_ProgramEE(buf, (u32)ptr, len);
-        }
-        else {
-            FLASH_SIM_ProgramEE(buf, (u32)ptr, len);
-        }
-    }
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  read the last set of data that was written in the specified EEPROM.
-/// @note   This function can be used for all MM32 devices.
-/// @param  ptr: the buffer to store the last set of data in EEPROM
-/// @param  len: the length of data that the user wants to get
-/// @note   The actual length is the minimum of len and the EEPROM blockSize
-/// @retval s32: -1: the EEPROM is empty
-///         0: the instance does not exist
-///         1: Read data operation succeeded
-////////////////////////////////////////////////////////////////////////////////
-static s32 EEPROM_Read(u8* ptr, u16 len)
-{
-    u32 pAddr;
-    pAddr = FLASH_SIM_WriteLocate((u32)BASED_FLASH_SECTOR_ADDRESS, len);
-    //u16* pAddr   = FLASH_SIM_Locate((u32)(BASED_FLASH_SECTOR_ADDRESS), len);
-
-    if (pAddr == 0) {
-        return  -1;
-    }
-    else if (pAddr == BASED_FLASH_SECTOR_ADDRESS) {
-        pAddr = (BASED_FLASH_SECTOR_ADDRESS + 0x0800 - len);
-    }
-    else {
-        pAddr -= len;
-    }
-    memcpy(ptr, (s8*)pAddr, len);
-
-    return len;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief  write the set of data in the specified EEPROM.
-/// @note   This function can be used for all MM32 devices.
-/// @param  ptr: the buffer that store the data to be written in EEPROM
-/// @note   the data cannot be all 0xFF
-/// @param  len: the length of ptr
-/// @note   The actual length is the minimum of len and the EEPROM blockSize
-/// @retval s32: false: the EEPROM_Instance does not exist
-///         true: Write data operation succeeded
-////////////////////////////////////////////////////////////////////////////////
-s32 EEPROM_Write(u8* ptr, u16 len)
-{
-    FLASH_SIM_WriteEE((u16*)ptr, (u32)(BASED_FLASH_SECTOR_ADDRESS), len);
-    return len;
-}
-
-
-//the extension record (words 64-127, its magic at word 32 of the record) is written first, the main record
-//(PinFinder's format) last: the newest slot is always one PinFinder reads, the extension is the slot
-//before it. A record PinFinder appended has an older main record there: the extension stays default.
 void SaveConfig(void){
-	EEPROM_Write((u8*)&pinstorage[64], 2 * 64);
-	EEPROM_Write((u8*)pinstorage, 2 * 64);
+	uint32_t s = firstBlank();
+	FLASH_Unlock();
+	if(s>CFG_SLOTS-2){ FLASH_ErasePage(CFG_BASE); s = 0; }
+	const uint16_t* w = &pinstorage[64];    //the extension, then the main record
+	for(uint32_t k=0;k<2;k++,s++,w=pinstorage){
+		for(uint32_t i=0;i<SLOT/2;i++) FLASH_ProgramHalfWord(SLOT_ADDR(s)+2*i, w[i]);
+	}
+	FLASH_Lock();
 }
 
 //the newest record if its magic is valid (and the extension record before it, if it has one)
 uint8_t ConfigLoad(void){
-	uint16_t tmp[64];
-	if(EEPROM_Read((u8*)tmp, 2 * 64)<0) return 0;
-	if(tmp[MAGICNUM_POS]!=MAGIC_NUMBER) return 0;
-	for(uint8_t i=0;i<64;i++){
-		pinstorage[i]=tmp[i];
-	}
-	u32 a = FLASH_SIM_WriteLocate((u32)BASED_FLASH_SECTOR_ADDRESS, 2 * 64);    //first blank slot
-	u32 last = a==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : a-128;
-	u32 prev = last==BASED_FLASH_SECTOR_ADDRESS ? BASED_FLASH_SECTOR_ADDRESS+0x0800-128 : last-128;
-	if(M16(prev+2*32)==EXT_MAGIC) memcpy(&pinstorage[64], (const void*)prev, 128);
+	uint32_t s = firstBlank();
+	if(!s) return 0;
+	const uint16_t* m = (const uint16_t*)SLOT_ADDR(s-1);
+	if(m[MAGICNUM_POS]!=MAGIC_NUMBER) return 0;
+	memcpy(pinstorage, m, SLOT);
+	if(s>=2&&m[MAGICNUM_POS-SLOT/2]==EXT_MAGIC) memcpy(&pinstorage[64], m-SLOT/2, SLOT);
 	return 1;
 }
 

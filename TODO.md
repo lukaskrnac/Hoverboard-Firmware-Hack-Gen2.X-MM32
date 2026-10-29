@@ -156,12 +156,14 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
 ## Next
 
-- [ ] **Config storage, compact** (user 2026-10-30, next step when flash runs out): the record is 128 uint16
-      words (256 B RAM; flash: 16 slots of 128 B + the extension record in the 2 KB config area at 0x08007800).
-      A packed struct (pins as uint8, bools as bits, only the words in use) would make the record smaller, so
-      the config area could shrink (1 KB instead of 2 = +1 KB code) and RAM drop. Touches the layout migration
-      (CFG_VERSION), sim_eeprom.c, PinFinder, tools/mm32config.py, mm32flash.py (keeps the config page),
-      cfgfields.py / endpoints, the web console.
+- [x] **Config storage, compact** (2026-10-30, user chose one 1 KB page): the config area is the last page
+      (0x08007C00, 8 slots; a save = extension + main record, the page erased when < 2 slots are blank), code
+      31 KB (+1 KB). The vendor two-page sim-EEPROM replaced by ~40 lines (main -116 B, PinFinder -144 B). Tools:
+      tools/mm32cfgstore.py (both layouts), mm32flash.py moves an old 2 KB config into the new page, mm32config.py
+      writes the new one. Bench: flashed over the old layout, config identical; 5 saves (pairs, the 5th erases
+      and restarts), mm32config set, PinFinder get/set/save, all read back identical; host tests of both layouts.
+      Risk accepted: a power cut during every 4th save (~25 ms erase + write) loses the config (no-config blink).
+      Free now: main SPIN05 ~1.2 KB, SPIN25 ~1.1 KB; PinFinder ~2.2 KB. The record itself is still 128 words.
 - [ ] **Pre-filled firmware images for mass production** (user 2026-10-30): a web tool that takes a build
       (make target per MCU, main or PinFinder) and appends / places a config record (from a PinFinder export or
       a board profile, with the slave / node id changeable per board) into the image's config area, so one

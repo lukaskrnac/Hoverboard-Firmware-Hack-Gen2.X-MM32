@@ -10,8 +10,9 @@ pyOCD has no MM32 flash algorithm, so this erases pages through the FLASH regist
 with a 26-byte RAM routine (the CPU does the halfword stores; ST-Link 16-bit debug writes program
 every odd halfword as 0 on this chip).
 
-The last 2 KB (0x08007800) hold the board configuration written by PinFinder / the RemoteUartBus
-config command. They are kept unless --erase-config is given.
+The last 1 KB (0x08007C00) holds the board configuration written by PinFinder / CANSimple / the
+RemoteUartBus config command (mm32cfgstore.py). It is kept unless --erase-config is given; a board with
+the old layout (2 KB at 0x08007800, until 2026-10-30) gets its configuration moved into the new page.
 
 --start soft (default) starts the new firmware without a system reset: a reset floats every GPIO,
 which releases the power self-hold latch and switches the board off. Instead the APB peripherals
@@ -27,7 +28,8 @@ from pyocd.core.helpers import ConnectHelper
 
 FLASH_REG = 0x40022000
 FLASH_BASE, FLASH_SIZE, PAGE = 0x08000000, 0x8000, 0x400
-CONFIG = 0x08007800
+from mm32cfgstore import CFG_BASE as CONFIG    # noqa: E402  (the 1 KB config page)
+import mm32cfgstore                            # noqa: E402
 RCC = 0x40021000
 IWDG_KR, DBGMCU_CR = 0x40003000, 0x40013404
 RCC_APB2ENR_DBGMCU, DBGMCU_CR_IWDG_STOP = 1 << 22, 1 << 8
@@ -194,7 +196,7 @@ class Mm32:
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("image", help="raw binary for 0x08000000")
-    ap.add_argument("--erase-config", action="store_true", help="also erase the 2 KB board configuration")
+    ap.add_argument("--erase-config", action="store_true", help="also erase the board configuration (1 KB)")
     ap.add_argument("--backup", metavar="FILE", help="save the whole 32 KB flash before writing")
     ap.add_argument("--start", choices=("soft", "reset", "none"), default="soft",
                     help="how to start the new firmware (default: soft, keeps the board powered)")
@@ -206,7 +208,7 @@ def main():
     image = open(a.image, "rb").read()
     image += b"\xff" * (len(image) & 1)
     if FLASH_BASE + len(image) > CONFIG:
-        raise SystemExit("image is %d bytes and would overwrite the config pages at 0x%08x" % (len(image), CONFIG))
+        raise SystemExit("image is %d bytes and would overwrite the config page at 0x%08x" % (len(image), CONFIG))
 
     session = ConnectHelper.session_with_chosen_probe(
         unique_id=a.probe, target_override="cortex_m", frequency=a.frequency,
@@ -218,6 +220,7 @@ def main():
         if a.backup:
             open(a.backup, "wb").write(bytes(mcu.t.read_memory_block8(FLASH_BASE, FLASH_SIZE)))
             print("backup:", a.backup)
+        cfg, layout = (None, None) if a.erase_config else mm32cfgstore.read(mcu.t)
         # always erase the whole application area, so no code of an older, bigger image survives
         end = FLASH_BASE + FLASH_SIZE if a.erase_config else CONFIG
         for attempt in range(3):
@@ -235,6 +238,9 @@ def main():
                              "(the board stays on): flash again" % (bad[0], len(bad)))
         print("programmed and verified %d bytes, erased 0x%08x-0x%08x%s" %
               (len(image), FLASH_BASE, end, " (config erased)" if a.erase_config else ""))
+        if layout == "old":    # its first page was code space now (erased above): into the new page
+            mm32cfgstore.write(mcu, cfg, fresh=True)
+            print("config moved from the old 2 KB layout to the 1 KB page at 0x%08x" % CONFIG)
         if a.start == "soft":
             mcu.soft_start()
             print("started (soft start, board stays powered)")

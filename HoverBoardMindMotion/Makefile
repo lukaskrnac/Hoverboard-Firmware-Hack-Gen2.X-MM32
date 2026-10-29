@@ -13,8 +13,8 @@ SIZE    := $(CROSS)size
 
 # All MCUs share the SPIN05 register headers and HAL: their peripherals have the same register layout
 # (compared in the vendor SVD files). They differ in the pin tables (hardware.c), the clock (SPIN25: PLL)
-# and the op-amps (SPIN25: enabled per configured pin). Every image uses the same 32 KB layout (30 KB
-# code, the config in the last 2 KB) and 4 KB of RAM, the smallest of the four, so the tools and the
+# and the op-amps (SPIN25: enabled per configured pin). Every image uses the same 32 KB layout (31 KB
+# code, the config in the last 1 KB page) and 4 KB of RAM, the smallest of the four, so the tools and the
 # config address are the same on every board.
 MCUS    := SPIN05 SPIN06 SPIN25 F031
 MCU     ?= SPIN05

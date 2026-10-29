@@ -29,8 +29,8 @@ worst case stack, main loop plus nested interrupts, is ~670 bytes).
 
 MCUs (`make MCU=...`, `Inc/mcu.h`). All four share the SPIN05 register headers and HAL: their
 timers, ADC, UART, DMA, GPIO, RCC, flash, watchdog and hardware divider have the same addresses and
-register layout (compared in the vendor SVD files). Every image uses the 32 KB layout (30 KB code, the
-config in the last 2 KB) and 4 KB of RAM, so the tools work the same on all of them.
+register layout (compared in the vendor SVD files). Every image uses the 32 KB layout (31 KB code, the
+config in the last 1 KB page) and 4 KB of RAM, so the tools work the same on all of them.
 
 | MCU | state | differences |
 |---|---|---|
@@ -49,7 +49,8 @@ cd HoverBoardMindMotion
 make flash                             # = python3 ../tools/mm32flash.py build/hoverboard.bin
 ```
 Works with any probe pyOCD supports (ST-Link, DAPLink, J-Link). The board configuration in the
-last 2 KB of flash (written by PinFinder or the RemoteUartBus config command) is kept; the new
+last 1 KB page of flash (written by PinFinder, CANSimple or the RemoteUartBus config command; until
+2026-10-30 the last 2 KB, moved by the flasher) is kept; the new
 firmware is started without a reset so a self-holding board stays powered. A locked (read
 protected) chip must be unlocked with a full chip erase first, see the installation guide.
 
