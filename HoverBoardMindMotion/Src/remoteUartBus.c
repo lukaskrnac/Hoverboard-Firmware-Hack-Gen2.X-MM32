@@ -107,8 +107,8 @@ static void ApplyConfig(const SerialServer2HoverConfig* pData){
 		BAT_EMPTY = pData->fBattEmpty * 1000;
 	}
 	SetDriveMode(pData->iDriveMode);    //ignored if not supported
-	if (pData->iSlaveNew >= 0 && 0)    //disabled!
-		SLAVE_ID = pData->iSlaveNew;
+	if (pData->iSlaveNew >= 0 && pData->iSlaveNew <= 63)    //-1: keep; the new id answers from now on, saved below
+		SLAVE_ID = (uint16_t)pData->iSlaveNew;
 	bConfigSave = 1;
 }
 
@@ -219,6 +219,7 @@ static void feedV1(uint8_t cRead){
 					SerialServer2Hover* pData = (SerialServer2Hover*) aReceiveBuffer;
 					speed = pData->iSpeed;
 					wState = pData->wState;
+					if(wState&STATE_SHUTOFF) powerOffReq = 1;    //the power button's shutdown (boards with a latch)
 					break;
 				}
 				case 1:
@@ -226,6 +227,7 @@ static void feedV1(uint8_t cRead){
 					SerialServer2HoverMaster* pData = (SerialServer2HoverMaster*) aReceiveBuffer;
 					speed = pData->iSpeed;
 					wState = pData->wState;
+					if(wState&STATE_SHUTOFF) powerOffReq = 1;
 					break;
 				}
 				case 2:

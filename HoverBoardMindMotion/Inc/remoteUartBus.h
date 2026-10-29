@@ -11,7 +11,7 @@
 #define STATE_LED_DOWN       16
 #define STATE_LED_BATTLEVEL  32     //green/orange/red show the battery level instead of the bits above
 #define STATE_DISABLE        64     //gates off, motor coasts (disarmed)
-#define STATE_SHUTOFF        128    //not implemented
+#define STATE_SHUTOFF        128    //switch off: the power button's shutdown (boards with a latch)
 
 void RemoteUpdate(void);
 uint8_t RemoteTimedOut(void);

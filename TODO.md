@@ -348,8 +348,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       0.3 A + hard brake from 6 -> 0x800; power_off from the web console -> board off. Web console: board
       temperature, charger, Power off button, the new error names. Room: SVPWM tables (identical outputs on
       50e6 host cases), SpeedParams table, one CRC routine for both protocols. SPIN25 0 B free.
-- [ ] RemoteUartBus v1 extras (state bit 128 shut off, slaveNew, a config read): no flash left; CANSimple is
-      the recommended protocol (user 2026-10-30), so only after the compact config storage.
+- [x] RemoteUartBus v1 extras (2026-10-30): state bit 128 switches the board off (the power button's shutdown),
+      the config frame's iSlaveNew (0..63; -1 keeps) sets the slave id, saved with the config when stopped.
+      Bench (v1 frames at 115200): id 1 -> 5 -> 1, answers only on the current id; bit 128 -> board off.
+      v1 has no config read frame (CANSimple is the recommended protocol, user 2026-10-30).
 - [x] Bus line above 115200 baud (2026-10-30): config `txpushpull` (word 94, 2 = on) drives TX push-pull for
       one board alone on the line. Bench (FT232R): open drain 115200 500/500, 230400 7/500, 460800 0/500;
       push-pull 460800 and 921600 500/500. Open: the web console's copy of cfgfields.json (console repo).
