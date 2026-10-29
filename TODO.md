@@ -135,9 +135,16 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         the debug port; extend to both.
       - Temperature: MCU internal sensor (ADC channel) and an NTC pin if fitted; report + derate.
       - Headlight / brake light outputs on some boards (detect like the LEDs).
-      - Hall inputs inverted / 180 deg off the commutation: PinFinder detects it (no assignment fits, the
-        inverted one does) but the firmware cannot use it; a `hallinvert` config bit (hallpos() 7-state)
-        would make such motors work.
+      - Done 2026-10-30: hall inputs inverted: config `hallinvert` (word 95, 2 = on), applied in hallpos() and
+        PinFinder's HallState(); detect hall sets it when only the inverted assignment fits (it was an error).
+        Recalibrating alone could not do it: no pin order gives a 180 deg shift, and the inverted states run the
+        sequence backwards. Bench: hallinvert 2 set by mistake -> detect sets 1, same pins; a simulated inverted
+        board (pins read inverted in a test build of both images) -> detect sets 2, rotate both ways, calibrate hall
+        within 3 deg of the normal angles, main firmware block / sine / FOC at +-4 turns/s and position moves as on
+        the normal board. Not tried on a board with really inverted halls.
+      - Not wanted (user 2026-10-30): WS2812, master/slave UART (the firmware is addressed, no master/slave), NTC
+        (boards have none; the MCU's internal sensor is planned), more light outputs (5 is the most there is).
+      - E-stop: detectable like the button (a person presses it); only if boards have one.
       - Hall edge positions at 30 deg resolution come out of `detect hall` already (12 directions); the
         hall angle calibration (P5) can refine them.
 

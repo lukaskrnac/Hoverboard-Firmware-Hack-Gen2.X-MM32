@@ -52,6 +52,7 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
                                          //around the built-in sector centres
 #define VBAT_GAIN pinstorage[93]         //battery divider in 0.001 (PinFinder detect vbat <V>); unset: VBAT_DIVIDER
 #define TX_PUSHPULL pinstorage[94]       //2: uart TX push-pull (one board on the line), else open drain
+#define HALL_INVERT pinstorage[95]       //2: the three hall signals inverted (detect hall), else as read
 static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : def); }
 
 

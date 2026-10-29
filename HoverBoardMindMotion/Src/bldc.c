@@ -93,14 +93,9 @@ uint8_t hallpos(uint8_t forward){
 	HallB = digitalRead(HALLBPIN);
 	HallC = digitalRead(HALLCPIN);
 
-	if(forward == 1)
-	{
-		HallValue = HallC*4 + HallB*2 + HallA;
-	}
-	else
-	{
-		HallValue = 7-(HallC*4 + HallB*2 + HallA);
-	}
+	//inverted halls (HALL_INVERT, PinFinder's detect hall): 7 - state, like the other direction
+	HallValue = (uint8_t)(HallC*4 + HallB*2 + HallA);
+	if((forward == 1) == cfgBool(HALL_INVERT, 0)) HallValue = (uint8_t)(7-HallValue);
 
 	//return hall_to_pos[HallValue];
 	return HallValue;

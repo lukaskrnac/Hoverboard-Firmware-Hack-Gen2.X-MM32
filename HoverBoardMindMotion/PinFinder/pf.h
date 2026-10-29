@@ -66,7 +66,7 @@ void FieldAngle(uint16_t th, int32_t mv);    //field at th (65536 per electrical
 int32_t Sin16(uint16_t a);                   //Q15    //k = 0..11: field at k x 30 deg el (even k: step k/2+1), complementary
 uint16_t DutyForMv(int32_t mv);         //duty for this average phase voltage at the measured (or assumed 42 V) battery
 uint8_t PinFree(uint16_t pin);          //not SWD, not configured for anything (pins in words 0-17, 23, 24)
-uint8_t HallState(void);                //C*4 + B*2 + A (the main firmware's hallpos(1))
+uint8_t HallState(void);                //C*4 + B*2 + A, 7 - that with hallinvert (the main firmware's hallpos(1))
 const char* PinName(uint16_t pin);
 uint16_t PinByName(const char* s);      //PIN_NONE: not a pin name
 extern uint8_t uartUsed;                //1: UART1, 2: UART2

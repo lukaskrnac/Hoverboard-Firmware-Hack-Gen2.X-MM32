@@ -123,20 +123,22 @@ void DetectHall(int32_t mv){
 		if(edges==2&&ones>=4&&ones<=8&&nc<6) cand[nc++] = (uint8_t)p;
 	}
 	//the assignment of 3 candidates to A, B, C with every direction at 60..120 deg lead, best at 90
-	int8_t best = -1, inverted = 0;
-	uint8_t pick[3] = { 0, 0, 0 };
+	int8_t best = -1, bestInv = -1;
+	uint8_t pick[3] = { 0, 0, 0 }, pickInv[3] = { 0, 0, 0 };
 	for(uint8_t i=0;i<nc;i++) for(uint8_t j=0;j<nc;j++) for(uint8_t m=0;m<nc;m++){
 		if(i==j||j==m||i==m) continue;
 		uint8_t pins[3] = { cand[i], cand[j], cand[m] };
 		int8_t sc = leadScore(bit, sure, pins, 0);
 		if(sc>best){ best = sc; pick[0] = pins[0]; pick[1] = pins[1]; pick[2] = pins[2]; }
-		if(leadScore(bit, sure, pins, 1)>=0) inverted = 1;
+		sc = leadScore(bit, sure, pins, 1);    //the same with the signals inverted (hallinvert)
+		if(sc>bestInv){ bestInv = sc; pickInv[0] = pins[0]; pickInv[1] = pins[1]; pickInv[2] = pins[2]; }
 	}
+	uint8_t inv = best<0&&bestInv>=0;
+	if(inv){ best = bestInv; pick[0] = pickInv[0]; pick[1] = pickInv[1]; pick[2] = pickInv[2]; }
 	if(stop||turns<TURNS||best<0){
 		HALLAPIN = old[0]; HALLBPIN = old[1]; HALLCPIN = old[2];
 		if(stop) err("stopped");
 		else if(turns<TURNS) err("motor did not follow (more mV)");
-		else if(inverted) err("halls fit only inverted: not supported");
 		else err(nc<3 ? "fewer than 3 hall pins found" : "no hall order fits the commutation");
 		return;
 	}
@@ -144,6 +146,8 @@ void DetectHall(int32_t mv){
 	kvp("halla", HALLAPIN);
 	kvp("hallb", HALLBPIN);
 	kvp("hallc", HALLCPIN);
+	HALL_INVERT = inv ? 2 : 1;
+	kvi("hallinvert", HALL_INVERT);
 	kvi("lead90", best);    //directions at the ideal 90 deg lead (of up to 6 off the hall edges)
 	HwCheck();
 	ok();

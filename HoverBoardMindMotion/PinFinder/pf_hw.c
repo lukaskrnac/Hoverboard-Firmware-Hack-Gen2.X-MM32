@@ -197,8 +197,9 @@ uint8_t PinFree(uint16_t pin){
 	return OCPPIN!=pin&&OCPREFPIN!=pin&&IMU_SDA!=pin&&IMU_SCL!=pin&&IR_PIN(0)!=pin&&IR_PIN(1)!=pin;
 }
 
-uint8_t HallState(void){
-	return (uint8_t)(digitalRead(HALLCPIN)*4+digitalRead(HALLBPIN)*2+digitalRead(HALLAPIN));
+uint8_t HallState(void){    //as the main firmware reads it (hallpos(1)): inverted with hallinvert
+	uint8_t h = (uint8_t)(digitalRead(HALLCPIN)*4+digitalRead(HALLBPIN)*2+digitalRead(HALLAPIN));
+	return cfgBool(HALL_INVERT, 0) ? (uint8_t)(7-h) : h;
 }
 
 const char* PinName(uint16_t pin){

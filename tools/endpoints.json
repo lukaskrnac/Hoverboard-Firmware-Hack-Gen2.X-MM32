@@ -572,6 +572,12 @@
    "access": "rw",
    "unit": "uart TX push-pull: 2 = on (one board alone on the line, fast edges above 230400 baud), 1/0/65535 = open drain (shared bus line, needs a pull-up)"
   },
+  "hoverboard.config.hallinvert": {
+   "id": 95,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall signals inverted (all three; a 180 deg el shift no pin order gives): 2 = on, 1/0/65535 = off; detect hall sets it"
+  },
   "hoverboard.config.extmagic": {
    "id": 96,
    "type": "uint16",
