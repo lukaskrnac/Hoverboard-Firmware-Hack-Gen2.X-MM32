@@ -160,8 +160,15 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       So the bus shunt calibration from PinFinder's detect current (itotaldivider 333 / itotalzero 495, derived
       from the phase currents) reads ~1.8x high on the bench board; not recalibrated against the supply (that
       would only fix this board). If detect current is revisited: check its bus divider against a known load.
-- [ ] Position (v1 protocol): the target is int16 hall steps (the command field). Sine takes 1.6-2.2 s
-      per move.
+- [x] Position, sine (2026-10-30): was P on whole hall steps (2 rpm per step, +-1 step dead band, no stopping
+      limit): half a turn 1.7-1.9 s, stopped a step short, 10 turns at vel_limit 30 asked 1800 rpm: 1.2 turns
+      overshoot, once 5.5 and CURRENT_LIMIT_VIOLATION. Now the FOC path's fine P, sqrt(2 a err) stopping limit
+      and accel slew, half step dead band; sine gain 60. Sine: 0.5 / 3 / 10 turns in 0.47 / 1.6 / 2.6 s settled,
+      overshoot 0.005 / 0.06 / 0.06, exact (FOC 0.44 / 1.2 / 2.25 s, 0). Block uses the same path (gain 20):
+      exact now, still overshoots (0.4 turns at 3, 1.5 at 10; was 0.4 / 1.73 and a step short): it cannot brake.
+- [ ] Block position overshoot (it cannot brake actively; a 10 turn move once pumped the bench supply into
+      its 41 V OVP with the old firmware). Options: a lower stopping rate for block, or the short brake on
+      approach. Position (v1 protocol): the target is int16 hall steps (the command field).
 - [ ] Sine torque is a model (MOTOR_R, the sine kv and dead band): it reads high against FOC at the
       same command; block torque depends on the shunt calibration.
 - [ ] FOC field weakening with 13 A of d current (~840 rpm at 24 V) shakes and trips (9 A: 0.7-0.9

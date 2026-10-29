@@ -147,7 +147,7 @@
    "index": 18,
    "name": "poskp",
    "kind": "num",
-   "meaning": "position: 0.1 rpm per hall step of error; 0/65535 = default 20"
+   "meaning": "position: 0.1 rpm per hall step of error; 0/65535 = default block 20, sine 60, FOC 133"
   },
   {
    "index": 19,

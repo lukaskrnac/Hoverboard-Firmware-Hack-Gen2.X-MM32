@@ -70,19 +70,13 @@ static int32_t LowSpeedMeas(void){
 static int32_t FocSpeedMeas(void){ return LowSpeedMeas(); }
 
 //position gain, 0.1 rpm per hall step: POS_KP, default FOC 133 (ODrive's pos_gain 20 (turns/s)/turn),
-//block / sine 20 (they act on whole hall steps; more hunts around the target)
+//sine 60 (20 stalled a step short: 2 rpm does not move it; half a turn 1.6-1.9 s, now 0.47), block 20
+//(60 overshot short moves by 0.13 turns)
 int32_t PosGain(void){
-	return cfgOrDefault(POS_KP, COMMUTATION(DRIVEMODE)==COMMUT_FOC ? 133 : 20);
+	static const uint8_t def[3] = { 20, 60, 133 };    //block, sine, FOC
+	return cfgOrDefault(POS_KP, def[COMMUTATION(DRIVEMODE)]);
 }
 
-//block / sine position mode: hall step error -> speed set point (P, limited)
-static int32_t PositionSpeed(int32_t err){
-	int32_t vmax = cfgOrDefault(POS_RPM, 300);
-	if(err<=1&&err>=-1) return 0;    //at the target within the hall step: hold, the speed integrator decays
-	int32_t v = err*PosGain()/10;
-	if(v>vmax) v = vmax; else if(v<-vmax) v = -vmax;
-	return v;
-}
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
@@ -208,7 +202,8 @@ void speedupdate(void){
 			if(realspeed>lim||realspeed<-lim) axisDisarm |= ERR_VELOCITY_LIMIT_VIOLATION;
 		}
 		uint8_t focPos = ctl==CTRL_POSITION&&COMMUTATION(DRIVEMODE)==COMMUT_FOC&&!held;
-		if(!focPos){ FocHoldStop(); posSp = realspeed; }
+		if(!focPos) FocHoldStop();
+		if(held||ctl!=CTRL_POSITION) posSp = realspeed;
 		if(held||ctl!=CTRL_POSITION) posI = 0;
 		if(ctl==CTRL_POSITION){
 			//targets and the estimate in 1/POS_FINE step
@@ -221,15 +216,24 @@ void speedupdate(void){
 			int32_t ff = 0, target = posHold;
 			if(!held) target = InputPos(posHold, cmdSource==2&&!timedOut ? posVelFf : 0, dtms, &ff);
 			int32_t errF = target-hallPosFine;
+			//P on the fine position, and no faster than it can stop from at accel_limit (default 20 turns/s^2,
+			//1800 steps/s^2): sqrt(2 a err) steps/s = sqrt(14 errF) * 2/3 rpm; it accelerates at that rate too
+			//(1200 rpm/s). FOC: with P alone half a turn overshot by 7 steps (still ~110 rpm 3 steps before the
+			//target); from a standing start the full current limit (10 A, ~3700 rpm/s) outran the hall angle
+			//tracker, it snapped, a 32 A trip. Sine had P on whole steps only (2 rpm per step, +-1 step dead band):
+			//1.7-1.9 s for half a turn, stopped a step short, and 10 turns asked 1800 rpm (vel_limit 30 turns/s):
+			//top speed, 1.2 turns overshoot, once 5.5 and a CURRENT_LIMIT_VIOLATION (block: the same P).
+			int32_t ae = errF<0 ? -errF : errF; if(ae>1000000) ae = 1000000;
+			int32_t ac = cfgOrDefault(POS_ACCEL, 2000);    //0.01 turns/s^2
+			int32_t pl = (int32_t)MCM_Sqrt(ae/16*(ac*9/80))*2/3, sl = ac*3*dtms/5000+1;
+			int32_t p = errF/POS_FINE*PosGain()/10+(errF%POS_FINE)*PosGain()/10/POS_FINE;
 			if(focPos){
-				//FOC: P on the fine position (the tracker's angle in the sector while moving) into the speed
-				//loop, no dead band; within 1.5 steps and below 25 rpm the hold (foc.c) takes the rotor to the
+				//FOC: no dead band; within 1.5 steps and below 25 rpm the hold (foc.c) takes the rotor to the
 				//target's electrical angle. (It was P with a +-1 step dead band at 2 rpm per step: a 1 step
 				//command did nothing, it stopped up to 4 deg off, ~1.2 s for half a turn.)
 				int32_t af = fastspeed<0 ? -fastspeed : fastspeed;
-				int32_t p = errF/POS_FINE*PosGain()/10+(errF%POS_FINE)*PosGain()/10/POS_FINE;
 				uint8_t holdOn = (uint8_t)cfgBool(HOLD_ENABLE, 1);
-				int32_t hw = cfgOrDefault(HOLD_WINDOW, 150)*POS_FINE/100, ac = cfgOrDefault(POS_ACCEL, 2000);    //0.01 turns/s^2
+				int32_t hw = cfgOrDefault(HOLD_WINDOW, 150)*POS_FINE/100;
 				if(focHold){
 					int32_t dh = target-focHoldPos;
 					if(focHoldSlip||dh>3*POS_FINE||dh<-3*POS_FINE){ FocHoldStop(); FocSpeedReset(); }
@@ -242,29 +246,24 @@ void speedupdate(void){
 				//arrived: in the hold at the target; without the hold within half a step, standing (it was
 				//the hold only: with it off trajectory_done never came)
 				posDone = InputPosDone()&&(focHold ? dh<=2&&dh>=-2 : !holdOn&&errF<=POS_FINE/2&&errF>=-POS_FINE/2&&af<=2);
-				//and no faster than it can stop from at 20 turns/s^2 (1800 steps/s^2): sqrt(2 a err) steps/s =
-				//sqrt(14 errF) * 2/3 rpm. With P alone half a turn overshot by 7 steps (still ~110 rpm 3 steps
-				//before the target).
-				int32_t ae = errF<0 ? -errF : errF; if(ae>1000000) ae = 1000000;
-				int32_t pl = (int32_t)MCM_Sqrt(ae/16*(ac*9/80))*2/3;    //accel_limit (default 20 turns/s^2)
 				if(p>pl) p = pl; else if(p<-pl) p = -pl;
 				if(!holdOn&&ae<=POS_FINE/2) p = 0;    //without the hold: no hunting inside the step
 				//and no current there once standing: the speed loop (3.3x below 60 rpm) acted on the last hall
 				//interval's stale +-3 rpm and the estimate's whole step jumps at a hall edge: +-1.5 A at ~16 Hz
 				//for up to 0.8 s after a long move. It restarts from 0 when the error leaves the half step.
 				posRest = !holdOn&&ae<=POS_FINE/2&&af<=5;
-				//and it accelerates at that rate too (1200 rpm/s): from a standing start the full current
-				//limit (10 A, ~3700 rpm/s here) outran the hall angle tracker, it snapped, a 32 A trip
-				int32_t sl = ac*3*dtms/5000+1;
 				if(focHold) posSp = fastspeed;
-				posSp += p+ff-posSp>sl ? sl : (p+ff-posSp<-sl ? -sl : p+ff-posSp);
-				posSpeed = posSp;
 			}else{
-				posErr = errF>=0 ? (errF+POS_FINE/2)/POS_FINE : -((-errF+POS_FINE/2)/POS_FINE);    //whole steps
-				posDone = InputPosDone()&&posErr<=1&&posErr>=-1;
-				int32_t v = PositionSpeed(posErr);    //0 at the target (+-1 step): I and D off there
-				posSpeed = ff+v+PosID(errF, ff, realspeed, dtms, vlim, v!=0);
+				//sine / block: the same, with a half step dead band (they hold there: zero vector / short brake)
+				uint8_t in = ae<=POS_FINE/2;
+				p += PosID(errF, ff, realspeed, dtms, vlim, !in);
+				if(p>pl) p = pl; else if(p<-pl) p = -pl;
+				if(in) p = 0;
+				posErr = in ? 0 : (errF>0 ? 1 : -1);
+				posDone = InputPosDone()&&in;
 			}
+			posSp += p+ff-posSp>sl ? sl : (p+ff-posSp<-sl ? -sl : p+ff-posSp);
+			posSpeed = posSp;
 			if(posSpeed>vlim) posSpeed = vlim; else if(posSpeed<-vlim) posSpeed = -vlim;
 		}
 		if(held){

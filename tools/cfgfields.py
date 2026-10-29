@@ -15,7 +15,7 @@ FIELDS = {
     12: ("vbat", "pin", "battery voltage adc"), 13: ("itotal", "pin", "bus current adc"),
     14: ("tx", "pin", "uart tx"), 15: ("rx", "pin", "uart rx"), 16: ("iphasea", "pin", "phase current adc 1 (phase: iphasecfg)"),
     17: ("iphaseb", "pin", "phase current adc 2 (phase: iphasecfg)"),
-    18: ("poskp", "num", "position: 0.1 rpm per hall step of error; 0/65535 = default 20"),
+    18: ("poskp", "num", "position: 0.1 rpm per hall step of error; 0/65535 = default block 20, sine 60, FOC 133"),
     19: ("posrpm", "num", "velocity limit (vel_limit) in position and velocity modes, rpm; 0/65535 = default 300"),
     20: ("motorr", "num", "phase resistance incl. mosfets, mOhm; 0/65535 = default 300"),
     21: ("fwimax", "num", "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"),
