@@ -401,10 +401,12 @@ void Rotate(int32_t permille, uint32_t ms){
 //---------------------------------------------------------------- uart search (boot, no uart pins known)
 //The user connects the board's uart TX and RX together: every tx/rx pin pair of one uart is tried until
 //the test bytes come back; the pins are saved at once, then the board waits until the loop is removed.
+//The loop can also be the host: the web PinFinder echoes the test bytes (not '.'), so the wait for a byte
+//covers a USB round trip (FTDI latency timer 16 ms, Firefox Web Serial add-on ~40 ms).
 static uint8_t loopback(UART_TypeDef* u, uint8_t c){
 	while(u->CSR&UART_CSR_RXAVL) (void)u->RDR;
 	u->TDR = c;
-	for(uint32_t t=millis;millis-t<5;){
+	for(uint32_t t=millis;millis-t<150;){
 		if(u->CSR&UART_CSR_RXAVL) return (uint8_t)u->RDR==c;
 	}
 	return 0;
@@ -421,6 +423,7 @@ uint8_t UartFind(void){
 			}
 			UART_TypeDef* u = uarts[t].uart==2 ? UART2 : UART1;
 			UARTX_Init(PF_BAUD, uarts[t].uart);
+			u->GCR &= ~UART_GCR_DMA;    //polled: the dma serves the rx request even with its channel off (takes RDR)
 			pinModeAF(uarts[t].io, uarts[t].af);
 			pinModeAF(uarts[r].io, uarts[r].af);
 			pinMode(uarts[t].io, OUTPUT_AF);
