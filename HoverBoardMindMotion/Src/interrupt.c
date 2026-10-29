@@ -17,7 +17,7 @@
 
 static uint32_t itotaloffset=0;
 volatile uint8_t poweron=0;
-static uint16_t vrefint;    //last internal 1.2V reference conversion
+static uint16_t vrefint;    //internal 1.2V reference conversion, filtered (below)
 static volatile uint32_t adcticks;    //adc interrupts since boot (one per control period, pinout.h)
 volatile uint8_t realdir=0;
 static uint8_t buzzLevel;
@@ -66,6 +66,15 @@ void ADC1_COMP_IRQHandler(void){
 		adcticks++;
 		//the compare values active in this period (written by the last control step, loaded at this update)
 		int32_t cc[3] = { (int32_t)TIM1->CCR1, (int32_t)TIM1->CCR2, (int32_t)TIM1->CCR3 };
+		{    //the internal 1.2 V reference (VDD for the bus voltage and the shunt current): a reading now and then
+		     //is far off (seen ~26 instead of ~1489 counts: the bus voltage read 57x, the FOC voltage limit
+		     //overflowed negative, one period without q voltage, a 4 A current kick, a knock at speed with field
+		     //weakening, ~1 per second). VDD changes slowly: filtered, readings 1/16 off it ignored (not at boot).
+			int32_t vr = (int32_t)(ADC1->ADDR15&0xFFF), f = vrefint;
+			if(!f||poweron<127) f = f ? f+(vr-f)/4 : vr;
+			else if(vr>f-f/16&&vr<f+f/16) f += (vr-f)/8;
+			vrefint = (uint16_t)f;
+		}
 		if(poweron<127){//cancel out adc offset
 			itotaloffset+=analogRead(ITOTALPIN);
 			poweron++;
@@ -87,11 +96,15 @@ void ADC1_COMP_IRQHandler(void){
 			//integer math only: this runs every pwm period, with soft-float double math the isr took 45% cpu (gcc).
 			//VDD = 1.2V*4096/vrefint, so DIVIDER*adc*VDD*100/4096 (unit 0.01) = DIVIDER*adc*120/vrefint.
 			//32 bit is enough for dividers below 4369.
-			vrefint = ADC1->ADDR15;
 			if(vrefint){
 				uint32_t vg = VBAT_GAIN;    //0.001: gain*adc*120/1000 = gain*adc/25*3 (32 bit)
-				vbat = (int32_t)(vg&&vg!=0xFFFF ? vg*analogRead(VBATPIN)/25u*3u/vrefint
-				                                : (uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
+				int32_t vb = (int32_t)(vg&&vg!=0xFFFF ? vg*analogRead(VBATPIN)/25u*3u/vrefint
+				                                      : (uint32_t)VBAT_DIVIDER*analogRead(VBATPIN)*120u/vrefint);
+				//and the bus voltage channel's own glitches (bus traffic couples into the adc): a reading 1/12 off
+				//the last is held for up to 3 periods (a real change, regeneration, takes far longer)
+				static uint8_t vbHeld;
+				if(vbat>0&&(vb>vbat+vbat/12||vb<vbat-vbat/12)&&vbHeld<3) vbHeld++;
+				else{ vbat = vb; vbHeld = 0; }
 				//a zero below adc 0 (ITOTAL_ZERO) reads 0 up to that current (0.76 A on the bench board), then
 				//the shifted value
 				itotal = shuntCurrent(analogRead(ITOTALPIN));

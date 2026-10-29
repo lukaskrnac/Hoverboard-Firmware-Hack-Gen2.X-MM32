@@ -195,6 +195,14 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       (frozen by the phone's spike / in-firmware triggers): single-period d/q readings 1.5-2.5 A off (often
       +q -d), taken by the 3 A glitch filter; the loop answers with ~1 V for a period; the angles are clean.
       Experiment code: scratch fw/knock_experiments.patch, fw/knockcatch.py, fw/trknock.py.
+      FOUND and fixed: the internal 1.2 V reference reading (vrefint, ADDR15, unmasked, unfiltered) now and then
+      read ~26 instead of ~1489 counts: the bus voltage read 57x, MOD_MAX*v overflowed, vmax negative, one
+      period with no q voltage, a 4 A current kick (trace frozen on |vq| < 2 V). The small phase sample outliers
+      (~1 %, the same with and without field weakening) were bystanders. Now vrefint masked + filtered (1/16
+      gate), vbat held up to 3 periods if 1/12 off, v clamped to 70 V for vmax. Bench: 0 knocks at 9-10.8
+      turns/s with field weakening (was 12-25 per 15 s), 0 at pwmres 2048 / 5-6 turns/s (was 3 per 30 s).
+      Room for it: the 512 byte sine table replaced by 65 entries + linear interpolation (error 3.6 instead of
+      201 / 32768; low speed FOC 0.29-0.36 m/s^2, sine 0.05-0.20, was 0.39-0.59 / 0.19-0.49).
 - [ ] Sine drawing a lot of current (seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
@@ -245,7 +253,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       2048 (17.6 kHz) +7.4 / +13.2, 6-12 kHz +4 / +12, the rest at 17.6 kHz. Below 1 kHz all alike (the motor).
       2048 costs the modulation limit (76 % instead of 94 %). The bench board runs 2048 (user's choice, 2026-10-29:
       top 7.25 turns/s = 435 rpm at 24 V without field weakening); the firmware default stays 8192.
-- [ ] Flash (2026-10-29): main firmware SPIN05 30524 of 30720 B; PinFinder SPIN05 30688, SPIN25 30720 (0 B free: a new config name had to be 7 letters). Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
+- [ ] Flash (2026-10-29, after the sine table): main SPIN05 30276 of 30720 B, SPIN25 30392; PinFinder SPIN05 30688, SPIN25 30720 (0 B free: a new config name had to be 7 letters). Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.

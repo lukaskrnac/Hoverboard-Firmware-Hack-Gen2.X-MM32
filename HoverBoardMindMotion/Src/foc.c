@@ -406,6 +406,7 @@ void FocControl(void){
 		return;
 	}
 	int32_t v = vbat>1000 ? vbat : 2400;    //0.01 V
+	if(v>7000) v = 7000;                    //MOD_MAX*v in 32 bits (a glitch once overflowed it negative)
 	int32_t vmax = MOD_MAX*v/5676;          //mV; phase amplitude Vbus/sqrt(3) at modulation 32768
 	int16_t th = HALL1.Angle;
 	int32_t id, iq;
