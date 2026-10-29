@@ -12,6 +12,7 @@ extern volatile int vbat;                //battery voltage 0.01V
 extern volatile int itotal;              //bus current 0.01A
 extern volatile int fvbat;               //filtered vbat
 extern volatile int fitotal;             //filtered itotal
+extern volatile uint8_t powerOffReq;     //hoverboard.power_off (CANSimple): the main loop switches off
 extern volatile int speed;               //setpoint from the remote
 extern volatile int pwm;
 extern volatile int realspeed;           //measured speed

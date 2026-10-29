@@ -156,6 +156,20 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
 ## Next
 
+- [ ] **Config storage, compact** (user 2026-10-30, next step when flash runs out): the record is 128 uint16
+      words (256 B RAM; flash: 16 slots of 128 B + the extension record in the 2 KB config area at 0x08007800).
+      A packed struct (pins as uint8, bools as bits, only the words in use) would make the record smaller, so
+      the config area could shrink (1 KB instead of 2 = +1 KB code) and RAM drop. Touches the layout migration
+      (CFG_VERSION), sim_eeprom.c, PinFinder, tools/mm32config.py, mm32flash.py (keeps the config page),
+      cfgfields.py / endpoints, the web console.
+- [ ] **Pre-filled firmware images for mass production** (user 2026-10-30): a web tool that takes a build
+      (make target per MCU, main or PinFinder) and appends / places a config record (from a PinFinder export or
+      a board profile, with the slave / node id changeable per board) into the image's config area, so one
+      flash writes firmware + config. The firmware then needs no special handling: drop EEPROMEN and the
+      compile-time PINSTORAGE_DEFAULTS path ("copy pinstorage initializer from autodetect"). Main and PinFinder
+      stay build targets of one tree (no branches); the image format: the binary up to 0x08007800, the config
+      record at its slot. Needs the record format fixed first (compact storage above).
+
 - [ ] Bus current reading (2026-10-30): in sine above SAMPLE_MAX (the phase samples invalid, ~10 turns/s up
       with field advance) itotal froze at its last phase value (user: "it doesn't read current any more");
       it now stays the shunt's active-vector reading (busv runs in sine always). That reads 1.5-2.2x the
@@ -324,8 +338,17 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
       (1.2 KB, a switch per endpoint), the 512 byte sine table.
 - [ ] ODrive settings not implemented: encoder bandwidth (the hall tracker's gains are per edge and
-      measured, see hallhandle.c), calibration_current / motor calibration, dc_max_positive/negative_current
-      (bus current limits; the regeneration limit is by voltage, `batfull`), spinout detection.
+      measured, see hallhandle.c), calibration_current / motor calibration, spinout detection.
+      Done 2026-10-30 (config words, endpoints hoverboard.config.*): softocp exceeded disarms a CANSimple axis
+      (DC_BUS_OVER_CURRENT, as dc_max_positive_current); regenmax (word 108, 0.1 A) -> DC_BUS_OVER_REGEN_CURRENT
+      (signed bus current only from the phase currents); templimit (word 107, C, default 85) -> INVERTER_OVER_TEMP,
+      gates off (v1 masters too, 5 C hysteresis); hoverboard.power_off (0x202) = the power button's shutdown.
+      Bench: templimit 30 -> 0x4000 + IDLE; softocp 1 A + step to 8 turns/s -> 0x400 after 0.13 s; regenmax
+      0.3 A + hard brake from 6 -> 0x800; power_off from the web console -> board off. Web console: board
+      temperature, charger, Power off button, the new error names. Room: SVPWM tables (identical outputs on
+      50e6 host cases), SpeedParams table, one CRC routine for both protocols. SPIN25 0 B free.
+- [ ] RemoteUartBus v1 extras (state bit 128 shut off, slaveNew, a config read): no flash left; CANSimple is
+      the recommended protocol (user 2026-10-30), so only after the compact config storage.
 - [x] Bus line above 115200 baud (2026-10-30): config `txpushpull` (word 94, 2 = on) drives TX push-pull for
       one board alone on the line. Bench (FT232R): open drain 115200 500/500, 230400 7/500, 460800 0/500;
       push-pull 460800 and 921600 500/500. Open: the web console's copy of cfgfields.json (console repo).
@@ -350,9 +373,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Naming is mixed (camelCase, snake_case, Hungarian `iSpeed`/`bConfigRx`, vendor `u8`/`s32`
       next to stdint; config macros like `DRIVEMODE` are lvalues of `pinstorage[]`): clean up file by
       file when a file gets real work, not in one sweep.
-- [ ] RemoteUartBus: state bit 128 (shut off) and `slaveNew` are not implemented; there is no read
-      command for the configuration (the console cannot show the board's drive mode). A position mode
-      (GD32 drive mode 3, odometer target) would be the useful new mode.
+- RemoteUartBus v1 extras: see Next.
 - [ ] Peripheral paths not tested on hardware yet: an IMU that does not answer (TX_ABRT -> state 2),
       the passive buzzer's sound (TIM17 CH1 on PB9: registers verified, 2.2 kHz / 50 %, not listened
       to), TIM14/TIM16 and the CH1N pins, a hall wiring that needs a pin's second channel (PA0 AF2 / PB3 AF2/AF4: host-tested only),

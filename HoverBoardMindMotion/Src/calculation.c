@@ -62,21 +62,19 @@ __attribute__((noinline)) int32_t SpeedDerivStep(SpeedDeriv* f, int32_t meas, in
 static uint32_t spdT;
 
 //0 and 65535 (an unset word) = default: 65535 was taken as a gain of 65535
-static int32_t cfgOr(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }
 
 void SpeedParams(uint8_t mode, SpeedPlant* p){    //config fields, 0 = default
-	if(mode==SINE_SPEED){
-		//default gains: lowest overshoot of a sweep (<= 9%), 8x below instability (40/340) on the bench wheel
-		p->kp = cfgOr(SINE_KP, 5); p->ki = cfgOr(SINE_KI, 85); p->kd = cfgOrDefault(SINE_KD, 0);
-		p->kv = cfgOr(SINE_KV, 242); p->d0 = cfgOr(SINE_D0, 10); p->tref = 100;
-		//above 100 % the sine path turns the excess into phase advance (field weakening), if enabled
-		p->umax = cfgOrDefault(FW_ADVANCE, 0) ? (1220<<8) : SPD_UMAX;
-	}else{
-		//default gains 2x below where steps from rest start to overshoot (100/200), 4x below instability
-		p->kp = cfgOr(SPEED_KP, 50); p->ki = cfgOr(SPEED_KI, 100); p->kd = cfgOrDefault(SPEED_KD, 0);
-		p->kv = cfgOr(SPEED_KV, 355); p->d0 = cfgOr(SPEED_D0, 53); p->tref = 350;
-		p->umax = SPD_UMAX;
-	}
+	//kp, ki, kd, kv, d0 (SpeedPlant order): block (COM_SPEED) and sine words, defaults. Block: gains 2x below
+	//where steps from rest start to overshoot (100/200), 4x below instability. Sine: lowest overshoot of a
+	//sweep (<= 9%), 8x below instability (40/340) on the bench wheel
+	static const uint8_t w[2][5] = { { 48, 49, 78, 50, 51 }, { 52, 53, 77, 54, 55 } };
+	static const uint16_t def[2][5] = { { 50, 100, 0, 355, 53 }, { 5, 85, 0, 242, 10 } };
+	uint8_t s = mode==SINE_SPEED;
+	int32_t* f = &p->kp;
+	for(uint8_t k=0;k<5;k++) f[k] = cfgOrDefault(pinstorage[w[s][k]], def[s][k]);
+	p->tref = s ? 100 : 350;
+	//above 100 % the sine path turns the excess into phase advance (field weakening), if enabled
+	p->umax = s&&cfgOrDefault(FW_ADVANCE, 0) ? (1220<<8) : SPD_UMAX;
 }
 
 void SpeedCtrlReset(void){

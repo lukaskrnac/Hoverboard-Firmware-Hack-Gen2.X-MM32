@@ -644,6 +644,18 @@
    "access": "rw",
    "unit": "phase current pullback limit 0.1 A: above it the current loop pulls the current back, no error; it only trips (curtrip, CURRENT_LIMIT_VIOLATION) if the current rises anyway; kept between focimax and curtrip; 0/65535 = 3/4 of curtrip"
   },
+  "hoverboard.config.templimit": {
+   "id": 107,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "MCU temperature limit, C: above it INVERTER_OVER_TEMP and the gates off; 0/65535 = 85"
+  },
+  "hoverboard.config.regenmax": {
+   "id": 108,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "regenerated bus current limit, 0.1 A (from the phase currents): DC_BUS_OVER_REGEN_CURRENT; 0/65535 = off"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",
@@ -1075,6 +1087,12 @@
    "type": "function",
    "access": "w",
    "unit": ""
+  },
+  "hoverboard.power_off": {
+   "id": 514,
+   "type": "function",
+   "access": "w",
+   "unit": "switches the board off (the power button's shutdown; boards with a power latch)"
   }
  }
 }

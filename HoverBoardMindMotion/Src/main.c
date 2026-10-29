@@ -31,6 +31,7 @@ volatile int vbat;
 volatile int itotal;
 volatile int fvbat;
 volatile int fitotal;
+volatile uint8_t powerOffReq;    //CANSimple hoverboard.power_off: the power button's shutdown
 volatile int speed=0;
 volatile int pwm=0;
 volatile int realspeed=0;
@@ -210,8 +211,8 @@ s32 main(void){
 			flicker=!flicker;
 		  lastflicker=millis;
 		}
-		if(LATCHPIN<PINCOUNT&&BUTTONPIN<PINCOUNT){
-			if(digitalRead(BUTTONPIN)){    //button press for shutdown
+		if(LATCHPIN<PINCOUNT){
+			if(powerOffReq||(BUTTONPIN<PINCOUNT&&digitalRead(BUTTONPIN))){    //button press (or hoverboard.power_off) for shutdown
 				//gates off for good: speedupdate() is not called again, so gatesoff stays set and the adc
 				//isr keeps them off. Zeroing CCR1-3 did not stop the motor: the isr rewrites them in sine
 				//mode, and the gates stayed armed. Switched here too in case the isr is the part that hangs.

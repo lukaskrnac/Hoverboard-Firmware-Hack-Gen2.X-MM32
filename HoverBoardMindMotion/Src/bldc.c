@@ -147,13 +147,23 @@ void speedupdate(void){
 		//a disarm by error leaves the axis IDLE (ODrive): Clear_Errors alone switched the gates back on
 		//with the old set point; now the master arms again (Set_Axis_State CLOSED_LOOP_CONTROL)
 		if(axisDisarm) axisState = AXIS_IDLE;
-		gatesoff = lowbatperm || axisDisarm || idle || (charging&&cfgBool(CHARGE_LOCK, 0));
+		//ODrive's limits as errors: the averaged bus current above softocp (dc_max_positive_current), the
+		//regenerated current above regenmax (dc_max_negative_current; signed only from the phase currents),
+		//the MCU above templimit (the boards have no thermistor; 5 C hysteresis for v1 masters, which cannot
+		//clear errors). They disarm a CANSimple axis until Clear_Errors; overtemperature stops v1 masters too.
+		static uint8_t hot;
+		int32_t tl = cfgOrDefault(TEMP_LIMIT, 85)*10, tc = McuTemp();
+		if(tc>tl) hot = 1; else if(tc<tl-50) hot = 0;
+		uint32_t trip = (hot ? ERR_INVERTER_OVER_TEMP : 0)|(overcurrent ? ERR_DC_BUS_OVER_CURRENT : 0)|
+		                (fitotal<-(int32_t)cfgOrDefault(REGEN_MAX, 6553)*10 ? ERR_DC_BUS_OVER_REGEN_CURRENT : 0);
+		if(trip&&cmdSource==2) axisDisarm |= trip;    //(IDLE from the next pass; the gates are off now)
+		gatesoff = lowbatperm || axisDisarm || idle || hot || (charging&&cfgBool(CHARGE_LOCK, 0));
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage
 		uint8_t overvolt = BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL+3000;
 		axisErrors = (lowbatperm ? ERR_DC_BUS_UNDER_VOLTAGE : 0)|(overvolt ? ERR_DC_BUS_OVER_VOLTAGE : 0)|
-		             (overcurrent ? ERR_DC_BUS_OVER_CURRENT : 0)|(focTrip ? ERR_CURRENT_LIMIT_VIOLATION : 0);
+		             trip|(focTrip ? ERR_CURRENT_LIMIT_VIOLATION : 0);
 		if((speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)||gatesoff){
 			FocClearTrip();    //zero command, or disarmed (the only way in position mode: its command is a target)
 		}

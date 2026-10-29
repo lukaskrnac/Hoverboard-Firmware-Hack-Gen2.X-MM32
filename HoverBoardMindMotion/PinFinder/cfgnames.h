@@ -108,5 +108,7 @@
 	F(104, 0, "holdidle") \
 	F(105, 0, "holdidledelay") \
 	F(106, 0, "curpull") \
+	F(107, 0, "templimit") \
+	F(108, 0, "regenmax") \
 
-#define CFG_FIELD_COUNT 107
+#define CFG_FIELD_COUNT 109

@@ -68,7 +68,7 @@ enum{
 	//IMU (imu.c): state uint8, then float: accel m/s^2, gyro deg/s, temperature C, pitch and roll deg
 	EP_IMU_STATE = 0x150, EP_IMU_ACCEL_X, EP_IMU_ACCEL_Y, EP_IMU_ACCEL_Z, EP_IMU_GYRO_X, EP_IMU_GYRO_Y, EP_IMU_GYRO_Z,
 	EP_IMU_TEMPERATURE, EP_IMU_PITCH, EP_IMU_ROLL,
-	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS,
+	EP_SAVE_CONFIGURATION = 0x200, EP_CLEAR_ERRORS, EP_POWER_OFF,
 };
 
 static int32_t posOffset;    //odometer at position 0 (Set_Absolute_Position), hall steps
@@ -96,7 +96,7 @@ float TorqueConstant(void){    //Nm per A (amplitude of the phase current)
 	return (float)kt/1000.0f;
 }
 
-static uint16_t crc16(const uint8_t* p, int n){
+uint16_t Crc16(const uint8_t* p, int n){    //CRC-16 poly 0x1021, init 0 (also the v1 frames)
 	uint16_t crc = 0;
 	while(n-->0){
 		crc ^= (uint16_t)*p++<<8;
@@ -109,7 +109,7 @@ static void reply(uint8_t cmd, const uint8_t* data, uint8_t len){
 	uint8_t f[14];
 	f[0] = START; f[1] = (uint8_t)SLAVE_ID; f[2] = cmd; f[3] = len;
 	memcpy(&f[4], data, len);
-	uint16_t c = crc16(&f[1], 3+len);
+	uint16_t c = Crc16(&f[1], 3+len);
 	f[4+len] = (uint8_t)c; f[5+len] = (uint8_t)(c>>8);
 	SerialSend(f, (u16)(6+len));
 }
@@ -293,7 +293,7 @@ uint8_t CanSimpleFeed(uint8_t c){
 	uint8_t len = buf[3];
 	pos = 0;
 	uint16_t c16 = (uint16_t)(buf[4+len]|buf[5+len]<<8);
-	if(c16!=crc16(&buf[1], 3+len)) return 1;
+	if(c16!=Crc16(&buf[1], 3+len)) return 1;
 	if(buf[1]!=SLAVE_ID&&buf[1]!=BROADCAST) return 1;
 	handle(buf[1], buf[2], &buf[4], len);
 	return 1;
@@ -457,6 +457,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_IMU_STATE: r = imuState; break;
 			case EP_SAVE_CONFIGURATION: if(!write) return 0; RemoteSaveConfig(); break;
 			case EP_CLEAR_ERRORS: if(!write) return 0; axisDisarm = 0; FocClearTrip(); break;
+			case EP_POWER_OFF: if(!write) return 0; powerOffReq = 1; break;    //boards with a latch
 			default:
 				if(ep<EP_IMU_ACCEL_X||ep>EP_IMU_ROLL) return 0;
 				wrF((uint8_t*)&r, ImuValue((uint8_t)(ep-EP_IMU_ACCEL_X)));

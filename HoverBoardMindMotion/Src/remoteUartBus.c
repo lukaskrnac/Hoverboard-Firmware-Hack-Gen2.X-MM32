@@ -89,29 +89,8 @@ _Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 
 static uint32_t iTimeLastRx = 0;
 
 
-static uint16_t CalcCRC(uint8_t *ptr, int count){    //file checksum calculation
-
-  uint16_t  crc;
-  uint8_t i;
-  crc = 0;
-  while (--count >= 0)
-  {
-    crc = crc ^ (uint16_t) *ptr++ << 8;
-    i = 8;
-    do
-    {
-      if (crc & 0x8000)
-      {
-        crc = crc << 1 ^ 0x1021;
-      }
-      else
-      {
-        crc = crc << 1;
-      }
-    } while(--i);
-  }
-  return (crc);
-}
+//checksum: CRC-16 (poly 0x1021, init 0), the same as CANSimple's (cansimple.c)
+#define CalcCRC(p, n) Crc16((const uint8_t*)(p), (n))
 
 
 

@@ -79,6 +79,7 @@ RUNTIME = [  # id, name (ODrive's where it has one), type, access, unit/meaning 
     (0x159, "hoverboard.imu.roll", "float", "r", "deg, right side down positive, 0 = the level of calibrate imu"),
     (0x200, "save_configuration", "function", "w", "store everything (when the wheel stands still)"),
     (0x201, "clear_errors", "function", "w", ""),
+    (0x202, "hoverboard.power_off", "function", "w", "switches the board off (the power button's shutdown; boards with a power latch)"),
 ]
 
 eps = {}

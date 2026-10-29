@@ -12,4 +12,5 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out);    //RxSdo paylo
 int32_t StepsPerTurn(void);
 float TorqueConstant(void);
 
+uint16_t Crc16(const uint8_t* p, int n);    //CRC-16 poly 0x1021, init 0: CANSimple and the v1 frames
 #endif
