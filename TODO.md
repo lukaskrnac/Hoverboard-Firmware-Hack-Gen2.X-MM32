@@ -235,7 +235,8 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       Audible noise (phone mic, UNPROCESSED, dB added by the running wheel over standing, 4 / 7 turns/s):
       pwmres 8192 (4.4 kHz) +15.0 / +17.8, 6-12 kHz +33 (whine at 4.4 / 8.8 / 13 kHz); 4096 +8.7 / +16.8;
       2048 (17.6 kHz) +7.4 / +13.2, 6-12 kHz +4 / +12, the rest at 17.6 kHz. Below 1 kHz all alike (the motor).
-      2048 costs the modulation limit (76 % instead of 94 %). Default stays 8192 until the user chooses.
+      2048 costs the modulation limit (76 % instead of 94 %). The bench board runs 2048 (user's choice, 2026-10-29:
+      top 7.25 turns/s = 435 rpm at 24 V without field weakening); the firmware default stays 8192.
 - [ ] Flash (2026-10-29): main firmware SPIN05 30524 of 30720 B; PinFinder SPIN05 30688, SPIN25 30720 (0 B free: a new config name had to be 7 letters). Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
