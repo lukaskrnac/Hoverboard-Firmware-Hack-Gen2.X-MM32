@@ -248,7 +248,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 - [ ] Push `gcc-build` and the web console (`remoteuartbus-online`, branch `console`; pushing to
       `main` deploys GitLab Pages). Try the console once in Firefox (WebSerial add-on, over http).
 
-- [ ] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
+- [x] Position: during a hard reversal at speed the hall angle waits for an edge that comes late; with
       speed gains of 60/200 that once ran the currents away (30 A trip). 100/300 (position default) and
       30/100 passed every run; the tracker should handle a reversal between edges better.
       2026-10-28: no trip in 40 reversals from 230-290 rpm (target flipped mid-move, gains 30/100 .. 100/333), but
@@ -274,7 +274,12 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       2026-10-29, the motor in a rigid mount (printed v4, ~/Documents/3ddesign/motormount): the same reversals
       0.62-0.75 m/s^2 rms (peaks 3.5-6, 120-180 Hz) instead of 1.8-2.5 (peaks 10-17, 35-70 Hz), no trips, no
       overshoot, also at vel_limit 30 turns/s in PASSTHROUGH and POS_FILTER: most of it was the loose mount.
-      The edge shift per A of q current still to be measured again on the rigid mount.
+      2026-10-30, rigid mount, current firmware: the edge shift with the q current is gone (q square wave +-1 / +-2 A at
+      1 and 2 turns/s: first edge after a flip -0.6..+0.3 deg el, all edges within +-0.7, sd 3-5; loose mount: ~+10 deg
+      el per A): it was the stator rocking in the loose clamp, no tracker correction needed. Reversals from 4.8 turns/s
+      (PASSTHROUGH, vel_limit 30): default gains 30/100 0.70-0.82 m/s^2 rms (peaks 3-8), no overshoot, exact arrival,
+      no errors in 10; 100/300 2.3-3.1 rms (peaks 14-30), also no errors: too stiff for this wheel, keep the default.
+      Experiment hooks (q square wave word 120, edge log) in scratch reversal/edgeshift2.py, not in the tree.
       Steady speed (rigid mount, phone on the mount): 0.35 / 0.69 / 0.55 m/s^2 at 4 / 6 / 8 turns/s, peaks at
       29.6x and 26.6x the wheel frequency (2x electrical = 30 magnets, and the 27 stator slots; the 1.3 % below
       30 / 27 is probably the HSI clock). The same in sine (no current loop): 0.37 / 0.62 / 0.53; unchanged by
