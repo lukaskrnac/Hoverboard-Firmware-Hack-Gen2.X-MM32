@@ -426,3 +426,16 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 Verification for every change: flashed to the bench board and checked with RemoteUartBus telemetry
 (bus replies, speed steps, CPU load by IPSR sampling); refactors also by comparing `objdump -d -r` of
 the objects before/after.
+
+## Review fixes (2026-10-30, f0f0089)
+
+Done: DRV_FAULT (break input only; the adc watchdog just holds the gates off 2 periods), v1 latching of
+DRV_FAULT/spinout/regen, overflows, FOC voltage mode regen limit, gates off during a config save, config
+magic written last, range checks (baud, node id, poles, pins), invlowside = 1 only, v1 speed clamp.
+Open:
+- [ ] Flash is nearly full: SPIN25 main image 24 B free, SPIN05 164 B. Next feature needs savings first.
+- [ ] Not tried on hardware: the v1 latch path, the adc watchdog hold with a real over-current, a board with
+      an OCP comparator (the bench DRV_FAULT test used software break events over SWD).
+- [ ] A config page erase (every 4th save) is still a ~25 ms window where a power cut loses the config
+      (needs a second page: no room).
+- [ ] Stack depth not measured since 2026-10-27 (~670 B then, ~1.3 KB free).
