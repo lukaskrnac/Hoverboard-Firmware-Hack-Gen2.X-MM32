@@ -211,8 +211,13 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       modulation the window is a few us and the shunt (3rd in the scan) lands on a switching edge. Now the
       watchdog only breaks in block mode and sine without phase pins; sine/FOC with phase pins rely on the phase
       current trip. Bench: 0 knocks at 6/7/8 turns/s and 40 s at the top (8.35), peak 1.1-1.5 instead of 6.4 m/s^2.
-      Open: a shunt sample that is real in those modes (an active-vector CC4 sample, as busv does) would bring the
-      hardware limit back.
+      Hardware limit back (2026-10-29): sine/FOC with phase pins take the CC4 sample inside an active vector too
+      (as sine without phase pins), the watchdog breaks only on that conversion. Two timing fixes: the trigger
+      leads by the shunt's place in the scan (120 timer counts per channel before it + 23; bench 263: PA2, PA6
+      first; it fires on the down count, measured), and windows below 9 us are skipped (at 6 us: 3 hits per
+      20 s). Bench, pwmres 2048: watchdog hits at 8 turns/s 20 -> 3 -> 0 (30 s at 6 / 8 / 8.3, no trips); with
+      hardocp 8 a hard step trips it on real current (12-23 counts), a gentle ramp does not. Sine without phase
+      pins: windows < 9 us now count 0 in the bus current (was 6).
 - [x] Sine drawing a lot of current (confirmed fixed by the user 2026-10-29; seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
@@ -267,7 +272,8 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       (tools/pfstrings.py, 128 pairs, decoded in out() / eq()): SPIN05 30624 -> 28964 B (1.6 KB free), SPIN25
       28996, F031 28932; agent and TUI output byte-identical on the bench board. Next room there: the 0x01-0x1F
       bytes as more pair codes, Command()'s if-chain as a table, the soft float in the calibrations.
-      Main firmware SPIN05 30564, SPIN25 30704 (16 B free).
+      Main firmware SPIN05 30568, SPIN25 30672 (48 B free; the boot "hello World" on the bus line removed,
+      adc_Init()'s three adc table searches merged).
       Earlier (2026-10-29, hardware I2C/buzzer + PinFinder pin checks): main SPIN05 30564 of 30720 B, SPIN25 30704 (16 B free), F031 30540; PinFinder SPIN05 30632, SPIN25 30660, F031 30608 (PinFinder messages shortened for it). After the sine table: main SPIN05 30276, SPIN25 30392; PinFinder SPIN05 30688, SPIN25 30720. Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`

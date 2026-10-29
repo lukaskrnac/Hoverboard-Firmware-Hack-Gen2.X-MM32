@@ -66,9 +66,3 @@ void SerialSend(const u8* buf, u16 len){
 	dmaTx->CNDTR = len;
 	dmaTx->CCR = DMA_CCR_MINC_|DMA_CCR_DIR_|DMA_CCR_EN_;
 }
-
-void UART_SendString(char* str){
-	u16 n = 0;
-	while(str[n]&&n<sizeof(txBuf)) n++;
-	SerialSend((const u8*)str, n);
-}

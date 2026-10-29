@@ -266,31 +266,13 @@ void adc_Init(void){
 	ADC_RegularChannelConfig(ADC1, ADC_Channel_VoltReference, 0, ADC_SampleTime_7_5Cycles);
 	ADC_VrefintCmd(ENABLE);
 	ADC_Cmd(ADC1, ENABLE);
-	if(VBATPIN<PINCOUNT){
-		pinMode(VBATPIN, INPUT_ADC);
-		for(uint8_t i=0;i<ADCCOUNT;i++){
-			if(adcs[i].io==VBATPIN){
-				ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
-				break;
-			}
-		}
-	}
-	if(ITOTALPIN<PINCOUNT){
-		pinMode(ITOTALPIN, INPUT_ADC);
-		for(uint8_t i=0;i<ADCCOUNT;i++){
-			if(adcs[i].io==ITOTALPIN){
-				ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
-				break;
-			}
-		}
-	}
-	if(IPHASEAPIN<PINCOUNT&&IPHASEBPIN<PINCOUNT){
-		pinMode(IPHASEAPIN, INPUT_ADC);
-		pinMode(IPHASEBPIN, INPUT_ADC);
-		for(uint8_t i=0;i<ADCCOUNT;i++){
-			if(adcs[i].io==IPHASEAPIN||adcs[i].io==IPHASEBPIN){
-				ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
-			}
+	//the battery, bus shunt and (both) phase current pins that have an adc channel: analog, in the scan
+	uint8_t phases = IPHASEAPIN<PINCOUNT&&IPHASEBPIN<PINCOUNT;
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint16_t io = adcs[i].io;
+		if(io==VBATPIN||io==ITOTALPIN||(phases&&(io==IPHASEAPIN||io==IPHASEBPIN))){
+			pinMode(io, INPUT_ADC);
+			ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
 		}
 	}
 #ifdef MCU_OPAMPS

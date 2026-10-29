@@ -3,7 +3,7 @@
 //Current sensing (MM32SPIN05PFOP bench board): the chip's two internal op-amps amplify the low side
 //current of phases B and C, outputs on PA2 / PA6 (no register setup: they run from reset). An output
 //is only valid while the low sides conduct and saturates otherwise (gates off, high side on), so the
-//adc samples at the pwm counter's zero (TIM1 CC4 = 1, centre of the low side time), the zero current
+//adc samples at the pwm counter's zero (TIM1 update, TRGO: centre of the low side time), the zero current
 //offsets are measured with the gates on and the zero vector applied, and the modulation is limited to
 //94 % of the linear range (low side time at the sample >= ~3.4 us; the op-amps need 2.5). Measured gain: 19.4 counts/A
 //(51.5 mA per count), offset ~1520 counts.

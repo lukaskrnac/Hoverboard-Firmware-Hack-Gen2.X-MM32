@@ -30,8 +30,16 @@ volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILI
 //its conversion is read in a short second run of this isr, which sets the trigger back to TRGO. The bus
 //current = (window 1 x I1 + window 2 x I2) / period. A window too short for a settled sample counts as 0
 //(it carries little). BusSampleCheck() (SysTick) restores the trigger if a sample never came.
-#define BUS_MINW 432                 //timer counts (6 us): the sample >= 3 us from both switching edges
+//The scan converts the channels in channel order, 20 adc clocks each (7.5 sample + 12.5) = 120 timer counts
+//at the /6 adc clock: the shunt's sample comes busLead counts after the trigger. With the phase pins before
+//it (bench: PA2, PA6, then the shunt on PA7) that is ~3.6 us, past the end of a 6 us window when the trigger
+//sat in its middle: the watchdog saw the edge (20 hits per 20 s at 8 turns/s, 0.5 A real). The trigger
+//comes on the down count (the counter falls while time runs), so it is placed busLead above the middle
+//(measured: busLead below it hit edges in 9-14 us windows).
+#define BUS_MINW 648                 //timer counts (9 us): the sample >= 4.5 us from both switching edges (at 6 us
+                                     //the watchdog still saw the edges now and then: 3 per 20 s at 8 turns/s)
 static volatile uint8_t busPending, busWhich;
+static uint16_t busLead;
 static volatile uint32_t busT;
 static int32_t busI[2];              //0.01 A, the last sample of each window
 static int32_t shuntCurrent(int32_t a){    //an adc reading of the shunt -> 0.01 A (0 below the zero)
@@ -53,12 +61,11 @@ void ADC1_COMP_IRQHandler(void){
 	if(ADC_GetFlagStatus(ADC1, ADC_IT_AWD) != RESET) {
     ADC_ClearFlag(ADC1, ADC_IT_AWD);
 		//sine / FOC with phase current pins sample the shunt in the zero vector (all low sides on), where it
-		//carries no current: there the watchdog only saw switching noise. At pwmres 2048 near full modulation
-		//the window is a few us and the shunt, 3rd in the scan, lands on an edge: ~80 A equivalent spikes, a
-		//break, the gates off for 2 periods and the current loop restarting from 0 V against ~10 V of back-EMF,
-		//a 7 A kick (the knocks with field weakening, 12 per 10 s at 8 turns/s, each one a watchdog hit). The
-		//phase current trip (curtrip) covers those modes.
-		if(!(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK&&FocAvailable())) TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
+		//carries no current, only switching noise: at pwmres 2048 near full modulation the window is a few us,
+		//the shunt (3rd in the scan) lands on an edge, ~80 A equivalent spikes (each one a break, the gates off
+		//for 2 periods, the current loop restarting from 0 V against the back-EMF: a 7 A kick). There only the
+		//conversion inside an active vector (CC4, busPending, see busv below) counts.
+		if(busPending||!(COMMUTATION(DRIVEMODE)!=COMMUT_BLOCK&&FocAvailable())) TIM_GenerateEvent(TIM1, TIM_EventSource_Break);
   }
 	if(RESET != ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
 		if(busPending){    //the CC4 sample inside an active vector: the bus current, then back to the control sample
@@ -85,15 +92,17 @@ void ADC1_COMP_IRQHandler(void){
 			poweron++;
 		}else if(poweron==127){//divide by 128
 			itotaloffset = itotaloffset>>7;
-			if(AWDG){    //hardware current limit, only if the current sense pin has an adc channel
-				for(uint8_t i=0;i<ADCCOUNT;i++){
-					if(adcs[i].io==ITOTALPIN){
+			for(uint8_t i=0;i<ADCCOUNT;i++){
+				if(adcs[i].io==ITOTALPIN){
+					busLead = 23;    //the middle of the 7.5 cycle sample, 120 per channel converted before the shunt
+					for(uint32_t m=ADC1->ADCHS&((1u<<adcs[i].channel)-1);m;m&=m-1) busLead += 120;
+					if(AWDG){    //hardware current limit, only if the current sense pin has an adc channel
 						ADC_AnalogWatchdogCmd(ADC1, ENABLE);
 						ADC_AnalogWatchdogThresholdsConfig(ADC1, (uint16_t)(AWDG+itotaloffset), 0);
 						ADC_AnalogWatchdogSingleChannelConfig(ADC1, adcs[i].channel);
 						ADC_ITConfig(ADC1, ADC_IT_AWD, ENABLE);
-						break;
 					}
+					break;
 				}
 			}
 			poweron++;
@@ -115,8 +124,9 @@ void ADC1_COMP_IRQHandler(void){
 				itotal = shuntCurrent(analogRead(ITOTALPIN));
 			}
 			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC, sine = COMMUTATION(DRIVEMODE)==COMMUT_SINE;
-			//sine without phase current pins: the bus current from the active vectors (above)
-			uint8_t busv = sine&&!FocAvailable()&&ITOTALPIN<PINCOUNT&&(TIM1->BDTR&TIM_BDTR_MOEN);
+			//sine without phase current pins: the bus current from the active vectors (above); with phase pins
+			//(itotal from them, FocMeasure()) the same samples for the adc watchdog
+			uint8_t busv = (foc||sine)&&(AWDG||!FocAvailable())&&ITOTALPIN<PINCOUNT&&(TIM1->BDTR&TIM_BDTR_MOEN);
 			int32_t lo = cc[0], mid = cc[1], hi = cc[2], t;
 			if(lo>mid){ t = lo; lo = mid; mid = t; }
 			if(mid>hi){ t = mid; mid = hi; hi = t; }
@@ -161,9 +171,9 @@ void ADC1_COMP_IRQHandler(void){
 			}
 			if(busv){    //the next bus sample: the other window of this period's vectors
 				busWhich ^= 1;
-				int32_t a = busWhich ? mid : lo, b = busWhich ? hi : mid;
-				if(b-a>=BUS_MINW){
-					TIM1->CCR4 = (uint16_t)((a+b)/2);
+				int32_t a = busWhich ? mid : lo, b = busWhich ? hi : mid, c = (a+b)/2+busLead;
+				if(b-a>=BUS_MINW&&c<(int32_t)PWM_PERIOD){
+					TIM1->CCR4 = (uint16_t)c;
 					busT = millis;
 					busPending = 1;
 					adcTrigger(ADC_CR_TIM1_CC4);

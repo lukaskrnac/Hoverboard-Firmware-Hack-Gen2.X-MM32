@@ -162,7 +162,6 @@ s32 main(void){
 		}
 	}
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);    //Software start conversion
-	UART_SendString("hello World\n\r");    //debug uart
 
 	PWM_GEN_init(&pwm_gen);
 	HALLModuleInit(&HALL1);
