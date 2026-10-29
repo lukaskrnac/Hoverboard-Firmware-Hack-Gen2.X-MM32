@@ -218,6 +218,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       20 s). Bench, pwmres 2048: watchdog hits at 8 turns/s 20 -> 3 -> 0 (30 s at 6 / 8 / 8.3, no trips); with
       hardocp 8 a hard step trips it on real current (12-23 counts), a gentle ramp does not. Sine without phase
       pins: windows < 9 us now count 0 in the bus current (was 6).
+      2026-10-30, sine with field advance at 10 turns/s still knocked (user): 8 watchdog breaks per 30 s. The
+      compare registers have no preload, so the values the control step writes act at once, also in the period
+      of the CC4 sample, while its window came from the values read at the isr's start (~12 deg el earlier at
+      10 turns/s). Now from the new values: 0 hits at sine 10 / 10.5 and FOC 8.3 turns/s (30 s each).
 - [x] Sine drawing a lot of current (confirmed fixed by the user 2026-10-29; seen on the bench supply by the user, conditions unknown). Not
       reproduced on the unloaded wheel: at its top speed (95 % modulation) sine takes 0.4 A at 24 V
       (FOC 0.3 A), accelerations peak at ~3.8 A phase current. The board's readings froze above 90 %
@@ -272,7 +276,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       (tools/pfstrings.py, 128 pairs, decoded in out() / eq()): SPIN05 30624 -> 28964 B (1.6 KB free), SPIN25
       28996, F031 28932; agent and TUI output byte-identical on the bench board. Next room there: the 0x01-0x1F
       bytes as more pair codes, Command()'s if-chain as a table, the soft float in the calibrations.
-      Main firmware SPIN05 30568, SPIN25 30672 (48 B free; the boot "hello World" on the bus line removed,
+      Main firmware SPIN05 30596, SPIN25 30700 (20 B free; the boot "hello World" on the bus line removed,
       adc_Init()'s three adc table searches merged).
       Earlier (2026-10-29, hardware I2C/buzzer + PinFinder pin checks): main SPIN05 30564 of 30720 B, SPIN25 30704 (16 B free), F031 30540; PinFinder SPIN05 30632, SPIN25 30660, F031 30608 (PinFinder messages shortened for it). After the sine table: main SPIN05 30276, SPIN25 30392; PinFinder SPIN05 30688, SPIN25 30720. Was: 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the

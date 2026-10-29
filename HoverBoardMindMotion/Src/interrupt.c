@@ -46,6 +46,12 @@ static int32_t shuntCurrent(int32_t a){    //an adc reading of the shunt -> 0.01
 	int32_t raw = a-(int32_t)itotaloffset, zero = cfgOrDefault(ITOTAL_ZERO, 0);
 	return raw>0&&vrefint ? (int32_t)ITOTAL_DIVIDER*(raw*100+zero)*120/vrefint/100 : 0;
 }
+static void sort3(int32_t* v){    //ascending
+	int32_t t;
+	if(v[0]>v[1]){ t = v[0]; v[0] = v[1]; v[1] = t; }
+	if(v[1]>v[2]){ t = v[1]; v[1] = v[2]; v[2] = t; }
+	if(v[0]>v[1]){ t = v[0]; v[0] = v[1]; v[1] = t; }
+}
 static void adcTrigger(uint32_t src){ ADC1->ADCR = (ADC1->ADCR&~ADC_CR_TRGSEL)|src; }
 void BusSampleCheck(void){
 	if(busPending&&millis-busT>2){ busPending = 0; adcTrigger(ADC_CR_T1_TRIG); }
@@ -127,11 +133,8 @@ void ADC1_COMP_IRQHandler(void){
 			//sine without phase current pins: the bus current from the active vectors (above); with phase pins
 			//(itotal from them, FocMeasure()) the same samples for the adc watchdog
 			uint8_t busv = (foc||sine)&&(AWDG||!FocAvailable())&&ITOTALPIN<PINCOUNT&&(TIM1->BDTR&TIM_BDTR_MOEN);
-			int32_t lo = cc[0], mid = cc[1], hi = cc[2], t;
-			if(lo>mid){ t = lo; lo = mid; mid = t; }
-			if(mid>hi){ t = mid; mid = hi; hi = t; }
-			if(lo>mid){ t = lo; lo = mid; mid = t; }
-			if(busv) itotal = ((mid-lo)*busI[0]+(hi-mid)*busI[1])/(int32_t)PWM_PERIOD;
+			sort3(cc);
+			if(busv) itotal = ((cc[1]-cc[0])*busI[0]+(cc[2]-cc[1])*busI[1])/(int32_t)PWM_PERIOD;
 			else busI[0] = busI[1] = 0;
 			if(foc||sine){
 				//phase currents (if the board has the pins); itotal from them: the shunt reads ~0 at this
@@ -169,9 +172,13 @@ void ADC1_COMP_IRQHandler(void){
 			}else if(foc){
 				FocControl();
 			}
-			if(busv){    //the next bus sample: the other window of this period's vectors
+			if(busv){    //the next bus sample: the other window of the vectors just written. The compare registers
+				//have no preload: the new values act at once, also in the period of this sample (the window of the
+				//values read at the isr's start was ~12 deg el off at 10 turns/s in sine: 8 watchdog hits per 30 s)
 				busWhich ^= 1;
-				int32_t a = busWhich ? mid : lo, b = busWhich ? hi : mid, c = (a+b)/2+busLead;
+				int32_t n[3] = { (int32_t)TIM1->CCR1, (int32_t)TIM1->CCR2, (int32_t)TIM1->CCR3 };
+				sort3(n);
+				int32_t a = n[busWhich], b = n[busWhich+1], c = (a+b)/2+busLead;
 				if(b-a>=BUS_MINW&&c<(int32_t)PWM_PERIOD){
 					TIM1->CCR4 = (uint16_t)c;
 					busT = millis;
