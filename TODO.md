@@ -164,14 +164,13 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       and restarts), mm32config set, PinFinder get/set/save, all read back identical; host tests of both layouts.
       Risk accepted: a power cut during every 4th save (~25 ms erase + write) loses the config (no-config blink).
       Free now: main SPIN05 ~1.2 KB, SPIN25 ~1.1 KB; PinFinder ~2.2 KB. The record itself is still 128 words.
-- [ ] **Pre-filled firmware images for mass production** (user 2026-10-30): a web tool that takes a build
-      (make target per MCU, main or PinFinder) and appends / places a config record (from a PinFinder export or
-      a board profile, with the slave / node id changeable per board) into the image's config area, so one
-      flash writes firmware + config. The firmware then needs no special handling: drop EEPROMEN and the
-      compile-time PINSTORAGE_DEFAULTS path ("copy pinstorage initializer from autodetect"). Main and PinFinder
-      stay build targets of one tree (no branches); the image format: the binary up to 0x08007800, the config
-      record at its slot. Needs the record format fixed first (compact storage above).
-
+- [x] **Pre-filled firmware images for mass production** (2026-10-30): the web console's image.html (image.js,
+      test/image.test.js): a firmware .bin (any make target, main or PinFinder) + a PinFinder export + an id or an
+      id range -> one file per id: the firmware, 0xFF up to 0x08007C00, the config pair in slots 0 / 1. Any SWD
+      tool writes it at 0x08000000; mm32flash.py takes it as a whole (config included). EEPROMEN and the
+      "copy the initializer" build path removed from main.c. Bench: an export of the bench board -> image id 3
+      -> flashed: config identical except slaveid 3, answers as node 3; the page in headless Chrome (ids 2..4,
+      id 3 byte-identical to the node-built one).
 - [ ] Bus current reading (2026-10-30): in sine above SAMPLE_MAX (the phase samples invalid, ~10 turns/s up
       with field advance) itotal froze at its last phase value (user: "it doesn't read current any more");
       it now stays the shunt's active-vector reading (busv runs in sine always). That reads 1.5-2.2x the

@@ -292,6 +292,9 @@ cd HoverBoardMindMotion
 make pinfinder && make flash-pinfinder   # build/pinfinder.bin
 make flash                               # back to the main firmware
 ```
+Many boards of one type: set one up with PinFinder, Export its configuration (pinfinder.html), and
+build one image per board id on the web console's `image.html` (firmware + config page in one file;
+program it at 0x08000000 with any SWD tool, or `python3 tools/mm32flash.py hoverboard-id3.bin`).
 The build compresses PinFinder's messages and config names (`tools/pfstrings.py`, byte pair codes that
 `out()` / `eq()` expand; ~1.7 KB). In PinFinder code, a literal that is only printed goes straight into
 an output function or `T("...")`, and a name compared with input uses `eq(input, "name")`. Literals that

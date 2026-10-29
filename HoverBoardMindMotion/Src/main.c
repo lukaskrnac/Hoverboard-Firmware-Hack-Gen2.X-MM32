@@ -44,13 +44,9 @@ static uint32_t chargeT;
 uint8_t uarten=1;
 uint8_t halltimen=1;
 uint8_t pwmDiv=1;    //pwm periods per control period (pinout.h)
-////////////////////////////////////////////////////////////////////////////////////////////
-//  compile device specefic firmware for mass produce
-//  change EEPROMEN to 0
-#define EEPROMEN 1
-//  copy pinstorage initializer from autodetect and replace the default line below
+//the board configuration (pinout.h), read from flash at boot (sim_eeprom.c). Many boards of one type: one
+//image with firmware and config (the web console's image.html), no special build.
 uint16_t pinstorage[128]=PINSTORAGE_DEFAULTS;
-////////////////////////////////////////////////////////////////////////////////////////////
 
 
 //every wait after the watchdog started: in steps well below its timeout (a 2 x 150 ms melody note
@@ -94,7 +90,7 @@ static void __attribute__((noinline, noreturn)) noConfig(void){
 
 s32 main(void){
 	DELAY_Init();
-	if(!restorecfg()&&EEPROMEN) noConfig();
+	if(!restorecfg()) noConfig();
 
 	ConfigMigrate();
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;
