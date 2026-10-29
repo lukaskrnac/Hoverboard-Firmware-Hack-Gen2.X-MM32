@@ -114,7 +114,7 @@
    "id": 18,
    "type": "uint16",
    "access": "rw",
-   "unit": "position: 0.1 rpm per hall step of error; 0/65535 = default 20"
+   "unit": "position: 0.1 rpm per hall step of error; 0/65535 = default block 20, sine 60, FOC 133"
   },
   "hoverboard.config.posrpm": {
    "id": 19,
@@ -565,6 +565,12 @@
    "type": "uint16",
    "access": "rw",
    "unit": "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"
+  },
+  "hoverboard.config.txpushpull": {
+   "id": 94,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart TX push-pull: 2 = on (one board alone on the line, fast edges above 230400 baud), 1/0/65535 = open drain (shared bus line, needs a pull-up)"
   },
   "hoverboard.config.extmagic": {
    "id": 96,

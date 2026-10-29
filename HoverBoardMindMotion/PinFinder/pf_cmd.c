@@ -74,6 +74,7 @@ static void setWord(const char* name, const char* val){
 		if(CfgIsPin((uint8_t)idx)&&v>=PINCOUNT&&v!=PIN_NONE){ err("not a pin"); return; }
 	}
 	pinstorage[idx] = (uint16_t)v;
+	if(&pinstorage[idx]==&INVERT_LOWSIDE) MotorInit();    //the gate polarity at once (TIM1_init reads it)
 	CfgPrint((uint8_t)idx);
 	ok();
 }
