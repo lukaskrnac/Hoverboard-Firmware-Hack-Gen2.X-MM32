@@ -139,14 +139,18 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
 
 ## Next
 
-- [x] Bus current reading (2026-10-30): in sine above SAMPLE_MAX (the phase samples invalid, ~10 turns/s up
+- [ ] Bus current reading (2026-10-30): in sine above SAMPLE_MAX (the phase samples invalid, ~10 turns/s up
       with field advance) itotal froze at its last phase value (user: "it doesn't read current any more");
-      it now stays the shunt's active-vector reading (busv runs in sine always). That showed the bench's
-      shunt calibration 2.5x high (detect current's 333 / 495). Fitted against the supply's meter in sine at
-      11-16 turns/s: itotaldivider 120, itotalzero 419 (blockcal.py's zero): board 0.68 / 1.26 / 2.16 A vs
-      supply 0.72 / 1.26 / 2.22 A; block 5 turns/s 0.12 vs 0.16 A. Saved on the bench board. Open: PinFinder's
-      `detect current` bus divider is ~2.8x high (it derives it from the phase currents); fix it to fit
-      against the phase currents in the active vectors the same way, or against a known load.
+      it now stays the shunt's active-vector reading (busv runs in sine always). That reads 1.5-2.2x the
+      supply there (333 / 495: 1.09 / 2.48 / 4.75 A vs 0.70 / 1.32 / 2.18 A at 11 / 13 / 16 turns/s).
+      A divider of 120 matched the supply at those speeds but was WRONG (reverted the same day): the shunt
+      per sample follows 2.2-2.35 counts/A against the phase currents both static (PinFinder) and running
+      (logged at FOC 8.3 / sine 8 turns/s: binned means, 2-3 % spikes), so 333 / 495 is right and 120 made
+      block mode, softocp and the watchdog read 2.8x low. The cause of the high reading: the adc clips at
+      0, so the shunt cannot see negative (regenerating) window currents, which field advance makes large;
+      the sum of the positive parts is above the net bus current. Open: a better estimate above SAMPLE_MAX
+      (power balance from the commanded voltages, or the window sign from the current angle); until then
+      the shunt reading is an upper bound (conservative for softocp).
 - [ ] (old note) Bus current in sine mode on boards **without** phase current pins: done 2026-10-28 (interrupt.c): after
       each control step the adc trigger moves to TIM1 CC4 in the middle of one of the two active vector windows
       (alternating), a short second isr run reads the shunt there and sets the trigger back to TRGO; bus current
