@@ -218,6 +218,10 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       reaction. Suspect the bench mount: the stator (halls) rocking on its axle clamp under torque (1 deg
       mechanical = 15 deg el), resonant at ~40-60 Hz like the shaking. Experiment code: scratch reversal/
       foc.c.edgeshift, hallhandle.c.edgeshift (words 106 amplitude, 107 c). Check the mount first.
+      2026-10-29, the motor in a rigid mount (printed v4, ~/Documents/3ddesign/motormount): the same reversals
+      0.62-0.75 m/s^2 rms (peaks 3.5-6, 120-180 Hz) instead of 1.8-2.5 (peaks 10-17, 35-70 Hz), no trips, no
+      overshoot, also at vel_limit 30 turns/s in PASSTHROUGH and POS_FILTER: most of it was the loose mount.
+      The edge shift per A of q current still to be measured again on the rigid mount.
 - [ ] Flash 29.1 of 30 KB (1.6 KB free; PinFinder 30.6 of 30 KB, 104 B free, SPIN25 32 B), RAM 1.4 KB + 1 KB stack reserve of 4 KB (worst case stack
       ~670 bytes, GCC's call graph `-fcallgraph-info=su` on the LTO link). Next room if needed: the
       vendor HAL init calls inlined into main (TIM1 / ADC / UART init through structs), `odriveParam()`
