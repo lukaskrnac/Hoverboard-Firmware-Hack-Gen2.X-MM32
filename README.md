@@ -295,7 +295,9 @@ The build compresses PinFinder's messages and config names (`tools/pfstrings.py`
 `out()` / `eq()` expand; ~1.7 KB). In PinFinder code, a literal that is only printed goes straight into
 an output function or `T("...")`, and a name compared with input uses `eq(input, "name")`. Literals that
 are copied or indexed stay plain.
-It talks 115200 8N1 on the configured TX/RX pins. On a board without a configuration the uart pins
+The main firmware does not boot without a valid configuration (hall and uart pins): it pulls every pin
+up for 0.2 s and down for 0.8 s instead, so the board's LEDs flash (and an active buzzer beeps); a known
+power latch stays held. It talks 115200 8N1 on the configured TX/RX pins. On a board without a configuration the uart pins
 are searched first: connect the board's TX and RX together (loop-back) until it finds them, then
 connect your adapter. It prints `PinFinder 2.0: Enter = menu, @<command> = agent mode` every 2 s.
 

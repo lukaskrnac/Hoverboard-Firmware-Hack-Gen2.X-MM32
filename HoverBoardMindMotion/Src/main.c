@@ -78,11 +78,22 @@ static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured 
 	digitalWrite(LEDBPIN, b);
 }
 
+//no valid config (hall / uart pins unknown): do not boot, nothing driven (PinFinder writes one). The fault
+//shows on whatever the board has: every pin (not SWD; the bridge pins are not in the pin list) pulled up for
+//0.2 s, down for 0.8 s; LEDs and an active buzzer behind a transistor follow a pull-up (flash / beep). A
+//known power latch stays pulled up (the pull-down switched the board off; the pull-up holds it); with no config at all it stays on only
+//while the power button is held.
+static void __attribute__((noinline, noreturn)) noConfig(void){
+	RCC->AHBENR |= RCC_AHBENR_GPIOA|RCC_AHBENR_GPIOB|RCC_AHBENR_GPIOC|RCC_AHBENR_GPIOD;
+	for(uint8_t on=1;;on^=1){
+		for(uint8_t i=0;i<PINCOUNT;i++) if(i!=PA13&&i!=PA14) pinMode(i, on||i==LATCHPIN ? INPUT_PULLUP : INPUT_PULLDOWN);
+		DELAY_Ms(on ? 200 : 800);
+	}
+}
+
 s32 main(void){
 	DELAY_Init();
-	//no valid config (hall / uart pins unknown): do not boot, nothing driven (PinFinder writes one). It
-	//toggled every pin between pull-up and pull-down each second (inherited, unused).
-	if(!restorecfg()&&EEPROMEN) while(1);
+	if(!restorecfg()&&EEPROMEN) noConfig();
 
 	ConfigMigrate();
 	if(!DriveModeSupported(DRIVEMODE)) DRIVEMODE=COM_VOLT;

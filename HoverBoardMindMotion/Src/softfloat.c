@@ -82,8 +82,11 @@ float __aeabi_fmul(float x, float y){
 	if(isNaN(b)) return flt(b|0x400000u);
 	if(ea==255||eb==255) return flt(ea==0||eb==0 ? DEFAULT_NAN : s|0x7F800000u);    //inf * 0 = NaN
 	if(ea==0||eb==0) return flt(s);
-	uint64_t p = (uint64_t)mant(a)*mant(b);    //2^46 .. 2^48
-	uint32_t m = (uint32_t)(p>>16)|((p&0xFFFFu)!=0);
+	//the 2^46..2^48 product >> 16, bit 0 = any of the low 16 bits set; from 12 bit halves in 32 bit (the 64 bit
+	//multiply pulled in libgcc's __aeabi_lmul, 90 B; checked against it on 2e8 random + edge pairs)
+	uint32_t ma = mant(a), mb = mant(b), ah = ma>>12, al = ma&0xFFFu, bh = mb>>12, bl = mb&0xFFFu;
+	uint32_t mid = ah*bl+al*bh, r = ((mid&15u)<<12)+al*bl;
+	uint32_t m = ((ah*bh<<8)+(mid>>4)+(r>>16))|((r&0xFFFFu)!=0);
 	int32_t e = (int32_t)(ea+eb)-126;
 	if(!(m>>31)){ m <<= 1; e--; }
 	return roundPack(s, e, m);
