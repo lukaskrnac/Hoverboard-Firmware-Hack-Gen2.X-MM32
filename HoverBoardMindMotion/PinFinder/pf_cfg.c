@@ -26,7 +26,7 @@ static uint16_t saved[128];    //the record in flash (or the defaults): CfgChang
 int16_t CfgIndex(const char* name){
 	const char* n = fieldNames;
 	for(uint8_t i=0;i<CFG_FIELD_COUNT;i++,n+=strlen(n)+1){
-		if(!strcmp(name, n)) return fieldIdx[i]&127;
+		if(eq(name, n)) return fieldIdx[i]&127;
 	}
 	//a number: the word index
 	int32_t v = 0;

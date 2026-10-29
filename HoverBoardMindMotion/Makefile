@@ -84,12 +84,25 @@ flash: $(TARGET).bin
 # PinFinder: a separate image (the main firmware has no room for it) built from PinFinder/ and the shared
 # hardware, config, uart and startup code. make pinfinder / make flash-pinfinder
 PF       := $(BUILD)/pinfinder
-PF_SRC   := $(wildcard PinFinder/*.c) Src/hardware.c Src/initialize.c Src/sim_eeprom.c Src/uart.c Src/softfloat.c Src/i2c.c Src/imumath.c \
+PF_SRC   := Src/hardware.c Src/initialize.c Src/sim_eeprom.c Src/uart.c Src/softfloat.c Src/i2c.c Src/imumath.c \
             $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
             Device/MM32SPIN0x/Source/system_mm32spin05.c Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
-PF_OBJ   := $(addprefix $(BUILD)/,$(PF_SRC:.c=.o) Src/hwdiv.o)
-$(BUILD)/PinFinder/%.o: CFLAGS += $(WARN)
-$(BUILD)/PinFinder/%.o: CFLAGS += -IPinFinder
+# PinFinder's own sources are compiled from copies with the messages compressed (../tools/pfstrings.py,
+# expanded by out() and eq()); the config names too (the copy of cfgnames.h there is found first); pfdict.c
+# is the pair table
+PF_C     := $(wildcard PinFinder/*.c)
+PFZ      := $(BUILD)/pfz
+PFZ_SRC  := $(addprefix $(PFZ)/,$(notdir $(PF_C)) pfdict.c)
+PF_OBJ   := $(addprefix $(BUILD)/,$(PF_SRC:.c=.o) Src/hwdiv.o) $(PFZ_SRC:.c=.o)
+$(PFZ)/%.o: CFLAGS += $(WARN) -IPinFinder
+
+$(PFZ)/stamp: $(PF_C) PinFinder/cfgnames.h ../tools/pfstrings.py
+	$(PYTHON) ../tools/pfstrings.py $(PFZ) $(PF_C) PinFinder/cfgnames.h
+	@touch $@
+$(PFZ_SRC): $(PFZ)/stamp ;
+
+$(PFZ)/%.o: $(PFZ)/%.c Makefile $(FLAGS_STAMP)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 pinfinder: $(PF).bin
 

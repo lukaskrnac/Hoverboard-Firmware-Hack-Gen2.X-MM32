@@ -46,11 +46,11 @@ static int32_t millivolts(const char* s){
 
 static void help(void){
 	static const char* const h[] = {
-		"info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults",
-		"detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | ir [ms] | latch",
-		"calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max] | imu",
-		"adc | hall | pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]",
-		"step <1-6|101-112> [mV] [ms] | rotate <permille> [ms] | poweroff | tui | agent",
+		T("info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults"),
+		T("detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | ir [ms] | latch"),
+		T("calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max] | imu"),
+		T("adc | hall | pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]"),
+		T("step <1-6|101-112> [mV] [ms] | rotate <permille> [ms] | poweroff | tui | agent"),
 	};
 	for(uint8_t i=0;i<sizeof(h)/sizeof(h[0]);i++){
 		if(agent) out("# ");
@@ -66,7 +66,7 @@ static void setWord(const char* name, const char* val){
 	uint8_t g;
 	int32_t v;
 	uint16_t pin = PinByName(val);
-	if(!strcmp(val, "none")) v = PIN_NONE;
+	if(eq(val, "none")) v = PIN_NONE;
 	else if(pin!=PIN_NONE) v = pin;
 	else{
 		v = num(val, &g);
@@ -81,7 +81,7 @@ static void setWord(const char* name, const char* val){
 static void pinCmd(const char* name, const char* mode, const char* arg){
 	uint16_t p = name ? PinByName(name) : PIN_NONE;
 	if(p==PIN_NONE){ err("pin name, e.g. PB9"); return; }
-	if(!mode||!strcmp(mode, "read")){    //any pin, its mode unchanged: level, the voltage on adc pins, what it is
+	if(!mode||eq(mode, "read")){    //any pin, its mode unchanged: level, the voltage on adc pins, what it is
 		kvi(PinName(p), digitalRead((uint8_t)p));
 		uint8_t analog = p==VBATPIN||p==ITOTALPIN||p==IPHASEAPIN||p==IPHASEBPIN;
 		if(AdcChannel(p)>=0&&(analog||PinFree(p))){    //not on pins the board drives or reads digitally
@@ -99,13 +99,13 @@ static void pinCmd(const char* name, const char* mode, const char* arg){
 		return;
 	}
 	uint32_t ms = optnum(arg);
-	if(!strcmp(mode, "high")){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 1); }
-	else if(!strcmp(mode, "low")){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 0); }
-	else if(!strcmp(mode, "pullup")) pinMode((uint8_t)p, INPUT_PULLUP);
-	else if(!strcmp(mode, "pulldown")) pinMode((uint8_t)p, INPUT_PULLDOWN);
-	else if(!strcmp(mode, "input")) pinMode((uint8_t)p, INPUT);
-	else if(!strcmp(mode, "tone")) Tone(p, ms ? ms : 500, 2000);
-	else if(!strcmp(mode, "blink")){    //pull-up / pull-down, not driven: safe on a pin of unknown purpose
+	if(eq(mode, "high")){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 1); }
+	else if(eq(mode, "low")){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 0); }
+	else if(eq(mode, "pullup")) pinMode((uint8_t)p, INPUT_PULLUP);
+	else if(eq(mode, "pulldown")) pinMode((uint8_t)p, INPUT_PULLDOWN);
+	else if(eq(mode, "input")) pinMode((uint8_t)p, INPUT);
+	else if(eq(mode, "tone")) Tone(p, ms ? ms : 500, 2000);
+	else if(eq(mode, "blink")){    //pull-up / pull-down, not driven: safe on a pin of unknown purpose
 		for(uint32_t t=millis;millis-t<(ms ? ms : 2000)&&!aborted();){
 			pinMode((uint8_t)p, (millis/150)&1 ? INPUT_PULLUP : INPUT_PULLDOWN);
 		}
@@ -132,53 +132,53 @@ void Command(char* line){
 	const char* a2 = argc>2 ? argv[2] : 0;
 	const char* a3 = argc>3 ? argv[3] : 0;
 	if(agent){ out("> "); out(line); for(uint8_t i=1;i<argc;i++){ outc(' '); out(argv[i]); } nl(); }
-	if(!strcmp(c, "help")||!strcmp(c, "?")){ help(); ok(); }
-	else if(!strcmp(c, "info")){ Info(); ok(); }
-	else if(!strcmp(c, "list")){ for(uint8_t i=0;i<128;i++) if(CfgName(i)) CfgPrint(i); ok(); }
-	else if(!strcmp(c, "get")){
+	if(eq(c, "help")||eq(c, "?")){ help(); ok(); }
+	else if(eq(c, "info")){ Info(); ok(); }
+	else if(eq(c, "list")){ for(uint8_t i=0;i<128;i++) if(CfgName(i)) CfgPrint(i); ok(); }
+	else if(eq(c, "get")){
 		int16_t idx = a1 ? CfgIndex(a1) : -1;
 		if(idx<0) err("unknown name"); else{ CfgPrint((uint8_t)idx); ok(); }
 	}
-	else if(!strcmp(c, "set")) setWord(a1, a2);
-	else if(!strcmp(c, "save")){ HwCheck(); CfgSave(); note("saved"); ok(); }
-	else if(!strcmp(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
-	else if(!strcmp(c, "defaults")){ CfgDefaults(); note("defaults in RAM (save keeps them)"); ok(); }
-	else if(!strcmp(c, "detect")||!strcmp(c, "calibrate")){
+	else if(eq(c, "set")) setWord(a1, a2);
+	else if(eq(c, "save")){ HwCheck(); CfgSave(); note("saved"); ok(); }
+	else if(eq(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
+	else if(eq(c, "defaults")){ CfgDefaults(); note("defaults in RAM (save keeps them)"); ok(); }
+	else if(eq(c, "detect")||eq(c, "calibrate")){
 		const char* w = a1 ? a1 : "";
 		if(c[0]=='d'){
-			if(!strcmp(w, "hall")) DetectHall((int32_t)optnum(a2));
-			else if(!strcmp(w, "vbat")) DetectVbat(millivolts(a2));
-			else if(!strcmp(w, "current")) DetectCurrent((int32_t)optnum(a2), millivolts(a3));    //shunt mOhm -> uOhm
-			else if(!strcmp(w, "imu")) DetectImu();
-			else if(!strcmp(w, "button")) DetectButton(optnum(a2));
-			else if(!strcmp(w, "charger")) DetectCharger(optnum(a2));
-			else if(!strcmp(w, "ir")) DetectIr(optnum(a2));
-			else if(!strcmp(w, "latch")) LatchFind();
+			if(eq(w, "hall")) DetectHall((int32_t)optnum(a2));
+			else if(eq(w, "vbat")) DetectVbat(millivolts(a2));
+			else if(eq(w, "current")) DetectCurrent((int32_t)optnum(a2), millivolts(a3));    //shunt mOhm -> uOhm
+			else if(eq(w, "imu")) DetectImu();
+			else if(eq(w, "button")) DetectButton(optnum(a2));
+			else if(eq(w, "charger")) DetectCharger(optnum(a2));
+			else if(eq(w, "ir")) DetectIr(optnum(a2));
+			else if(eq(w, "latch")) LatchFind();
 			else err("detect what? (help)");
 		}else{
-			if(!strcmp(w, "hall")) CalHall((int32_t)optnum(a2));
-			else if(!strcmp(w, "poles")) CalPoles(optnum(a2));
-			else if(!strcmp(w, "rl")) CalRL((int32_t)optnum(a2));
-			else if(!strcmp(w, "kv")) CalKv(a2, (int32_t)optnum(a3));
-			else if(!strcmp(w, "imu")) CalImu();
+			if(eq(w, "hall")) CalHall((int32_t)optnum(a2));
+			else if(eq(w, "poles")) CalPoles(optnum(a2));
+			else if(eq(w, "rl")) CalRL((int32_t)optnum(a2));
+			else if(eq(w, "kv")) CalKv(a2, (int32_t)optnum(a3));
+			else if(eq(w, "imu")) CalImu();
 			else err("calibrate what? (help)");
 		}
 	}
-	else if(!strcmp(c, "adc")){ ShowAdc(); ok(); }
-	else if(!strcmp(c, "hall")){
+	else if(eq(c, "adc")){ ShowAdc(); ok(); }
+	else if(eq(c, "hall")){
 		kvi("hall", HallState());
 		kvi("a", digitalRead(HALLAPIN)); kvi("b", digitalRead(HALLBPIN)); kvi("c", digitalRead(HALLCPIN));
 		ok();
 	}
-	else if(!strcmp(c, "pin")) pinCmd(a1, a2, a3);
-	else if(!strcmp(c, "step")) StepHold((uint8_t)optnum(a1), (int32_t)optnum(a2), optnum(a3));
-	else if(!strcmp(c, "rotate")){
+	else if(eq(c, "pin")) pinCmd(a1, a2, a3);
+	else if(eq(c, "step")) StepHold((uint8_t)optnum(a1), (int32_t)optnum(a2), optnum(a3));
+	else if(eq(c, "rotate")){
 		uint8_t g;
 		int32_t pm = num(a1, &g);
 		if(!g) err("rotate <permille> [ms]"); else Rotate(pm, optnum(a2));
 	}
-	else if(!strcmp(c, "poweroff")) PowerOff();
-	else if(!strcmp(c, "tui")){ agent = 0; TuiStart(); }
-	else if(!strcmp(c, "agent")){ agent = 1; ok(); }
+	else if(eq(c, "poweroff")) PowerOff();
+	else if(eq(c, "tui")){ agent = 0; TuiStart(); }
+	else if(eq(c, "agent")){ agent = 1; ok(); }
 	else err("unknown command (help)");
 }

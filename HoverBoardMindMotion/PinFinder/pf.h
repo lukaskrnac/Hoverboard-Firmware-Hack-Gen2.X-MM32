@@ -12,6 +12,9 @@
 #define PF_VERSION "2.0"
 #define PF_BAUD 115200
 #define PIN_NONE 0xFFFF
+//T("text"): a literal that is only printed (with out()): compressed at build time like the output
+//functions' arguments (tools/pfstrings.py). Never for literals that are compared or indexed.
+#define T(s) s
 
 //pf_io.c: serial output (blocking) and input (the uart rx ring of uart.c)
 extern uint8_t agent;    //1: agent protocol, 0: TUI
@@ -19,6 +22,8 @@ extern uint8_t ansi;     //TUI: the terminal answered the ANSI status request
 void IoInit(uint8_t uart);
 void outc(char c);
 void out(const char* s);
+uint8_t eq(const char* in, const char* name);    //1: input equals a (compressed) name literal or config name
+uint8_t zlen(const char* s);            //printed length of a compressed string
 void outi(int32_t v);
 void outfix(int32_t v, uint8_t dec);    //v / 10^dec with dec decimals
 void outpin(uint16_t pin);              //PA7, "none" when not set

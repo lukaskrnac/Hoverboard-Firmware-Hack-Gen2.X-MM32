@@ -42,7 +42,7 @@ static void mapCell(uint8_t idx){
 	out(" ");
 	const char* n = CfgName(idx);
 	out(n);
-	for(uint8_t k=(uint8_t)strlen(n);k<9;k++) outc(' ');
+	for(uint8_t k=zlen(n);k<9;k++) outc(' ');
 	if(CfgChanged()&&pinstorage[idx]!=0xFFFF) color(33);
 	if(CfgIsPin(idx)){
 		out(PinName(pinstorage[idx]));
@@ -205,7 +205,7 @@ void TuiKey(int c){
 			line[len] = 0;
 			nl();
 			if(!len){ draw(); return; }
-			if(!strcmp(line, "x")||!strcmp(line, "exit")){ draw(); return; }
+			if(eq(line, "x")||eq(line, "exit")){ draw(); return; }
 			Command(line);
 			if(agent||screen!=SCR_LINE) return;    //"agent" / "tui" switched the front end
 			lineStart("");

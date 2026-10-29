@@ -14,12 +14,12 @@ static const struct{ uint8_t addr, reg, val; } chips[] = {
 	{ 0x6A, 0x0F, 0x6A }, { 0x6A, 0x0F, 0x6C }, { 0x6A, 0x00, 0x05 }, { 0x18, 0x0F, 0x33 },
 	{ 0x18, 0x0F, 0x11 }, { 0x12, 0x00, 0xE7 }, { 0x12, 0x00, 0xB0 },
 };
-static const char chipNames[] =
+static const char chipNames[] = T(
 	"MPU-6050\0" "MPU-6050 clone\0" "MPU-6500\0" "MPU-9250\0"
 	"ICM-20602\0" "ICM-20608\0" "ICM-20689\0" "ICM-42605\0"
 	"ICM-42688\0" "BMI160\0" "BMI270\0" "LSM6DS3\0"
 	"LSM6DSL/DS3TR-C\0" "LSM6DSO\0" "QMI8658\0" "LIS3DH\0"
-	"SC7A20\0" "QMA7981\0" "QMA6981\0";
+	"SC7A20\0" "QMA7981\0" "QMA6981\0");
 
 void DetectImu(void){
 	uint8_t cand[8], n = 0;

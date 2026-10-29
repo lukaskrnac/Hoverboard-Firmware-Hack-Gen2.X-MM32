@@ -333,7 +333,7 @@ void StepHold(uint8_t s, int32_t mv, uint32_t ms){
 	uint8_t h = HallState();
 	//current at the end of the hold: averaged triggered samples of the shunt and phase current pins
 	static const uint8_t which[3] = { 13, 16, 17 };    //itotal, iphasea, iphaseb
-	static const char* const names[3] = { "itotal_counts", "iphasea_counts", "iphaseb_counts" };
+	static const char* const names[3] = { T("itotal_counts"), T("iphasea_counts"), T("iphaseb_counts") };
 	int32_t sum[3] = { 0, 0, 0 };
 	uint32_t mask = 0;
 	for(uint8_t i=0;i<3;i++){ int8_t ch = AdcChannel(pinstorage[which[i]]); if(ch>=0){ mask |= 1u<<ch; pinMode((uint8_t)pinstorage[which[i]], INPUT_ADC); } }

@@ -18,8 +18,40 @@ void outc(char c){
 	U->TDR = (uint8_t)c;
 }
 
+//messages are byte pair encoded at build time (tools/pfstrings.py): 0x80 + k stands for pfPairs[k]
+extern const uint8_t pfPairs[][2];
+static void outz(uint8_t c){
+	while(c>=0x80){
+		outz(pfPairs[c-0x80][0]);
+		c = pfPairs[c-0x80][1];
+	}
+	outc((char)c);
+}
+
 void out(const char* s){
-	while(*s) outc(*s++);
+	while(*s) outz((uint8_t)*s++);
+}
+
+static const char* zin;
+static uint8_t zeq(uint8_t c){    //expands c against the input at zin
+	if(c>=0x80) return zeq(pfPairs[c-0x80][0])&&zeq(pfPairs[c-0x80][1]);
+	return *zin++==c;
+}
+
+uint8_t eq(const char* in, const char* name){
+	zin = in;
+	while(*name) if(!zeq((uint8_t)*name++)) return 0;
+	return !*zin;
+}
+
+static uint8_t zn(uint8_t c){
+	return c>=0x80 ? (uint8_t)(zn(pfPairs[c-0x80][0])+zn(pfPairs[c-0x80][1])) : 1;
+}
+
+uint8_t zlen(const char* s){
+	uint8_t n = 0;
+	while(*s) n = (uint8_t)(n+zn((uint8_t)*s++));
+	return n;
 }
 
 void outi(int32_t v){
