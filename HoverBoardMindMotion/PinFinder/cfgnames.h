@@ -115,5 +115,6 @@
 	F(111, 0, "autooff") \
 	F(112, 0, "batdeadoff") \
 	F(113, 0, "tempderate") \
+	F(114, 0, "deadtime") \
 
-#define CFG_FIELD_COUNT 114
+#define CFG_FIELD_COUNT 115

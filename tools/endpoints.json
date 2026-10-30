@@ -686,6 +686,12 @@
    "access": "rw",
    "unit": "temperature derating band below templimit, C: FOC current limit / block duty / sine modulation fall linearly to 0 at templimit (slewed ~2 s); 0/65535 = off"
   },
+  "hoverboard.config.deadtime": {
+   "id": 114,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TIM1 dead time between a half bridge's switches, ns, read at boot (restart); 0..1750; 0/65535 = 500 (the F031 board's FD2103S conducted through at 14 ns: hot MOSFETs)"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",

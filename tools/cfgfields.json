@@ -718,6 +718,12 @@
    "name": "tempderate",
    "kind": "num",
    "meaning": "temperature derating band below templimit, C: FOC current limit / block duty / sine modulation fall linearly to 0 at templimit (slewed ~2 s); 0/65535 = off"
+  },
+  {
+   "index": 114,
+   "name": "deadtime",
+   "kind": "num",
+   "meaning": "TIM1 dead time between a half bridge's switches, ns, read at boot (restart); 0..1750; 0/65535 = 500 (the F031 board's FD2103S conducted through at 14 ns: hot MOSFETs)"
   }
  ]
 }
