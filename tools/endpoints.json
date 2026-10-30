@@ -222,7 +222,7 @@
    "id": 36,
    "type": "uint16",
    "access": "rw",
-   "unit": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200)"
+   "unit": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200); 12..20000, else 1152"
   },
   "hoverboard.config.pwmres": {
    "id": 37,
@@ -234,19 +234,19 @@
    "id": 38,
    "type": "uint16",
    "access": "rw",
-   "unit": "RemoteUartBus slave id"
+   "unit": "RemoteUartBus slave id, 0..62 (63 = CANSimple broadcast)"
   },
   "hoverboard.config.windings": {
    "id": 39,
    "type": "uint16",
    "access": "rw",
-   "unit": "motor poles"
+   "unit": "motor poles, 2..200 (else 30)"
   },
   "hoverboard.config.invlowside": {
    "id": 40,
    "type": "uint16",
    "access": "rw",
-   "unit": "1 = low side gate drive inverted"
+   "unit": "1 = low side gate drive inverted, anything else (0, unset) not"
   },
   "hoverboard.config.softocp": {
    "id": 41,
@@ -276,13 +276,13 @@
    "id": 45,
    "type": "uint16",
    "access": "rw",
-   "unit": "mV"
+   "unit": "mV, <= 12000 = not set (no regen / overvoltage limit)"
   },
   "hoverboard.config.batempty": {
    "id": 46,
    "type": "uint16",
    "access": "rw",
-   "unit": "mV, <= 20000 disables the low battery cut-off"
+   "unit": "mV, <= 12000 disables the low battery cut-off"
   },
   "hoverboard.config.timeout": {
    "id": 47,
@@ -667,6 +667,12 @@
    "type": "uint16",
    "access": "rw",
    "unit": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
+  },
+  "hoverboard.config.buttonadc": {
+   "id": 111,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "analog power button (the press only raises a voltage, e.g. the switched supply): pressed above this adc count (12 bit) on the button pin; detect button sets it; 0/65535 = digital button"
   },
   "vbus_voltage": {
    "id": 256,

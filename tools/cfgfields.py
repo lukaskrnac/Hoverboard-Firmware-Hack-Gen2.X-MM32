@@ -92,6 +92,7 @@ FIELDS = {
     108: ("regenmax", "num", "regenerated bus current limit, 0.1 A (from the phase currents): DC_BUS_OVER_REGEN_CURRENT; 0/65535 = off"),
     109: ("spinelec", "num", "spinout detection (FOC): electrical power above this, W, ...; 0/65535 = 10"),
     110: ("spinmech", "num", "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"),
+    111: ("buttonadc", "num", "analog power button (the press only raises a voltage, e.g. the switched supply): pressed above this adc count (12 bit) on the button pin; detect button sets it; 0/65535 = digital button"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
     97: ("imumount", "num", "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"),
     98: ("imurestx", "num", "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"),
