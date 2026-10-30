@@ -16,6 +16,7 @@ extern volatile uint8_t coastreq;    //1: gates off for now, the drive mode's be
 extern volatile uint32_t lastcommutate;
 extern uint8_t lowbatcount;
 extern uint8_t lowbatperm;
+void ClearErrors(void);    //Clear_Errors: disarm reason, FOC trip, low battery once above empty again
 extern const uint8_t hall_to_pos[8];
 
 //CANSimple (ODrive) axis state and error bits, cansimple.c

@@ -80,6 +80,15 @@ int32_t PosGain(void){
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
 
+//Clear_Errors (command and endpoint): the disarm and FOC trip; the low battery cut-off too once the battery
+//is above the empty voltage again (or the cut-off is off): it held until power off, also after the limit
+//was lowered or the battery charged
+void ClearErrors(void){
+	axisDisarm = 0;
+	FocClearTrip();
+	if(!(BAT_SET(BAT_EMPTY)&&vbat*10<BAT_EMPTY)){ lowbatperm = 0; lowbatcount = 0; }
+}
+
 const uint8_t hall_to_pos[8] = HALL_TO_POS_INIT;
 
 

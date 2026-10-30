@@ -255,8 +255,7 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			if(len>=1&&d[0]==1) RemoteSaveConfig();    //save_configuration (reboot/erase/DFU: not supported)
 			break;
 		case CMD_CLEAR_ERRORS:
-			axisDisarm = 0;
-			FocClearTrip();
+			ClearErrors();
 			break;
 		case CMD_SET_ABSOLUTE_POSITION:
 			if(len>=4){
@@ -457,7 +456,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_FOOT_SENSORS: r = footPads; break;
 			case EP_IMU_STATE: r = imuState; break;
 			case EP_SAVE_CONFIGURATION: if(!write) return 0; RemoteSaveConfig(); break;
-			case EP_CLEAR_ERRORS: if(!write) return 0; axisDisarm = 0; FocClearTrip(); break;
+			case EP_CLEAR_ERRORS: if(!write) return 0; ClearErrors(); break;
 			case EP_POWER_OFF: if(!write) return 0; powerOffReq = 1; break;    //boards with a latch
 			default:
 				if(ep<EP_IMU_ACCEL_X||ep>EP_IMU_ROLL) return 0;
