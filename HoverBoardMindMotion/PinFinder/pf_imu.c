@@ -1,6 +1,6 @@
 //IMU search: every pair of free pins is tried as SDA/SCL, with or without the board's pull-ups (a soft
-//bus: released = input with the internal pull-up, low = driven low; ~20 kHz), at the usual IMU addresses;
-//a hit is checked against a full address scan (a pair that is no bus acknowledges everything) and the id
+//bus: released = input with the internal pull-up, low = driven low; ~20 kHz), at every address (a pair
+//that is no bus acknowledges everything); every device found is listed and the id
 //register of the usual IMUs / accelerometers names the chip. The main firmware then uses i2c.c.
 #include "pf.h"
 #include "i2c.h"
@@ -50,7 +50,6 @@ static int16_t bReg(uint8_t a, uint8_t reg){
 }
 
 void DetectImu(void){
-	static const uint8_t imuAddr[] = { 0x68, 0x69, 0x6A, 0x6B, 0x18, 0x19, 0x12, 0x13 };
 	uint8_t cand[PINCOUNT], n = 0;
 	uint16_t keep[2] = { IMU_SDA, IMU_SCL };
 	IMU_SDA = IMU_SCL = PIN_NONE;
@@ -66,12 +65,14 @@ void DetectImu(void){
 			if(digitalRead(bSda)&&digitalRead(bScl)){    //something holding a line low: not this pair
 				for(uint8_t k=0;k<9;k++){ lo(bScl); hi(bScl); }    //a slave stuck mid-byte lets go
 				bStop();
-				for(uint8_t k=0;k<sizeof(imuAddr)&&!hit;k++) hit = bProbe(imuAddr[k]);
-			}
-			if(hit){
+				//every address (accelerometers sit at many: 0x0E, 0x18, 0x1C, 0x26, 0x53, 0x68, 0x6A, ...); more than 8
+				//acknowledging = a line that reads low anyway, no bus
 				uint8_t acks = 0;
 				for(uint8_t a=0x08;a<0x78&&acks<=8;a++) acks = (uint8_t)(acks+bProbe(a));
-				if(acks<=8) for(uint8_t a=0x08;a<0x78;a++){
+				hit = acks&&acks<=8;
+			}
+			if(hit){
+				for(uint8_t a=0x08;a<0x78;a++){
 					if(!bProbe(a)) continue;
 					found = 1;
 					kv("i2c"); out("sda "); outpin(bSda); out(" scl "); outpin(bScl); out(" addr "); outi(a);
@@ -103,7 +104,7 @@ void DetectImu(void){
 	progressEnd();
 	if(IMU_SDA==PIN_NONE){
 		IMU_SDA = keep[0]; IMU_SCL = keep[1];
-		err(found ? "i2c devices found, no known IMU" : "no IMU answers on any pair of free pins");
+		err(found ? "i2c devices found, no known IMU" : "no i2c device answers on any pair of free pins");
 		return;
 	}
 	for(uint8_t k=0;k<2;k++){    //the main firmware's I2C needs the board's pull-ups (the soft bus did not)
