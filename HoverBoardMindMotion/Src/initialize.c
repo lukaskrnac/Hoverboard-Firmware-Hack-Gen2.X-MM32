@@ -156,14 +156,17 @@ void TIM1_init(u16 arr, u16 psc){
 	TIM1->PSC = psc;
 	TIM1->EGR = TIM_PSCReloadMode_Immediate;
 	//channels 1-3: PWM2, both outputs on, pulse 0, low sides inverted if configured; channel 4: PWM2 at 1, the
-	//adc trigger (output on, no pin); idle states low
+	//adc trigger (output on, no pin)
 	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|TIM_OCMode_PWM2|TIM_OCMode_PWM2<<8;
 	TIM1->CCMR2 = (TIM1->CCMR2&~(TIM_CCMR2_OC3M|TIM_CCMR2_OC4M))|TIM_OCMode_PWM2|TIM_OCMode_PWM2<<8;
 	uint32_t np = INVERT_LOWSIDE==1 ? TIM_CCER_CC1NP : 0, ch = TIM_CCER_CC1EN|TIM_CCER_CC1NEN|np;
 	TIM1->CCER = ch|ch<<4|ch<<8|TIM_CCER_CC4EN;
 	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
 	TIM1->CCR4 = 1;
-	TIM1->CR2 = (TIM1->CR2&~(TIM_CR2_OIS1|TIM_CR2_OIS1N|TIM_CR2_OIS2|TIM_CR2_OIS2N|TIM_CR2_OIS3|TIM_CR2_OIS3N|TIM_CR2_OIS4))|TIM_CR2_CCPC;
+	//idle states (MOE clear: gates off, a break): the pin level as is, the polarity bits do not apply. Inverted
+	//low sides idle high, else gates off would switch all three low sides on and short the motor (it brakes)
+	uint32_t ois = INVERT_LOWSIDE==1 ? TIM_CR2_OIS1N|TIM_CR2_OIS2N|TIM_CR2_OIS3N : 0;
+	TIM1->CR2 = (TIM1->CR2&~(TIM_CR2_OIS1|TIM_CR2_OIS1N|TIM_CR2_OIS2|TIM_CR2_OIS2N|TIM_CR2_OIS3|TIM_CR2_OIS3N|TIM_CR2_OIS4))|ois|TIM_CR2_CCPC;
 	TIM1->DIER |= TIM_DIER_COMI;
 	//automatic output enable (the gates come on at the next update), break input, dead time 1. MOE stays
 	//clear here as after the HAL's BDTR write: AOE sets it

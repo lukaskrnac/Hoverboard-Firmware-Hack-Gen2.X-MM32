@@ -110,7 +110,7 @@ static void pinCmd(const char* name, const char* mode, const char* arg){
 		for(uint32_t t=millis;millis-t<(ms ? ms : 2000)&&!aborted();){
 			pinMode((uint8_t)p, (millis/150)&1 ? INPUT_PULLUP : INPUT_PULLDOWN);
 		}
-		pinMode((uint8_t)p, INPUT);
+		PinRest(p);
 	}
 	else{ err("pin mode? (help)"); return; }
 	ok();

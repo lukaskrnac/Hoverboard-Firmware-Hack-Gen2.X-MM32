@@ -119,6 +119,8 @@ extern uint8_t pwmDiv;
 #define DRIVEMODE pinstorage[44]
 #define BAT_FULL pinstorage[45]
 #define BAT_EMPTY pinstorage[46]
+#define BAT_OFF_MV 12000    //batfull / batempty at or below this (or 65000 and up) = not set (6S empty is 19.2 V)
+#define BAT_SET(w) ((w)>BAT_OFF_MV&&(w)<65000)
 #define SERIAL_TIMEOUT pinstorage[47]
 //COM_SPEED / SINE_SPEED controllers (calculation.c), 0 = built-in default
 #define SPEED_KP pinstorage[48]    //0.1 permille duty per rpm error, default 50
@@ -151,7 +153,7 @@ static inline int32_t cfgOrDefault(uint16_t v, int32_t def){ return (v==0||v==0x
 //detects into it). Layout version 0 values (baud 19200 in baud): ConfigMigrate() brings it up to date.
 //words 32-47 of the defaults (the rest: unset 0xFFFF, 48-63 0, the extension magic); PinFinder builds the
 //record from this in a loop instead of a second 256 byte table
-#define PINSTORAGE_WORDS_32_47 0xDCAB, 31, 250, 0, 19200, 8192, 1, 30, 0, 10, 300, 1, 1, 42000, 32000, 1000
+#define PINSTORAGE_WORDS_32_47 0xDCAB, 31, 250, 0, 1152, 8192, 1, 30, 0, 10, 300, 1, 1, 42000, 32000, 1000
 #define PINSTORAGE_DEFAULTS {[0 ... 31] = 0xFFFF, [32] = PINSTORAGE_WORDS_32_47, [48 ... 63] = 0, \
 	[64 ... 95] = 0xFFFF, [EXT_MAGIC_POS] = EXT_MAGIC, [97 ... 127] = 0xFFFF}
 

@@ -309,13 +309,13 @@
    "index": 45,
    "name": "batfull",
    "kind": "num",
-   "meaning": "mV"
+   "meaning": "mV, <= 12000 = not set (no regen / overvoltage limit)"
   },
   {
    "index": 46,
    "name": "batempty",
    "kind": "num",
-   "meaning": "mV, <= 20000 disables the low battery cut-off"
+   "meaning": "mV, <= 12000 disables the low battery cut-off"
   },
   {
    "index": 47,

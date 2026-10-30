@@ -127,7 +127,7 @@ void speedupdate(void){
 	if(poweron>127){
 		RemoteUpdate();
 		//speed=200;
-		if(BAT_EMPTY>20000&&BAT_EMPTY<65000&&vbat*10<BAT_EMPTY){
+		if(BAT_SET(BAT_EMPTY)&&vbat*10<BAT_EMPTY){
 			if(lowbatcount<10){
 				lowbatcount++;
 			}else if(lowbatcount>=10&&speed==0&&realspeed<100){
@@ -183,7 +183,7 @@ void speedupdate(void){
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage
-		uint8_t overvolt = BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL+3000;
+		uint8_t overvolt = BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL+3000;
 		axisErrors = (lowbatperm ? ERR_DC_BUS_UNDER_VOLTAGE : 0)|(overvolt ? ERR_DC_BUS_OVER_VOLTAGE : 0)|
 		             trip|v1Trip|(ft ? ERR_CURRENT_LIMIT_VIOLATION : 0);
 		if(ft&&((speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)||gatesoff)){
@@ -209,7 +209,7 @@ void speedupdate(void){
 		//full battery, a bench supply): ramps that slow the wheel down pause and FOC gives no braking
 		//current; the wheel slows by friction. Above BAT_FULL + 3 V it coasts (overvolt, below). A 1 s
 		//voltage ramp from 1200 rpm (sine field weakening) pumped a bench supply to 46.6 V.
-		uint8_t regen = BAT_FULL>20000&&BAT_FULL<65000&&fvbat*10>(int32_t)BAT_FULL;
+		uint8_t regen = BAT_SET(BAT_FULL)&&fvbat*10>(int32_t)BAT_FULL;
 		if(held||ctl==CTRL_PWM||ctl==CTRL_TORQUE) InputTrack(hallPosFine, realspeed);
 		//velocity set point; the command limited first, the ramp would wind up to it
 		int32_t vin = speed>vlim ? vlim : (speed<-vlim ? -vlim : speed);

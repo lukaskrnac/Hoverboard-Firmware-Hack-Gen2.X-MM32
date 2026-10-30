@@ -21,6 +21,12 @@ static const char chipNames[] = T(
 	"LSM6DSL/DS3TR-C\0" "LSM6DSO\0" "QMI8658\0" "LIS3DH\0"
 	"SC7A20\0" "QMA7981\0" "QMA6981\0");
 
+static void pairRelease(uint16_t sda, uint16_t scl){    //I2cRelease floats them: back to the rest state
+	I2cRelease();
+	PinRest(sda);
+	PinRest(scl);
+}
+
 void DetectImu(void){
 	uint8_t cand[8], n = 0;
 	uint16_t keep[2] = { IMU_SDA, IMU_SCL };
@@ -30,19 +36,20 @@ void DetectImu(void){
 		pinMode((uint8_t)p, INPUT_PULLDOWN);
 		WaitUs(50);
 		if(digitalRead((uint8_t)p)) cand[n++] = (uint8_t)p;
-		pinMode((uint8_t)p, INPUT);
+		PinRest(p);    //pulled up again while the latch is unknown: floating it may switch the board off
 	}
 	for(uint8_t i=0;i<n;i++) kvp("pullup", cand[i]);
 	uint8_t found = 0;
 	for(uint8_t i=0;i<n&&!found;i++) for(uint8_t j=0;j<n&&!found;j++){
 		if(i==j) continue;
+		progress(i*n+j+1, n*n);    //every pair probes 112 addresses: seconds without output otherwise
 		uint8_t sda = cand[i], scl = cand[j];
 		I2cPins(sda, scl, 1);
-		if(!I2cHigh()){ I2cRelease(); continue; }
+		if(!I2cHigh()){ pairRelease(sda, scl); continue; }
 		I2cUnstick();
 		uint8_t acks = 0;
 		for(uint8_t a=0x08;a<0x78&&acks<=8;a++) acks = (uint8_t)(acks+I2cProbe(a));
-		if(!acks||acks>8){ I2cRelease(); continue; }    //nothing, or SDA does not follow (not an I2C pair)
+		if(!acks||acks>8){ pairRelease(sda, scl); continue; }    //nothing, or SDA does not follow (not an I2C pair)
 		for(uint8_t a=0x08;a<0x78;a++){
 			if(!I2cProbe(a)) continue;
 			found = 1;
@@ -68,8 +75,9 @@ void DetectImu(void){
 				IMU_SDA = sda; IMU_SCL = scl; IMU_ADDR = a; IMU_ID = (uint16_t)(v<0 ? 0 : v);
 			}
 		}
-		I2cRelease();
+		pairRelease(sda, scl);
 	}
+	progressEnd();
 	if(IMU_SDA==PIN_NONE){
 		IMU_SDA = keep[0]; IMU_SCL = keep[1];
 		err(found ? "i2c devices found, no known IMU" : (n<2 ? "fewer than 2 free pins with a pull-up" : "no i2c device answers"));

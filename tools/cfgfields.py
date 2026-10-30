@@ -37,7 +37,7 @@ FIELDS = {
     39: ("windings", "num", "motor poles, 2..200 (else 30)"), 40: ("invlowside", "num", "1 = low side gate drive inverted, anything else (0, unset) not"),
     41: ("softocp", "num", "A, averaged bus current limit, 0 = off"), 42: ("hardocp", "num", "adc watchdog current limit, adc counts above zero"),
     44: ("drivemode", "num", "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED, 3/7/11 COM/SINE/FOC_POSITION, 8 FOC_VOLT, 9 FOC_SPEED, 10 FOC_TORQUE (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"),
-    45: ("batfull", "num", "mV"), 46: ("batempty", "num", "mV, <= 20000 disables the low battery cut-off"),
+    45: ("batfull", "num", "mV, <= 12000 = not set (no regen / overvoltage limit)"), 46: ("batempty", "num", "mV, <= 12000 disables the low battery cut-off"),
     47: ("timeout", "num", "ms without a command until speed = 0"),
     48: ("speedkp", "num", "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"),
     49: ("speedki", "num", "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"),

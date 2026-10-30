@@ -167,7 +167,7 @@ s32 main(void){
 		if(!(state&STATE_LED_BATTLEVEL)){    //the remote sets the LEDs
 			setRGB((state&STATE_LED_RED)!=0, (state&STATE_LED_GREEN)!=0, (state&STATE_LED_ORANGE)!=0);
 		}else if(LEDRPIN<PINCOUNT&&LEDGPIN<PINCOUNT&&LEDBPIN<PINCOUNT){
-			if(BAT_FULL>20000&&BAT_FULL<65000&&BAT_EMPTY>20000&&BAT_EMPTY<65000&&BAT_FULL>BAT_EMPTY){
+			if(BAT_SET(BAT_FULL)&&BAT_SET(BAT_EMPTY)&&BAT_FULL>BAT_EMPTY){
 				//battery level: above 70 % of the range green, 60 % green + orange (the LEDB pin), 50 % orange,
 				//20 % red + orange, 10 % red, below that red flashing
 				static const uint8_t level[5][2] = { {70, 2}, {60, 3}, {50, 1}, {20, 5}, {10, 4} };    //percent, rgb bits

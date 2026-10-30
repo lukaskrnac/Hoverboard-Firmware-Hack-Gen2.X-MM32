@@ -107,6 +107,7 @@ uint8_t UartFind(void);                 //boot without uart pins: loop-back sear
 void LatchHold(void);                   //boot: hold the power latch (or pull every free pin up to find it)
 void LatchFind(void);
 void PowerOff(void);
+void PinRest(uint16_t p);                //a free pin's rest state (pull-up while the latch is unknown)
 void Tone(uint16_t pin, uint32_t ms, uint32_t hz);    //square wave (passive buzzer test)
 void Info(void);
 extern uint8_t master;                  //board has a power latch

@@ -10,9 +10,14 @@ uint8_t master;           //the board holds its own power (latch pin)
 static uint8_t holdAll;   //no latch known: every free pin is pulled up (one of them may be the latch)
 
 //free pins back to their idle state after a detection
+//a free pin's rest state: pulled up while the latch is unknown (it may be this pin; a pin left low or
+//floating lets the board switch off: the F031 bench board did after a tone)
+void PinRest(uint16_t p){
+	pinMode((uint8_t)p, holdAll ? INPUT_PULLUP : INPUT);
+}
 static void releasePins(void){
 	for(uint16_t p=0;p<PINCOUNT;p++){
-		if(PinFree(p)) pinMode((uint8_t)p, holdAll ? INPUT_PULLUP : INPUT);
+		if(PinFree(p)) PinRest(p);
 	}
 }
 
@@ -26,6 +31,7 @@ void Tone(uint16_t pin, uint32_t ms, uint32_t hz){    //square wave on a pin (pa
 		digitalWrite((uint8_t)pin, 0);
 		WaitUs(half);
 	}
+	if(PinFree(pin)) PinRest(pin);
 }
 
 //---------------------------------------------------------------- hall sensors
@@ -234,7 +240,7 @@ static uint8_t pinState(uint16_t p){
 	pinMode((uint8_t)p, INPUT_PULLDOWN);
 	WaitUs(30);
 	uint8_t down = digitalRead((uint8_t)p);
-	pinMode((uint8_t)p, holdAll ? INPUT_PULLUP : INPUT);
+	PinRest(p);
 	return up==down ? up : 2;
 }
 
@@ -673,7 +679,9 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		float den = (float)np*sxx-sx*sx;
 		if(!steady||np<3||den<0.01f) continue;
 		float a = ((float)np*sxy-sx*sy)/den;
-		if(a>0.5f&&(a>slope||p==ITOTALPIN)&&best!=ITOTALPIN){ slope = a; z = (sy-a*sx)/(float)np; best = p; }    //the configured pin first
+		//the configured pin first, else the steepest (best==PIN_NONE first: with no pin configured ITOTALPIN is
+		//PIN_NONE too, and "best!=ITOTALPIN" alone never let a pin in)
+		if(a>0.5f&&(best==PIN_NONE||(best!=ITOTALPIN&&(a>slope||p==ITOTALPIN)))){ slope = a; z = (sy-a*sx)/(float)np; best = p; }
 	}
 	if(best==PIN_NONE){ err("no bus current pin found"); return; }
 	ITOTALPIN = best;

@@ -476,7 +476,7 @@ void FocControl(void){
 		//regeneration limit, every period on the bus voltage now: above the full battery voltage no
 		//braking current (electrical frame: braking = iqRef with the sign of realspeed). In the main loop
 		//on the 7 ms average it came late: braking from 900 rpm pumped a bench supply to 34 V first.
-		if(BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL&&((iqRef>0&&realspeed>0)||(iqRef<0&&realspeed<0))) iqRef = 0;
+		if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL&&((iqRef>0&&realspeed>0)||(iqRef<0&&realspeed<0))) iqRef = 0;
 	}
 	if(focOver){    //soft limit: no current asked this period, the integrators start again: kp drives it down
 		idRef = iqRef = 0; intD = intQ = 0; fwId = 0;
@@ -521,7 +521,7 @@ void FocControl(void){
 		//regeneration limit (as the current modes above): a q voltage on the far side of the back emf
 		//brakes (the loop drives to qlo for a positive command, to qhi for a negative one); with the bus
 		//above BAT_FULL both bounds stay on the motoring side of it (no braking current)
-		if(BAT_FULL>20000&&BAT_FULL<65000&&vbat*10>(int32_t)BAT_FULL){
+		if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL){
 			int32_t e = vff<-vqmax ? -vqmax : (vff>vqmax ? vqmax : vff);
 			if(realspeed>0){ if(qhi>e) qhi = e; if(qlo>e) qlo = e; }
 			else if(realspeed<0){ if(qhi<e) qhi = e; if(qlo<e) qlo = e; }
