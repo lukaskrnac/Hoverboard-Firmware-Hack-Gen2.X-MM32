@@ -700,12 +700,6 @@
    "name": "spinmech",
    "kind": "num",
    "meaning": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
-  },
-  {
-   "index": 111,
-   "name": "buttonadc",
-   "kind": "num",
-   "meaning": "analog power button (the press only raises a voltage, e.g. the switched supply): pressed above this adc count (12 bit) on the button pin; detect button sets it; 0/65535 = digital button"
   }
  ]
 }

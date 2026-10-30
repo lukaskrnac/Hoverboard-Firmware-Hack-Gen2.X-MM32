@@ -198,76 +198,39 @@ void ShowAdc(void){
 }
 
 //the pin whose voltage times VBAT_DIVIDER is closest to expect_mv (or the only one between 20 and 45 V)
-//Battery pin. With the voltage given: the adc pins that a divider drives (not floating: the internal pull-up
-//and pull-down move a floating pin a lot) and whose divider for that voltage is 8..60. One of them: the
-//battery. Several (a switched supply behind the power switch reads like a battery too; the F031 board: PA4
-//battery x20.7, PA6 switched supply x38): they are listed and kept; "detect vbat <V>" again after the
-//voltage changed (supply, charger plugged in) picks the pin that changed in proportion. Without a voltage:
-//the one pin at 20..45 V with the configured divider.
-static int32_t vbPrevMv, vbPrev[ADCCOUNT];
-static uint8_t adcFloating(uint16_t p){
-	int8_t ch = AdcChannel(p);
-	int32_t v[2];
-	for(uint8_t k=0;k<2;k++){
-		pinMode((uint8_t)p, k ? INPUT_PULLDOWN : INPUT_PULLUP);
-		Wait(2);
-		AdcScan(1u<<ch);
-		v[k] = AdcValue((uint8_t)ch);
+//Battery pin: two voltage levels, nothing guessed from the readings' size (the divider is unknown; a supply
+//behind the power switch reads like a battery too). "detect vbat <V>" stores every adc pin at that voltage;
+//after the voltage changed (bench supply, charger plugged in) "detect vbat <new V>" takes the pin whose
+//reading changed in proportion (within 3 %) and calibrates its divider.
+static int32_t vbLevelMv, vbLevel[ADCCOUNT];
+void DetectVbat(int32_t mv){
+	if(mv<=0){ err("give the voltage you measure: detect vbat 36.5"); return; }
+	if(!vbLevelMv||(mv-vbLevelMv<300&&vbLevelMv-mv<300)){    //first level (or the same voltage again)
+		for(uint8_t i=0;i<ADCCOUNT;i++) vbLevel[i] = PinMv(adcs[i].io);
+		vbLevelMv = mv;
+		kvmv("level1", mv);
+		note("change the voltage (bench supply, or plug in the charger), measure it, then detect vbat <new V>");
+		ok();
+		return;
 	}
-	PinRest(p);
-	return v[0]-v[1]>400;    //~0.3 V: a divider of some 10 kOhm moves a few counts
-}
-void DetectVbat(int32_t expect_mv){
-	uint16_t best = PIN_NONE, inrange = 0;
-	if(expect_mv<=0){
-		for(uint8_t i=0;i<ADCCOUNT;i++){
-			uint16_t p = adcs[i].io;
-			if(!PinFree(p)&&p!=VBATPIN) continue;
-			int32_t v = PinMv(p)*(int32_t)VBAT_DIVIDER;
-			if(v>20000&&v<45000){ best = p; inrange++; }
-		}
-		if(inrange!=1){
-			ShowAdc();
-			err(inrange ? "several battery pins: give volts (detect vbat 36.5)" : "no pin at 20..45 V: give volts (detect vbat 36.5)");
-			return;
-		}
-	}else{
-		int32_t mv[ADCCOUNT], bestErr = 0x7FFFFFFF;
-		uint8_t n = 0, prev = vbPrevMv>0&&(expect_mv-vbPrevMv>300||vbPrevMv-expect_mv>300);
-		for(uint8_t i=0;i<ADCCOUNT;i++){
-			uint16_t p = adcs[i].io;
-			mv[i] = 0;
-			if((!PinFree(p)&&p!=VBATPIN)||p==ITOTALPIN||p==IPHASEAPIN||p==IPHASEBPIN) continue;
-			int32_t m = PinMv(p), div = m>0 ? expect_mv/m : 0;
-			if(m<50||div<8||div>60||adcFloating(p)) continue;
-			mv[i] = m;
-			if(!n++) best = p;    //the only one, unless the voltage change picks
-			if(prev&&vbPrev[i]>0){    //relative error of the change against the voltage's change, 0.1 %
-				int32_t e = (m*vbPrevMv-vbPrev[i]*expect_mv)/(vbPrev[i]*expect_mv/1000);
-				if(e<0) e = -e;
-				if(e<bestErr){ bestErr = e; best = p; }
-			}
-		}
-		if(!n){ ShowAdc(); err("no pin a divider drives at that voltage (8..60 x)"); return; }
-		if(n>1&&!(prev&&bestErr<30)){
-			for(uint8_t i=0;i<ADCCOUNT;i++){
-				vbPrev[i] = mv[i];
-				if(mv[i]){ kv("candidate"); outpin(adcs[i].io); out(" divider "); outi(expect_mv/mv[i]); nl(); }
-			}
-			vbPrevMv = expect_mv;
-			err("several pins could be the battery: change the voltage (supply, or plug in the charger), then detect vbat <new V>");
-			return;
-		}
-		vbPrevMv = 0;
-		int32_t pmv = PinMv(best);
-		if(pmv>0){
-			VBAT_GAIN = (uint16_t)(expect_mv*1000/pmv);
-			VBAT_DIVIDER = (uint16_t)((expect_mv+pmv/2)/pmv);
-			kvi("vbatgain", VBAT_GAIN);
-		}
+	uint16_t best = PIN_NONE;
+	int32_t bestErr = 30, bestMv = 0;    //0.1 %
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		int32_t m = PinMv(adcs[i].io), m0 = vbLevel[i];
+		if(m0<50||m<50) continue;
+		int32_t e = (m*vbLevelMv-m0*mv)/(m0*mv/1000);    //the reading's change against the voltage's
+		if(e<0) e = -e;
+		if(e<bestErr){ bestErr = e; best = adcs[i].io; bestMv = m; }
 	}
+	kvmv("level1", vbLevelMv);
+	kvmv("level2", mv);
+	vbLevelMv = 0;
+	if(best==PIN_NONE){ ShowAdc(); err("no pin followed the voltage change: detect vbat <V> again for a new first level"); return; }
 	VBATPIN = best;
+	VBAT_GAIN = (uint16_t)(mv*1000/bestMv);
+	VBAT_DIVIDER = (uint16_t)((mv+bestMv/2)/bestMv);
 	kvp("vbat", VBATPIN);
+	kvi("vbatgain", VBAT_GAIN);
 	kvmv("battery", VbatMv());
 	ok();
 }
@@ -287,16 +250,8 @@ static uint8_t pinState(uint16_t p){
 
 //waits for a free pin (or 'also') whose state changes and stays changed for 50 ms; pins that change by
 //themselves in the first 0.5 s are ignored
-//analog watch (detect button): a press that only raises a voltage (the F031 board: its switched supply on
-//an adc pin, 0.63 -> 0.8 V, digital 0 either way). aMv: released / pressed mV of the pin found
-static uint8_t watchAnalog;
-static int32_t aBase[ADCCOUNT], aMv[2];
-static uint8_t analogPin(uint16_t p, uint16_t also){    //an adc pin to watch: free, or the configured one
-	return p!=VBATPIN&&p!=ITOTALPIN&&p!=IPHASEAPIN&&p!=IPHASEBPIN&&(PinFree(p)||p==also);
-}
 static uint16_t waitChange(uint16_t also, uint32_t ms, uint8_t* from, uint8_t* to){
 	uint8_t st[PINCOUNT], noisy[PINCOUNT];
-	if(watchAnalog) for(uint8_t i=0;i<ADCCOUNT;i++) aBase[i] = analogPin(adcs[i].io, also) ? PinMv(adcs[i].io) : -1;
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		noisy[p] = 0;
 		if(PinFree(p)||p==also) st[p] = pinState(p);
@@ -319,17 +274,6 @@ static uint16_t waitChange(uint16_t also, uint32_t ms, uint8_t* from, uint8_t* t
 			*to = s;
 			return p;
 		}
-		for(uint8_t i=0;watchAnalog&&i<ADCCOUNT;i++){    //rises by a fifth (100 mV at least) and stays 50 ms
-			if(aBase[i]<0) continue;
-			int32_t d = aBase[i]/5>100 ? aBase[i]/5 : 100, v = PinMv(adcs[i].io);
-			if(v<aBase[i]+d) continue;
-			Wait(50);
-			v = PinMv(adcs[i].io);
-			if(v<aBase[i]+d) continue;
-			aMv[0] = aBase[i]; aMv[1] = v;
-			*from = 2; *to = 2;    //2: analog
-			return adcs[i].io;
-		}
 		if(aborted()) return PIN_NONE;
 	}
 	return PIN_NONE;
@@ -339,21 +283,10 @@ void DetectButton(uint32_t ms){
 	uint8_t from, to;
 	if(!ms) ms = 15000;
 	note("press and hold the power button");
-	watchAnalog = 1;
 	uint16_t p = waitChange(BUTTONPIN, ms, &from, &to);
-	watchAnalog = 0;
 	if(p==PIN_NONE){ err("no pin changed"); return; }
 	BUTTONPIN = p;
 	kvp("button", p);
-	if(to==2){    //analog: pressed above the middle, in adc counts (main firmware: analogRead > buttonadc)
-		BUTTON_ADC = (uint16_t)((aMv[0]+aMv[1])/2*4096/VddMv());
-		kvmv("released", aMv[0]);
-		kvmv("pressed", aMv[1]);
-		kvi("buttonadc", BUTTON_ADC);
-		ok();
-		return;
-	}
-	BUTTON_ADC = 0xFFFF;    //digital
 	kvi("released", from);
 	kvi("pressed", to);
 	if(to!=1) warn("reads 0 when pressed (expects 1)");

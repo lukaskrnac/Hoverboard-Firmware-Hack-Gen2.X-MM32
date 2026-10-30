@@ -32,13 +32,6 @@ volatile int itotal;
 volatile int fvbat;
 volatile int fitotal;
 volatile uint8_t powerOffReq;    //CANSimple hoverboard.power_off: the power button's shutdown
-
-//the power button: a digital pin (1 = pressed), or with buttonadc an adc pin above that count (a board whose
-//press only raises a voltage, the F031 board: the switched supply 19.5 -> 24.6 V on PA6)
-static uint8_t buttonDown(void){
-	if(BUTTONPIN>=PINCOUNT) return 0;
-	return BUTTON_ANALOG ? analogRead(BUTTONPIN)>BUTTON_ADC : digitalRead(BUTTONPIN);
-}
 volatile int speed=0;
 volatile int pwm=0;
 volatile int realspeed=0;
@@ -146,7 +139,7 @@ s32 main(void){
 	if(LATCHPIN<PINCOUNT){    //have latch
 		DelayFed(100);    //some board the micro controller can reset in time and turn back on
 		digitalWrite(LATCHPIN, 1);
-		while(buttonDown()){    //wait while release button
+		while(digitalRead(BUTTONPIN)&&BUTTONPIN<PINCOUNT){    //wait while release button
 			if(BUZZERPIN<PINCOUNT){    //have buzzer
 				Beep(2);
 				DelayFed(2);
@@ -219,15 +212,7 @@ s32 main(void){
 		  lastflicker=millis;
 		}
 		if(LATCHPIN<PINCOUNT){
-			//a press switches off only after the button was released for 300 ms since power-on (the press that
-			//switched the board on is still held while it boots; an analog button reads 0 for the adc's first
-			//few ms, far below that), and counts after 100 ms held: an analog button's switched supply decays
-			//slowly through the threshold after the release, its noise read as a new press
-			static uint8_t btnArmed;
-			static uint32_t tDown, tUp;    //last seen pressed / released
-			if(buttonDown()) tDown = millis; else tUp = millis;
-			if(millis-tDown>300) btnArmed = 1;
-			if(powerOffReq||(btnArmed&&millis-tUp>100)){    //button press (or hoverboard.power_off) for shutdown
+			if(powerOffReq||(BUTTONPIN<PINCOUNT&&digitalRead(BUTTONPIN))){    //button press (or hoverboard.power_off) for shutdown
 				//gates off for good: speedupdate() is not called again, so gatesoff stays set and the adc
 				//isr keeps them off. Zeroing CCR1-3 did not stop the motor: the isr rewrites them in sine
 				//mode, and the gates stayed armed. Switched here too in case the isr is the part that hangs.
@@ -240,7 +225,7 @@ s32 main(void){
 						DelayFed(150);
 					}
 				}
-				while(buttonDown()) {    //wait for release
+				while(digitalRead(BUTTONPIN)) {    //wait for release
 					__NOP();
 					IWDG_ReloadCounter();
 				}

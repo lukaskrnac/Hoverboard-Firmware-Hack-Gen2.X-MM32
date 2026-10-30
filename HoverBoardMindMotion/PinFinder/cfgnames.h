@@ -112,6 +112,5 @@
 	F(108, 0, "regenmax") \
 	F(109, 0, "spinelec") \
 	F(110, 0, "spinmech") \
-	F(111, 0, "buttonadc") \
 
-#define CFG_FIELD_COUNT 112
+#define CFG_FIELD_COUNT 111

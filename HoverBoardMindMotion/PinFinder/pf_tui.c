@@ -200,7 +200,7 @@ static void detectAll(void){
 		T("power button"), T("charger (any key skips)"), T("IMU") };
 	uint8_t run = 0, good = 0, skip = 0, esc = 0;
 	for(uint8_t k=0;k<6&&!esc;k++){
-		if(k==3&&!master) continue;
+		if((k==3&&!master)||k==2) continue;    //battery: two voltage levels the user sets (menu 3)
 		heading(names[k]);
 		failed = 0;
 		abortKey = 0;
@@ -273,7 +273,7 @@ void TuiKey(int c){
 	case '3':
 		heading("battery voltage");
 		ShowAdc();
-		out("Battery voltage you measure (36.5), or Enter: the pin at 20..45 V"); nl();
+		out("Battery voltage you measure (36.5); then change it (supply, charger) and give the new one"); nl();
 		lineStart("detect vbat ");
 		break;
 	case '4': heading("power button"); DetectButton(0); after(); break;

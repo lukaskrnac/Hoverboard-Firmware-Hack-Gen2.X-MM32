@@ -47,7 +47,7 @@ static int32_t millivolts(const char* s){
 static void help(void){
 	static const char* const h[] = {
 		T("info | list | get <name> | set <name> <value|pin|none> | save | revert | defaults"),
-		T("detect hall [mV] | vbat [V] | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | ir [ms] | latch"),
+		T("detect hall [mV] | vbat <V> (twice, 2 levels) | current [mV] [shunt mOhm] | imu | button [ms] | charger [ms] | ir [ms] | latch"),
 		T("calibrate hall [mV] | poles [ms] | rl [mV] | kv block|sine [max] | imu"),
 		T("adc | hall | pin <pin> high|low|pullup|pulldown|input|read|blink|tone [ms]"),
 		T("step <1-6|101-112> [mV] [ms] | rotate <permille> [ms] | poweroff | tui | agent"),

@@ -272,7 +272,7 @@ void adc_Init(void){
 	uint8_t phases = IPHASEAPIN<PINCOUNT&&IPHASEBPIN<PINCOUNT;
 	for(uint8_t i=0;i<ADCCOUNT;i++){
 		uint16_t io = adcs[i].io;
-		if(io==VBATPIN||io==ITOTALPIN||(phases&&(io==IPHASEAPIN||io==IPHASEBPIN))||(io==BUTTONPIN&&BUTTON_ANALOG)){
+		if(io==VBATPIN||io==ITOTALPIN||(phases&&(io==IPHASEAPIN||io==IPHASEBPIN))){
 			pinMode(io, INPUT_ADC);
 			ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
 		}
