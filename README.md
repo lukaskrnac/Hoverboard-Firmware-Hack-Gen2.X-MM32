@@ -258,6 +258,17 @@ https://youtu.be/hCaIlEKzI3A
 * software and hardware over current protection
 * sine wave mode to drive the motor with more torque and higher effiency
 * FOC with two measured phase currents; pwm, speed, torque and position control for block, sine and FOC; field weakening
+### Stand-alone power and temperature settings
+The board is meant for robots, where the host has full control, so these are all off by default. They are
+for boards used without a host program that looks after the battery and the temperature.
+* `autooff=<minutes>`: power off (the power button's shutdown, boards with a latch) after this many minutes
+  disarmed and without a command (set points / v1 frames; telemetry reads do not count).
+* `batdeadoff=2`: power off at the low battery cut-off (`batempty`, DC_BUS_UNDER_VOLTAGE, standing) instead
+  of keeping the MCU on with the gates off.
+* `tempderate=<C>`: below `templimit` the FOC current limit, the block duty and the sine modulation fall
+  linearly from 100 % at `templimit - tempderate` to 0 at `templimit` (slewed over ~2 s); the
+  INVERTER_OVER_TEMP trip at `templimit` stays.
+
 ### Buzzer, charger and foot sensors
 * `buzzerpassive=2` for a buzzer without its own oscillator (a plain piezo or magnetic buzzer stays
   silent on a steady level): it gets a 2.2 kHz square wave from a timer output (TIM14/16/17 CH1 or

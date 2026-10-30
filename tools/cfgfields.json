@@ -700,6 +700,24 @@
    "name": "spinmech",
    "kind": "num",
    "meaning": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
+  },
+  {
+   "index": 111,
+   "name": "autooff",
+   "kind": "num",
+   "meaning": "power off after this many minutes disarmed and without a command (set point / v1 frame; telemetry reads do not count); 0/65535 = off (the host decides)"
+  },
+  {
+   "index": 112,
+   "name": "batdeadoff",
+   "kind": "num",
+   "meaning": "power off at the low battery cut-off (batempty, DC_BUS_UNDER_VOLTAGE, standing): 2 = on, 1/0/65535 = off"
+  },
+  {
+   "index": 113,
+   "name": "tempderate",
+   "kind": "num",
+   "meaning": "temperature derating band below templimit, C: FOC current limit / block duty / sine modulation fall linearly to 0 at templimit (slewed ~2 s); 0/65535 = off"
   }
  ]
 }

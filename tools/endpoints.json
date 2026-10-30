@@ -668,6 +668,24 @@
    "access": "rw",
    "unit": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
   },
+  "hoverboard.config.autooff": {
+   "id": 111,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power off after this many minutes disarmed and without a command (set point / v1 frame; telemetry reads do not count); 0/65535 = off (the host decides)"
+  },
+  "hoverboard.config.batdeadoff": {
+   "id": 112,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power off at the low battery cut-off (batempty, DC_BUS_UNDER_VOLTAGE, standing): 2 = on, 1/0/65535 = off"
+  },
+  "hoverboard.config.tempderate": {
+   "id": 113,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "temperature derating band below templimit, C: FOC current limit / block duty / sine modulation fall linearly to 0 at templimit (slewed ~2 s); 0/65535 = off"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",

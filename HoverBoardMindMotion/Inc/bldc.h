@@ -16,6 +16,7 @@ extern volatile uint8_t coastreq;    //1: gates off for now, the drive mode's be
 extern volatile uint32_t lastcommutate;
 extern uint8_t lowbatcount;
 extern uint8_t lowbatperm;
+extern volatile int16_t derate;    //1/1024 of the current limit / max duty left by the temperature (TEMP_DERATE)
 void ClearErrors(void);    //Clear_Errors: disarm reason, FOC trip, low battery once above empty again
 extern const uint8_t hall_to_pos[8];
 

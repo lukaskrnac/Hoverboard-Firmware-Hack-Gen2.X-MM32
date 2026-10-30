@@ -112,5 +112,8 @@
 	F(108, 0, "regenmax") \
 	F(109, 0, "spinelec") \
 	F(110, 0, "spinmech") \
+	F(111, 0, "autooff") \
+	F(112, 0, "batdeadoff") \
+	F(113, 0, "tempderate") \
 
-#define CFG_FIELD_COUNT 111
+#define CFG_FIELD_COUNT 114

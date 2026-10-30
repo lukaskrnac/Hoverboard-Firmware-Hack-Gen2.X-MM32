@@ -79,6 +79,7 @@ int32_t PosGain(void){
 
 uint8_t lowbatcount=0;
 uint8_t lowbatperm=0;
+volatile int16_t derate=1024;
 
 //Clear_Errors (command and endpoint): the disarm and FOC trip; the low battery cut-off too once the battery
 //is above the empty voltage again (or the cut-off is off): it held until power off, also after the limit
@@ -167,6 +168,11 @@ void speedupdate(void){
 		int32_t tl = cfgOrDefault(TEMP_LIMIT, 85)*10, tc = McuTemp();
 		if(tc<=tl) hotN = 0; else if(hotN<250) hotN++;
 		if(hotN>=250) hot = 1; else if(tc<tl-50) hot = 0;
+		//derating (TEMP_DERATE, off by default): the limit falls from 100 % at templimit - band to 0 at templimit,
+		//slewed 1/1024 per pass (~2 s for the full range: single glitched readings do not jerk the motor)
+		//(target (tl - tc) * 1024 / band, compared without the division)
+		int32_t band = cfgOrDefault(TEMP_DERATE, 0)*10, dr = (tl-tc)*1024-derate*band;
+		if((!band||dr>0)&&derate<1024) derate++; else if(dr<0&&derate>0) derate--;
 		uint32_t trip = (hot ? ERR_INVERTER_OVER_TEMP : 0)|(overcurrent ? ERR_DC_BUS_OVER_CURRENT : 0)|
 		                (fitotal<-(int32_t)cfgOrDefault(REGEN_MAX, 6553)*10 ? ERR_DC_BUS_OVER_REGEN_CURRENT : 0);
 		//spinout (ODrive): FOC draws power (electrical > SPIN_ELEC W) while I_q * kt * speed says it brakes
@@ -429,7 +435,7 @@ void speedupdate(void){
 		}else{
 		dir=-1;
 		}
-		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
+		abspwm=(pwm<0 ? -pwm : pwm)*derate>>10;    //block duty; temperature derating (sine: interrupt.c, FOC: CurrentImax())
 		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
 			//block brake: the ramped duty regenerates into the bus (the off time: the motor current through the
 			//high side diodes); above BAT_FULL + 0.5 V the adc isr shorts the motor fully (interrupt.c). Full = CCR

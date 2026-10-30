@@ -86,7 +86,7 @@ _Static_assert(sizeof(SerialHover2Server) == 15, "SerialHover2Server must be 15 
 
 
 
-static uint32_t iTimeLastRx = 0;
+uint32_t iTimeLastRx = 0;
 
 
 //checksum: CRC-16 (poly 0x1021, init 0), the same as CANSimple's (cansimple.c)

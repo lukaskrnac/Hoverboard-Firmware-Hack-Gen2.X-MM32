@@ -149,7 +149,7 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         (not SWD, the bridge is not in the pin list) pulled up 0.2 s / down 0.8 s, LEDs / active buzzer behind a
         transistor flash / beep; a known latch stays pulled up (the pull-down switched the board off). Bench
         (halla cleared): the board stays on, ODR 0x1fff / 0x4 at 0.2 / 0.8 s. Without any config it stays on only
-        while the button is held. Room for it: soft float multiply without the 64 bit lmul (-90 B). SPIN25 0 B free. No derating / over-temperature limit yet., more light outputs (5 is the most there is).
+        while the button is held. Room for it: soft float multiply without the 64 bit lmul (-90 B). SPIN25 0 B free. Derating (`tempderate`, word 113) since 2026-10-31, off by default., more light outputs (5 is the most there is).
       - E-stop: detectable like the button (a person presses it); only if boards have one.
       - Hall edge positions at 30 deg resolution come out of `detect hall` already (12 directions); the
         hall angle calibration (P5) can refine them.

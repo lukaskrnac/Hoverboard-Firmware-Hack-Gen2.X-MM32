@@ -205,7 +205,7 @@ void ADC1_COMP_IRQHandler(void){
 				if(q>32000){ adv = fw ? (q-32000)*fw*182/8000 : 0; q = 32000; if(adv>fw*182) adv = fw*182; }
 				else if(q<-32000){ adv = fw ? (q+32000)*fw*182/8000 : 0; q = -32000; if(adv<-fw*182) adv = -fw*182; }
 				ipark1.Ds = 0;
-				ipark1.Qs = q;
+				ipark1.Qs = q*derate>>10;    //temperature derating (TEMP_DERATE)
 				ipark1.Theta = (int16_t)(HALL1.Angle+adv);    //182 = 65536/360
 				IPARK_MACRO1(&ipark1);
 				pwm_gen.Mode = SEVENMODE;

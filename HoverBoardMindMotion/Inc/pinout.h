@@ -56,6 +56,11 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define REGEN_MAX pinstorage[108]        //regenerated bus current limit, 0.1 A (DC_BUS_OVER_REGEN_CURRENT); 0/65535 = off
 #define SPIN_ELEC pinstorage[109]        //spinout: electrical power above it (W) ...; 0/65535 = 10
 #define SPIN_MECH pinstorage[110]        //... while the mechanical power is below minus this (W); 0/65535 = 10
+//Off by default: the host has the control (robotics); for boards driven without a host program
+#define AUTO_OFF pinstorage[111]         //power off after this many minutes disarmed without a command; 0/65535 = off
+#define BAT_DEAD_OFF pinstorage[112]     //power off at the low battery cut-off (DC_BUS_UNDER_VOLTAGE): 1 off, 2 on, default off
+#define TEMP_DERATE pinstorage[113]      //derating band below templimit, C: the current limit (FOC) / max duty (block,
+                                         //sine) falls linearly to 0 at templimit; 0/65535 = off
 #define HALL_INVERT pinstorage[95]       //2: the three hall signals inverted (detect hall), else as read
 static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : def); }
 

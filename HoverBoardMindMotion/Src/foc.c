@@ -229,7 +229,7 @@ int32_t CurrentPullback(void){    //mA
 }
 int32_t CurrentImax(void){    //mA
 	int32_t i = IMAX_CFG(), c = CurrentPullback()*9/10;
-	return i<c ? i : c;
+	return (i<c ? i : c)*derate>>10;    //temperature derating (TEMP_DERATE)
 }
 
 uint8_t FocSensing(void){    //phase currents measured (FOC, or sine on a board with the current pins)

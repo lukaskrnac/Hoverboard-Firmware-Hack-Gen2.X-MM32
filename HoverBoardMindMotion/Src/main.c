@@ -69,6 +69,10 @@ static void Beep(uint32_t ms){
 	BuzzerSet(0);
 }
 
+static void __attribute__((noinline)) Melody(uint8_t n, uint32_t ms){    //n beeps of ms, ms apart (boards with a buzzer)
+	if(BUZZERPIN<PINCOUNT) for(;n;n--){ Beep(ms); DelayFed(ms); }
+}
+
 static void setRGB(uint8_t r, uint8_t g, uint8_t b){    //RGB LED (unconfigured pins are ignored)
 	digitalWrite(LEDRPIN, r);
 	digitalWrite(LEDGPIN, g);
@@ -140,22 +144,11 @@ s32 main(void){
 		DelayFed(100);    //some board the micro controller can reset in time and turn back on
 		digitalWrite(LATCHPIN, 1);
 		while(digitalRead(BUTTONPIN)&&BUTTONPIN<PINCOUNT){    //wait while release button
-			if(BUZZERPIN<PINCOUNT){    //have buzzer
-				Beep(2);
-				DelayFed(2);
-			}else{
-				__NOP();
-				__NOP();
-			}
+			Melody(1, 2);    //beeps (with a buzzer)
 			IWDG_ReloadCounter();
 		}
 	}
-	if(BUZZERPIN<PINCOUNT){
-		for(int i=0;i<5;i++){    //power on melody
-			Beep(50);
-			DelayFed(50);
-		}
-	}
+	Melody(5, 50);    //power on melody
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);    //Software start conversion
 
 	PWM_GEN_init(&pwm_gen);
@@ -212,6 +205,14 @@ s32 main(void){
 		  lastflicker=millis;
 		}
 		if(LATCHPIN<PINCOUNT){
+			//off by default (the host decides): power off at the low battery cut-off (lowbatperm: standing), and
+			//after AUTO_OFF minutes disarmed and without a command (set point, v1 frame: iTimeLastRx; telemetry reads do
+			//not count)
+			static uint32_t activeT;
+			if(!gatesoff||millis-iTimeLastRx<1000) activeT = millis;
+			uint32_t ao = AUTO_OFF;
+			if(ao-1u<0xFFFEu&&millis-activeT>ao*60000u) powerOffReq = 1;
+			if(lowbatperm&&BAT_DEAD_OFF==2) powerOffReq = 1;
 			if(powerOffReq||(BUTTONPIN<PINCOUNT&&digitalRead(BUTTONPIN))){    //button press (or hoverboard.power_off) for shutdown
 				//gates off for good: speedupdate() is not called again, so gatesoff stays set and the adc
 				//isr keeps them off. Zeroing CCR1-3 did not stop the motor: the isr rewrites them in sine
@@ -219,12 +220,7 @@ s32 main(void){
 				gatesoff = 1;
 				pwm = 0;
 				gatesOutput(0);
-				if(BUZZERPIN<PINCOUNT){
-					for(int i=0;i<3;i++){    //power off melody
-						Beep(150);
-						DelayFed(150);
-					}
-				}
+				Melody(3, 150);    //power off melody
 				while(digitalRead(BUTTONPIN)) {    //wait for release
 					__NOP();
 					IWDG_ReloadCounter();
