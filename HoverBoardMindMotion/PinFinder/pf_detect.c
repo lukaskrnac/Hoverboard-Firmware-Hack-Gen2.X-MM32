@@ -592,6 +592,24 @@ static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint16_t n){    
 	}
 }
 
+//least squares of the bus pin's readings (counts) over the reference current xs (A), the points above the
+//adc's zero (a shunt's zero can be below it), rising steadily
+static uint8_t busFit(uint16_t (*avg)[16], uint8_t c, const float* xs, float* a, float* z){
+	float sx = 0, sy = 0, sxx = 0, sxy = 0;
+	uint8_t np = 0;
+	for(uint8_t s=0;s<8;s++){
+		float y = (float)avg[s][c]/8.0f;
+		if(s&&avg[s][c]+4<avg[s-1][c]) return 0;    //falls by more than half a count
+		if(y<3.0f) continue;
+		sx += xs[s]; sy += y; sxx += xs[s]*xs[s]; sxy += xs[s]*y; np++;
+	}
+	float den = (float)np*sxx-sx*sx;
+	if(np<3||den<0.01f) return 0;
+	*a = ((float)np*sxy-sx*sy)/den;
+	*z = (sy-*a*sx)/(float)np;
+	return 1;
+}
+
 void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	if(mv<=0) mv = 1000;
 	uint32_t mask = freeAdcMask();
@@ -663,7 +681,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	//per conversion (a scan converts its channels ~1.7 us apart, the window is ~+-7 us). The bus pin is the
 	//one that rises steadily with the current (op-amp inputs read high-impedance noise there: flat or jumpy)
 	static uint16_t avg[8][16];    //counts x 8, summed over the passes
-	float xs[8];
+	float xs[8], fr[8];
 	for(uint8_t s=0;s<8;s++){ xs[s] = 0; for(uint8_t c=0;c<16;c++) avg[s][c] = 0; }
 	FieldVector(kx, mv*5/2);    //the rotor aligns first: a swinging rotor changed the current between the samples
 	Wait(500);
@@ -673,6 +691,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 			FieldVector(kx, mv*(s+3)/4);
 			Wait(150);
 			uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
+			fr[s] = (float)(fieldCcr[(x+1)%3]-fieldCcr[x])/(float)PWM_PERIOD;    //duty x - duty others
 			sampleAvg(mask, 1, v, 16);
 			int32_t before = PHASE_X_MA();
 			for(uint8_t c=0;c<16;c++){
@@ -696,23 +715,38 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		uint8_t c = (uint8_t)adcs[i].channel;
 		uint16_t p = adcs[i].io;
 		if(!(mask>>c&1)||p==IPHASEAPIN||p==IPHASEBPIN) continue;
-		//least squares over the points above the adc's zero (a shunt's zero can be below it), rising steadily
-		float sx = 0, sy = 0, sxx = 0, sxy = 0;
-		uint8_t np = 0, steady = 1;
-		for(uint8_t s=0;s<8;s++){
-			float y = (float)avg[s][c]/8.0f;
-			if(s&&avg[s][c]+4<avg[s-1][c]) steady = 0;    //falls by more than half a count
-			if(y<3.0f) continue;
-			sx += xs[s]; sy += y; sxx += xs[s]*xs[s]; sxy += xs[s]*y; np++;
-		}
-		float den = (float)np*sxx-sx*sx;
-		if(!steady||np<3||den<0.01f) continue;
-		float a = ((float)np*sxy-sx*sy)/den;
-		//the configured pin first, else the steepest (best==PIN_NONE first: with no pin configured ITOTALPIN is
+		float a, zz;
+		if(!busFit(avg, c, xs, &a, &zz)) continue;
+		//(a filtered pin, below, rises only by its average: ~0.5 counts per A here) the configured pin first, else the steepest (best==PIN_NONE first: with no pin configured ITOTALPIN is
 		//PIN_NONE too, and "best!=ITOTALPIN" alone never let a pin in)
-		if(a>0.5f&&(best==PIN_NONE||(best!=ITOTALPIN&&(a>slope||p==ITOTALPIN)))){ slope = a; z = (sy-a*sx)/(float)np; best = p; }
+		if(a>0.2f&&(best==PIN_NONE||(best!=ITOTALPIN&&(a>slope||p==ITOTALPIN)))){ slope = a; z = zz; best = p; }
 	}
-	if(best==PIN_NONE){ err("no bus current pin found"); return; }
+	if(best==PIN_NONE){
+		//a zero below adc 0 hides small currents (F031: a filtered pin reads 0 up to ~0.75 A average)
+		if(mv<1500){ note("no bus current pin above the adc zero: again at 1.5x the voltage"); DetectCurrent(mv*3/2, shunt_uohm); return; }
+		err("no bus current pin found");
+		return;
+	}
+	//a filtered bus pin (RC on the shunt signal) reads the period's average everywhere, also in the zero
+	//vector where the shunt carries nothing: fitted against the active vector's current it read the average
+	//as that current, the phase gain came out ~3x low (F031 board: 98 instead of 283, a "4 A" hold was
+	//~11.6 A). Then the reference is the average bus current: I_x x (duty x - duty others).
+	{
+		uint8_t c = (uint8_t)AdcChannel(best);
+		int32_t one[16], zv, av;
+		FieldVector(kx, mv*5/2);
+		Wait(150);
+		sampleAvg(1u<<c, 1, one, 192); zv = one[c];
+		sampleAvg(1u<<c, (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2), one, 192); av = one[c];
+		FieldVector(0, 0);
+		GatesOff();
+		uint8_t filtered = zv*2>av;
+		kvi("itotal_filtered", filtered);
+		if(filtered){
+			for(uint8_t s=0;s<8;s++) xs[s] *= fr[s];
+			if(!busFit(avg, c, xs, &slope, &z)){ err("bus current pin: no fit"); return; }
+		}
+	}
 	ITOTALPIN = best;
 	kvp("itotal", best);
 	int32_t div = (int32_t)(4096000.0f/(slope*(float)VddMv()));    //divider = A / V = 1 / (counts per A x VDD / 4096)
