@@ -48,6 +48,15 @@ static uint16_t hwOcScore;
 //(measured: busLead below it hit edges in 9-14 us windows).
 #define BUS_MINW 648                 //timer counts (9 us): the sample >= 4.5 us from both switching edges (at 6 us
                                      //the watchdog still saw the edges now and then: 3 per 20 s at 8 turns/s)
+//Phase current pins first. The scan converts its channels in channel order, 1.67 us each from the
+//counter's zero (the centre of the low side time); a phase pin behind other channels is sampled late (F031
+//board: vbat ch4, shunt ch7, phase C ch8, B ch9: B at ~5.6 us). Under load the low side time of the phase
+//with the highest duty fell below that, B read a saturated amplifier (-58 A), CURRENT_LIMIT_VIOLATION at
+//2 A of I_q (300 rpm, a hand on the wheel). In sine / FOC the control sample leaves out adcRest (the
+//channels below the highest phase pin that are not phase pins) and the CC4 run after the control step (the
+//bus sample, else one at mid period) converts them too: every channel keeps its own result register.
+//adcRest 0: nothing to leave out (the phase pins are the lowest channels, as on the SPIN05 bench board).
+extern uint32_t adcRest;    //initialize.c adc_Init()
 static volatile uint8_t busPending, busWhich;
 static uint16_t busLead;
 static volatile uint32_t busT;
@@ -74,7 +83,7 @@ int32_t McuTemp(void){
 	return 250+uv*10/4801;
 }
 void BusSampleCheck(void){
-	if(busPending&&millis-busT>2){ busPending = 0; adcTrigger(ADC_CR_T1_TRIG); }
+	if(busPending&&millis-busT>2){ busPending = 0; adcTrigger(ADC_CR_T1_TRIG); }    //(adcRest: the next CC4 run restores the scan)
 }
 
 
@@ -100,6 +109,7 @@ void ADC1_COMP_IRQHandler(void){
   }
 	if(RESET != ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
 		if(busPending){    //the CC4 sample inside an active vector: the bus current, then back to the control sample
+			ADC1->ADCHS &= ~adcRest;
 			adcTrigger(ADC_CR_T1_TRIG);
 			busPending = 0;
 			busI[busWhich] = shuntCurrent(analogRead(ITOTALPIN));
@@ -205,6 +215,7 @@ void ADC1_COMP_IRQHandler(void){
 			}else if(foc){
 				FocControl();
 			}
+			int32_t at = 0;    //a CC4 run at this counter value
 			if(busv){    //the next bus sample: the other window of the vectors just written. The compare registers
 				//have no preload: the new values act at once, also in the period of this sample (the window of the
 				//values read at the isr's start was ~12 deg el off at 10 turns/s in sine: 8 watchdog hits per 30 s)
@@ -212,12 +223,18 @@ void ADC1_COMP_IRQHandler(void){
 				int32_t n[3] = { (int32_t)TIM1->CCR1, (int32_t)TIM1->CCR2, (int32_t)TIM1->CCR3 };
 				sort3(n);
 				int32_t a = n[busWhich], b = n[busWhich+1], c = (a+b)/2+busLead;
-				if(b-a>=BUS_MINW&&c<(int32_t)PWM_PERIOD){
-					TIM1->CCR4 = (uint16_t)c;
-					busT = millis;
-					busPending = 1;
-					adcTrigger(ADC_CR_TIM1_CC4);
-				}else busI[busWhich] = 0;
+				if(b-a>=BUS_MINW&&c<(int32_t)PWM_PERIOD) at = c;
+				else busI[busWhich] = 0;
+			}
+			if(adcRest&&(foc||sine)){    //phase pins first (adcRest): the rest in a CC4 run, the bus sample's or one at mid period
+				if(!at) at = (int32_t)PWM_PERIOD/2;
+				ADC1->ADCHS |= adcRest;
+			}
+			if(at){
+				TIM1->CCR4 = (uint16_t)at;
+				busT = millis;
+				busPending = 1;
+				adcTrigger(ADC_CR_TIM1_CC4);
 			}
 		}
 		ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);

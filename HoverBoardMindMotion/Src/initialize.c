@@ -254,6 +254,7 @@ uint8_t UART_GPIO_Init(void){
 	return uart;
 }
 
+uint32_t adcRest;
 void adc_Init(void){
 	ADC_InitTypeDef  ADC_InitStructure;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
@@ -269,13 +270,17 @@ void adc_Init(void){
 	ADC1->ADCHS |= ADC_CHSR_CHT;    //the internal temperature sensor (channel 14, after the pins in the scan: busLead unchanged)
 	ADC_Cmd(ADC1, ENABLE);
 	//the battery, bus shunt and (both) phase current pins that have an adc channel: analog, in the scan
+	//adcRest: the channels before the last phase pin that are not phase pins (adcs[] in channel order), left
+	//out of the control sample in sine / FOC (interrupt.c)
 	uint8_t phases = IPHASEAPIN<PINCOUNT&&IPHASEBPIN<PINCOUNT;
+	uint32_t seen = 0;
 	for(uint8_t i=0;i<ADCCOUNT;i++){
 		uint16_t io = adcs[i].io;
-		if(io==VBATPIN||io==ITOTALPIN||(phases&&(io==IPHASEAPIN||io==IPHASEBPIN))){
-			pinMode(io, INPUT_ADC);
-			ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
-		}
+		if(phases&&(io==IPHASEAPIN||io==IPHASEBPIN)) adcRest = seen;
+		else if(io==VBATPIN||io==ITOTALPIN) seen |= 1u<<adcs[i].channel;
+		else continue;
+		pinMode(io, INPUT_ADC);
+		ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
 	}
 #ifdef MCU_OPAMPS
 	//SPIN25: op-amp n drives its output pin (OP1 PA6, OP2 PB2, OP3 PB10; OP4's PA9 is a PWM pin); enabled
