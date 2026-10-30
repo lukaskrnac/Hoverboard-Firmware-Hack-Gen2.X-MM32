@@ -125,7 +125,7 @@ static void outputs(uint32_t ccer, uint16_t duty){
 	const uint32_t all = TIM_CCER_CC1EN|TIM_CCER_CC1NEN|TIM_CCER_CC2EN|TIM_CCER_CC2NEN|TIM_CCER_CC3EN|TIM_CCER_CC3NEN;
 	TIM1->CCMR1 = (TIM1->CCMR1&~(TIM_CCMR1_OC1M|TIM_CCMR1_OC2M))|BlockOcMode(ccer, 0)|BlockOcMode(ccer, 1)<<8;
 	TIM1->CCMR2 = (TIM1->CCMR2&~TIM_CCMR2_OC3M)|BlockOcMode(ccer, 2);
-	TIM1->CCER = (TIM1->CCER&~all)|ccer;
+	TIM1->CCER = (TIM1->CCER&~all)|ccer|BLOCK_CCER_LOW;
 	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = duty;
 	TIM1->EGR = TIM_EventSource_COM;
 	TIM1->BDTR |= TIM_BDTR_MOEN;

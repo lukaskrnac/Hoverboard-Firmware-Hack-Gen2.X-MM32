@@ -21,8 +21,16 @@
 //in the off time the current freewheeled through two body diodes against the bus voltage and collapsed
 //every period (2 V: 0.46 A instead of ~3 A; 18.5 % duty before the wheel turned). Now it freewheels
 //through the low side that stays on and the other low side's body diode: continuous, no braking.
+//All three low side outputs stay enabled (CCxNE) and are switched by the mode: a disabled output goes
+//to its off-state level, which on this MM32 ignores the polarity bit (like the idle levels). With
+//inverted low sides (invlowside) "disabled" was "on": the open phase's low side conducted (the motor
+//braked itself every step: 6 W unloaded at 50 rpm, shaking) and so did the chopping phase's own (shoot
+//through in every on-time). Channel with only CCxNE (low side): N follows OCxREF; with both (the
+//chopping high side): N is its complement, the low side rectifies in the off-time.
+#define BLOCK_CCER_LOW (TIM_CCER_CC1NEN|TIM_CCER_CC2NEN|TIM_CCER_CC3NEN)
 static inline uint32_t BlockOcMode(uint32_t ccer, uint8_t k){
-	return (ccer>>(4*k)&(TIM_CCER_CC1EN|TIM_CCER_CC1NEN))==TIM_CCER_CC1NEN ? TIM_ForcedAction_Active : TIM_OCMode_PWM1;
+	uint32_t c = ccer>>(4*k)&(TIM_CCER_CC1EN|TIM_CCER_CC1NEN);
+	return c==TIM_CCER_CC1NEN ? TIM_ForcedAction_Active : (c ? TIM_OCMode_PWM1 : TIM_ForcedAction_InActive);
 }
 
 //hall state C*4+B*2+A (hallpos(), 7-state backwards) -> step; 0 and 7 are not valid hall states

@@ -126,7 +126,7 @@ static void tim1Outputs(uint32_t mode, uint32_t en){ tim1Modes(mode, mode, mode,
 void commutate(void){//U,V,W(A,B,C)
 	static const uint16_t en[7] = BLOCK_CCER_INIT;
 	uint32_t e = step<7 ? en[step] : 0;    //other steps: 0,0,0
-	tim1Modes(BlockOcMode(e, 0), BlockOcMode(e, 1), BlockOcMode(e, 2), e);
+	tim1Modes(BlockOcMode(e, 0), BlockOcMode(e, 1), BlockOcMode(e, 2), e|BLOCK_CCER_LOW);
 }
 
 
