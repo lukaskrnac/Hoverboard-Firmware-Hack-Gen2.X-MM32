@@ -151,9 +151,14 @@ void TIM1_init(u16 arr, u16 psc){
 	uint32_t ois = INVERT_LOWSIDE==1 ? TIM_CR2_OIS1N|TIM_CR2_OIS2N|TIM_CR2_OIS3N : 0;
 	TIM1->CR2 = (TIM1->CR2&~(TIM_CR2_OIS1|TIM_CR2_OIS1N|TIM_CR2_OIS2|TIM_CR2_OIS2N|TIM_CR2_OIS3|TIM_CR2_OIS3N|TIM_CR2_OIS4))|ois|TIM_CR2_CCPC;
 	TIM1->DIER |= TIM_DIER_COMI;
-	//automatic output enable (the gates come on at the next update), break input, dead time 1. MOE stays
-	//clear here as after the HAL's BDTR write: AOE sets it
-	TIM1->BDTR = TIM_BDTR_OSSR|TIM_BDTR_OSSI|1|TIM_BDTR_BKEN|(AWDG ? TIM_BDTR_BKP : 0)|TIM_BDTR_AOEN;
+	//automatic output enable (the gates come on at the next update), break input, dead time 36 = 500 ns
+	//(72 MHz). It was 1 (14 ns), relying on the gate driver's own: the F031 board's Fortior FD2103S (built-in
+	//dead time, cross-conduction prevention) still let its legs conduct through at every edge: 4.3 W at 0 A
+	//and 17.6 kHz (216 mA from a 24 V supply against 58 at 1 us; 69 / 125 / 250 / 500 ns: 118 / 80 / 62 /
+	//60 mA), the MOSFETs ran hot. 500 ns: twice the knee. It delays only the start of a low side window,
+	//before the counter's zero: the current samples come after it. MOE stays clear here as after the HAL's
+	//BDTR write: AOE sets it
+	TIM1->BDTR = TIM_BDTR_OSSR|TIM_BDTR_OSSI|36|TIM_BDTR_BKEN|(AWDG ? TIM_BDTR_BKP : 0)|TIM_BDTR_AOEN;
 	if(!AWDG){
 		if(OCPREFPIN<PINCOUNT){
 			/*
