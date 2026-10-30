@@ -307,6 +307,9 @@ void speedupdate(void){
 			SpeedCtrlReset();
 			FocReset();
 		}else if(COMMUTATION(DRIVEMODE)==COMMUT_FOC){
+			//after a coast (overvoltage: gates off): the speed loop starts again from the wheel's speed. It
+			//kept integrating against a wheel it did not drive, and the first period back braked hard
+			if(coastreq) FocSpeedReset();
 			//command 0: pwm coasts (gates off), torque 0 current, speed holds 0 rpm (brakes)
 			switch(CONTROL(DRIVEMODE)){
 				case CTRL_PWM:
@@ -335,9 +338,7 @@ void speedupdate(void){
 						int32_t m = FocSpeedMeas();
 						i = FocSpeedCtrl(spd, (m<10&&m>-10) ? 0 : m, 1);
 					}
-					//regeneration limit (see above): no braking current while the bus is above BAT_FULL
-					if(regen&&((i>0&&realspeed<0)||(i<0&&realspeed>0))) i = 0;
-					FocSetCurrent(i);
+					FocSetCurrent(i);    //(the regeneration limit acts in the current loop, gradually: foc.c)
 					break;
 				}
 			}

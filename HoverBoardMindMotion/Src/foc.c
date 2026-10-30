@@ -86,6 +86,7 @@ static volatile int32_t focIqRef;  //mA, motor frame
 static volatile int16_t focVCmd;   //permille, motor frame; voltage mode if nonzero
 static volatile uint8_t focVoltMode;
 
+static volatile uint8_t regenLim;    //braking current held back by the regeneration limit (this period)
 static volatile int8_t qSat;    //q voltage on its limit: +1 towards positive focIqRef (motor frame), -1 negative
 
 //Position hold (FOC position mode, near the target): the frame is not the hall angle but the target's
@@ -473,10 +474,19 @@ void FocControl(void){
 	}else{
 		iqRef = -focIqRef;
 		if(iqRef>iqmax) iqRef = iqmax; else if(iqRef<-iqmax) iqRef = -iqmax;
-		//regeneration limit, every period on the bus voltage now: above the full battery voltage no
-		//braking current (electrical frame: braking = iqRef with the sign of realspeed). In the main loop
-		//on the 7 ms average it came late: braking from 900 rpm pumped a bench supply to 34 V first.
-		if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL&&((iqRef>0&&realspeed>0)||(iqRef<0&&realspeed<0))) iqRef = 0;
+		//regeneration limit, every period on the bus voltage now: the braking current (electrical frame:
+		//iqRef with the sign of realspeed) falls from the full limit at BAT_FULL to 0 at BAT_FULL + 1 V.
+		//In the main loop on the 7 ms average it came late (900 rpm pumped a bench supply to 34 V). It was
+		//on/off: the wheel coasted past a position target, the speed loop wound up meanwhile and fired
+		//-13.5 A of braking once the bus fell back: the bus jumped to ~60 V and the board lost power
+		//(F031 bench). regenLim stops the speed loop's integrator in the braking direction.
+		regenLim = 0;
+		if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL&&((iqRef>0&&realspeed>0)||(iqRef<0&&realspeed<0))){
+			int32_t lim = iqmax*((int32_t)BAT_FULL+1000-vbat*10)/1000;
+			if(lim<0) lim = 0;
+			if(iqRef>lim){ iqRef = lim; regenLim = 1; }
+			else if(iqRef<-lim){ iqRef = -lim; regenLim = 1; }
+		}
 	}
 	if(focOver){    //soft limit: no current asked this period, the integrators start again: kp drives it down
 		idRef = iqRef = 0; intD = intQ = 0; fwId = 0;
@@ -633,7 +643,9 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 	//no integration into a current the voltage cannot drive (q voltage on its limit): at top speed the
 	//integrator ran up to the current limit against an unreachable set point and took ~1.7 s to come
 	//back when the set point dropped
-	if((u<imax||di<0)&&(u>-imax||di>0)&&!(qSat>0&&di>0)&&!(qSat<0&&di<0)){
+	//nor into braking the regeneration limit holds back (braking: against the measured speed)
+	uint8_t brakeHeld = regenLim&&((di>0&&meas<0)||(di<0&&meas>0));
+	if((u<imax||di<0)&&(u>-imax||di>0)&&!(qSat>0&&di>0)&&!(qSat<0&&di<0)&&!brakeHeld){
 		spI += di;
 		if(spI>imax) spI = imax; else if(spI<-imax) spI = -imax;
 	}
