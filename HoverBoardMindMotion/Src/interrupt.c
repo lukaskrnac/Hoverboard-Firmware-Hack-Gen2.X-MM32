@@ -18,7 +18,6 @@
 static uint32_t itotaloffset=0;
 volatile uint8_t poweron=0;
 static uint16_t vrefint;    //internal 1.2V reference conversion, filtered (below)
-static volatile uint32_t adcticks;    //adc interrupts since boot (one per control period, pinout.h)
 volatile uint8_t realdir=0;
 volatile uint8_t overcurrent;    //soft current limit active (fitotal > SOFT_ILIMIT)
 //hardware current limit (the adc watchdog AWDG, or a comparator on the break input OCPPIN): each break
@@ -116,7 +115,6 @@ void ADC1_COMP_IRQHandler(void){
 			ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
 			return;
 		}
-		adcticks++;
 		//the compare values active in this period (written by the last control step, loaded at this update)
 		int32_t cc[3] = { (int32_t)TIM1->CCR1, (int32_t)TIM1->CCR2, (int32_t)TIM1->CCR3 };
 		{    //the internal 1.2 V reference (VDD for the bus voltage and the shunt current): a reading now and then
@@ -158,6 +156,10 @@ void ADC1_COMP_IRQHandler(void){
 				int32_t vb = (int32_t)(vg&&vg!=0xFFFF ? vg*a/25u*3u/vrefint : vd*a*120u/vrefint);
 				//and the bus voltage channel's own glitches (bus traffic couples into the adc): a reading 1/12 off
 				//the last is held for up to 3 periods (a real change, regeneration, takes far longer)
+				//block brake above BAT_FULL + 0.5 V: the full short at once, on the raw reading (bldc.c). Braking current
+				//into a bus that cannot take it (a full battery, a bench supply) raises it ~20 V/ms; the main loop's
+				//2 ms on the filtered value let a bench supply reach its 41 V OVP (F031, braking from 5 turns/s)
+				if(blockbrake&&BAT_SET(BAT_FULL)&&vb*10>(int32_t)BAT_FULL+500) TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD+1;
 				static uint8_t vbHeld;
 				if(vbat>0&&(vb>vbat+vbat/12||vb<vbat-vbat/12)&&vbHeld<3) vbHeld++;
 				else{ vbat = vb; vbHeld = 0; }

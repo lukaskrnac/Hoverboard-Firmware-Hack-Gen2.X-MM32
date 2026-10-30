@@ -13,27 +13,10 @@
 void io_init(void){
 	//enable gpio clock
 	RCC->AHBENR |= RCC_AHBENR_GPIOA|RCC_AHBENR_GPIOB|RCC_AHBENR_GPIOC|RCC_AHBENR_GPIOD;    //(RCC_AHBPeriphClockCmd x 4)
-	if(LEDRPIN<PINCOUNT){
-		pinMode(LEDRPIN, OUTPUT);
-	}
-	if(LEDGPIN<PINCOUNT){
-		pinMode(LEDGPIN, OUTPUT);
-	}
-	if(LEDBPIN<PINCOUNT){
-		pinMode(LEDBPIN, OUTPUT);
-	}
-	if(LEDUPIN<PINCOUNT){
-		pinMode(LEDUPIN, OUTPUT);
-	}
-	if(LEDDPIN<PINCOUNT){
-		pinMode(LEDDPIN, OUTPUT);
-	}
-	if(LATCHPIN<PINCOUNT){
-		pinMode(LATCHPIN, OUTPUT);
-	}
-	if(BUTTONPIN<PINCOUNT){
-		pinMode(BUTTONPIN, INPUT);
-	}
+	//pinMode() skips unassigned pins (>= PINCOUNT)
+	for(uint8_t i=3;i<=7;i++) pinMode(pinstorage[i], OUTPUT);    //LEDRPIN .. LEDDPIN
+	pinMode(LATCHPIN, OUTPUT);
+	pinMode(BUTTONPIN, INPUT);
 	BuzzerInit();
 	static const uint8_t pull[] = { INPUT, INPUT, INPUT_PULLUP, INPUT_PULLDOWN };    //0 / 1 floating, 2 up, 3 down
 	if(CHARGEPIN<PINCOUNT){

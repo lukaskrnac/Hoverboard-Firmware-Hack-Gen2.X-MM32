@@ -232,6 +232,11 @@ void speedupdate(void){
 		}
 		if(spd>vlim) spd = vlim; else if(spd<-vlim) spd = -vlim;
 		int32_t tq = ctl==CTRL_TORQUE ? InputTorque(speed, dtms, held) : speed;    //torque set point, 0.01 A
+		//enable_torque_mode_vel_limit (ODrive): FOC, the torque falls to 0 at vel_limit (vel_gain slope); block
+		//and sine (voltage drives) cap their voltage at the one for vel_limit (block torque ran an unloaded wheel
+		//to 9.4 turns/s at vel_limit 3; a torque clamped to 0 coasted it there and the loop surged back to full
+		//duty at speed: the bench supply's 4.5 A limit browned the MCU out)
+		int32_t tvl = cfgBool(TORQUE_VEL_LIMIT, 1) ? vlim : 0;
 		//enable_overspeed_error: disarm above vel_limit * vel_limit_tolerance (ODrive)
 		if(cfgBool(OVERSPEED_ERROR, 0)&&!gatesoff){
 			int32_t lim = vlim*cfgOrDefault(VEL_LIMIT_TOL, 120)/100;
@@ -320,9 +325,8 @@ void speedupdate(void){
 					int32_t i;    //mA
 					if(ctl==CTRL_TORQUE){
 						i = tq*10;    //0.01 A
-						//enable_torque_mode_vel_limit (ODrive): the torque falls to 0 at vel_limit (vel_gain slope)
-						if(cfgBool(TORQUE_VEL_LIMIT, 1)){
-							int32_t kv = cfgOrDefault(FOC_SPD_KP, 30), hi = kv*(vlim-realspeed), lo = kv*(-vlim-realspeed);
+						if(tvl){
+							int32_t kv = cfgOrDefault(FOC_SPD_KP, 30), hi = kv*(tvl-realspeed), lo = kv*(-tvl-realspeed);
 							if(i>hi) i = hi; else if(i<lo) i = lo;
 						}
 					}else if(ctl==CTRL_POSITION){
@@ -379,7 +383,7 @@ void speedupdate(void){
 					}else if(blk){
 						//direction from the sign; the shunt current is a magnitude
 						int32_t sgn = tq>0 ? 1 : -1;
-						pwm = sgn*TorqueCtrlBlock(tq*10*sgn, fitotal*10, fastspeed*sgn)*(int32_t)PWM_PERIOD/1000;
+						pwm = sgn*TorqueCtrlBlock(tq*10*sgn, fitotal*10, fastspeed*sgn, tvl)*(int32_t)PWM_PERIOD/1000;
 					}else{
 						//sine, no current sense: V = I*R + back emf (the sine kv), as modulation, plus the
 						//dead band of the sine plant (dead time, diodes: 1 % ~ 140 mV) in the command's direction
@@ -387,7 +391,8 @@ void speedupdate(void){
 						SpeedPlant p;
 						SpeedParams(SINE_SPEED, &p);
 						int32_t r = cfgOrDefault(MOTOR_R, 300);
-						int32_t mv = tq*(r>5000 ? 5000 : r)/100+fastspeed*5774/p.kv;    //(tq*10*r/1000 in 32 bit)
+						int32_t w = tvl&&fastspeed>tvl ? tvl : (tvl&&fastspeed<-tvl ? -tvl : fastspeed);    //back emf of at most vel_limit: brakes above it
+						int32_t mv = tq*(r>5000 ? 5000 : r)/100+w*5774/p.kv;    //(tq*10*r/1000 in 32 bit)
 						pwm = mv*5676/v+(tq>0 ? 1 : -1)*p.d0*32768/1000;
 						if(pwm>32000) pwm = 32000; else if(pwm<-32000) pwm = -32000;
 					}
@@ -426,7 +431,11 @@ void speedupdate(void){
 		}
 		abspwm=pwm<0 ? -pwm : pwm;    // 4095~-4095
 		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
-			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_PERIOD*brakeduty/1000) : abspwm;
+			//block brake: the ramped duty regenerates into the bus (the off time: the motor current through the
+			//high side diodes); above BAT_FULL + 0.5 V the adc isr shorts the motor fully (interrupt.c). Full = CCR
+			//above ARR (the ramp ends at 1001): at CCR = ARR the low sides went off for a tick at the counter's top
+			//every period.
+			uint16_t ccr = blockbrake ? (uint16_t)((uint32_t)PWM_PERIOD*brakeduty/1000) : abspwm;    //(1001: above ARR)
 			TIM1->CCR1=ccr;
 			TIM1->CCR2=ccr;
 			TIM1->CCR3=ccr;
@@ -455,14 +464,11 @@ void BlockBrake(uint8_t on){
 		NVIC_DisableIRQ(ADC_COMP_IRQn);
 		blockbrake = 1;
 		brakeduty = 0;
-		TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD;
 		tim1Outputs(TIM_OCMode_PWM1, TIM_CCER_CC1NEN|TIM_CCER_CC2NEN|TIM_CCER_CC3NEN);    //low sides only
 		NVIC_EnableIRQ(ADC_COMP_IRQn);
 	}
-	if(brakeduty<1000){
-		brakeduty += 6;    //called every ~2 ms
-		if(brakeduty>1000) brakeduty = 1000;
-	}
+	brakeduty += 6;    //called every ~2 ms
+	if(brakeduty>1001) brakeduty = 1001;
 }
 
 //TIM1 main output enable for all six gates. AOEN goes with MOEN: with automatic output enable set,

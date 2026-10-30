@@ -12,6 +12,6 @@ void SpeedParams(uint8_t mode, SpeedPlant* p);
 int SpeedCtrl(int sp, int meas, const SpeedPlant* p);
 void SpeedCtrlReset(void);
 void TorqueCtrlReset(void);
-int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm);    //COM_TORQUE: mA, mA, rpm -> permille duty (>= 0)
+int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm, int32_t vlim);    //COM_TORQUE: mA, mA, rpm, vel_limit rpm (0: none) -> permille duty (>= 0)
 
 #endif

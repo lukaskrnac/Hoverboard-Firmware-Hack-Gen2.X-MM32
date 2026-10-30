@@ -141,7 +141,7 @@ void TorqueCtrlReset(void){
 	trqT = millis;
 }
 
-int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm){    //mA (magnitude, imeas >= 0), rpm along the command
+int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm, int32_t vlim){    //mA (magnitude, imeas >= 0), rpm along the command; vlim rpm (0: none)
 	SpeedPlant p;
 	SpeedParams(COM_SPEED, &p);
 	int32_t v = vbat > 1000 ? vbat : 2400;
@@ -151,14 +151,18 @@ int TorqueCtrlBlock(int32_t iref, int32_t imeas, int32_t rpm){    //mA (magnitud
 	if(rpm > 1000) rpm = 1000; else if(rpm < -1000) rpm = -1000;
 	int32_t ff = (p.d0<<8)+rpm*256000/(p.kv*v/1000);    //permille<<8: FeedForward() of the speed along the command;
 	if(ff < 0) ff = 0;    //below the dead band (friction: ~5 % at standstill) no torque
+	//vel_limit: the duty at most the feed forward of vel_limit (the bus current of a filtered shunt reads 0
+	//below ~0.7 A: unloaded the loop ran to full duty)
+	int32_t umax = vlim&&vlim<1000 ? (p.d0<<8)+vlim*256000/(p.kv*v/1000) : SPD_UMAX;    //(32 bit: below 1000 rpm, as rpm)
+	if(umax > SPD_UMAX) umax = SPD_UMAX;
 	int32_t e = iref - imeas;
 	int32_t di = 800*e/1000*256/1000*dt;    //ki 800 permille per A*s
 	int32_t u = ff + 5*e*256/1000 + trqI + di;    //kp 5 permille per A
-	if((u < SPD_UMAX || di < 0) && (u > 0 || di > 0)){
+	if((u < umax || di < 0) && (u > 0 || di > 0)){
 		trqI += di;
 		if(trqI > SPD_UMAX) trqI = SPD_UMAX; else if(trqI < -SPD_UMAX) trqI = -SPD_UMAX;
 	}
 	u = ff + 5*e*256/1000 + trqI;
-	if(u > SPD_UMAX) u = SPD_UMAX; else if(u < 0) u = 0;    //no reverse duty: that would be plugging
+	if(u > umax) u = umax; else if(u < 0) u = 0;    //no reverse duty: that would be plugging
 	return u>>8;
 }

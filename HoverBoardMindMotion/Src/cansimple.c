@@ -121,6 +121,23 @@ static void setControlMode(uint32_t cm){
 	SetDriveMode((uint8_t)(COMMUTATION(DRIVEMODE)*4+map[cm]));    //RAM only; save_configuration stores it
 }
 
+//Set_Absolute_Position / pos_estimate: the wheel is at turns now
+static __attribute__((noinline)) void setPosition(float turns){
+	int32_t steps = clampF(turns*(float)StepsPerTurn(), 2000000000);
+	posOffset = iOdom-steps;
+	posCmd = hallPosFine;    //no jump: the target is where the wheel is
+}
+static __attribute__((noinline)) void setInputPos(float turns){    //position set point, turns
+	posCmd = clampF(turns*(float)StepsPerTurn()*POS_FINE, 2000000000)+posOffset*POS_FINE;
+}
+//Set_Axis_State / axis_state: returns 1 if it armed (closed loop)
+static uint8_t setAxisState(uint32_t st){
+	cmdSource = 2;
+	if(st==AXIS_IDLE) axisState = AXIS_IDLE;
+	else if(st==AXIS_CLOSED_LOOP&&!axisDisarm){ axisState = AXIS_CLOSED_LOOP; return 1; }
+	return 0;
+}
+
 static void inputArrived(void){    //a set point: commands come from this protocol, the watchdog is fed
 	cmdSource = 2;
 	RemoteFeedWatchdog();
@@ -200,10 +217,7 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			if(len>=4){
 				//the axis state takes effect for CANSimple commands only (v1: state bit 64): a board that
 				//had no set point yet (boot) ignored IDLE and kept driving
-				uint32_t st = rdU32(d);
-				cmdSource = 2;
-				if(st==AXIS_IDLE) axisState = AXIS_IDLE;
-				else if(st==AXIS_CLOSED_LOOP&&!axisDisarm){ axisState = AXIS_CLOSED_LOOP; RemoteFeedWatchdog(); }
+				if(setAxisState(rdU32(d))) RemoteFeedWatchdog();
 			}
 			break;
 		case CMD_SET_CONTROLLER_MODE:
@@ -214,8 +228,7 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			break;
 		case CMD_SET_INPUT_POS:
 			if(len>=4){
-				float steps = rdF(d)*(float)StepsPerTurn();
-				posCmd = clampF(steps*POS_FINE, 2000000000)+posOffset*POS_FINE;
+				setInputPos(rdF(d));
 				posVelFf = len>=6 ? (int16_t)(d[4]|d[5]<<8)*6/100 : 0;    //0.001 turns/s -> rpm
 				inputArrived();
 			}
@@ -259,13 +272,11 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			break;
 		case CMD_SET_ABSOLUTE_POSITION:
 			if(len>=4){
-				int32_t steps = clampF(rdF(d)*(float)StepsPerTurn(), 2000000000);
-				posOffset = iOdom-steps;
-				posCmd = hallPosFine;    //no jump: the target is where the wheel is
+				setPosition(rdF(d));
 			}
 			break;
 		case CMD_SET_POS_GAIN:    //(turns/s) per turn -> 0.1 rpm per hall step
-			if(len>=4) POS_KP = toWord(rdF(d)*600.0f/(float)StepsPerTurn());
+			if(len>=4){ float x; odriveParam(EP_POS_GAIN, 1, rdF(d), &x); }
 			break;
 		case CMD_SET_VEL_GAINS:{    //Nm/(turns/s), (Nm/s)/(turns/s) -> FOC speed loop mA/rpm, mA/(rpm*s)
 			if(len>=8){
@@ -305,25 +316,38 @@ static uint8_t controlModeOdrive(void){
 }
 
 
-//config words of EP_VEL_RAMP_RATE..EP_FW_ADVANCE and EP_HOLD_CURRENT..EP_PHASE_L in ODrive units:
-//value = word / 10^e, 0/65535 = def / 10^e
-static const float p10[] = { 1.0f, 10.0f, 100.0f, 1000.0f, 10000.0f, 100000.0f, 1000000.0f };
-static const struct{ uint8_t w, e; uint16_t def; } scaled[] = {
-	{29, 2, 100}, {30, 2, 200}, {31, 2, 200}, {35, 2, 50}, {43, 2, 50},    //input modes
-	{21, 1, 0}, {22, 0, 0},    //field weakening: FW_IMAX 0.1 A, FW_ADVANCE degrees; 0 = off
-	{64, 1, 40}, {66, 2, 150}, {67, 2, 2000},    //hold_current A, hold_window steps, accel_limit turns/s^2
-	{68, 2, 1}, {69, 4, 0}, {70, 2, 120}, {73, 6, 460},    //torque_ramp_rate, inertia, vel_limit_tolerance, phase_inductance H
+//config words in ODrive units, value = word / sc: 0/65535 = def / sc (RAW: the word as it is, 0/65535
+//included). One table instead of a switch case each (each case was ~40 bytes of flash)
+#define RAW 0x80    //e flag
+static const float p10[] = { 1.0f, 10.0f, 100.0f, 1000.0f, 10000.0f, 100000.0f, 1000000.0f, 60.0f };
+static const struct{ uint8_t ep, w, e; uint16_t def; } scaled[] = {    //ep - 0x100, word, sc = p10[e]
+	{0x2E, 29, 2, 100}, {0x2F, 30, 2, 200}, {0x30, 31, 2, 200}, {0x31, 35, 2, 50}, {0x32, 43, 2, 50},    //input modes
+	{0x33, 21, 1, 0}, {0x34, 22, 0, 0},    //field weakening: FW_IMAX 0.1 A, FW_ADVANCE degrees; 0 = off
+	{0x38, 64, 1, 40}, {0x39, 66, 2, 150}, {0x3A, 67, 2, 2000},    //hold_current A, hold_window steps, accel_limit turns/s^2
+	{0x3B, 68, 2, 1}, {0x3C, 69, 4, 0}, {0x3D, 70, 2, 120}, {0x3E, 73, 6, 460},    //torque_ramp_rate, inertia, vel_limit_tolerance, phase_inductance H
+	{EP_VEL_LIMIT-0x100, 19, 7, 300},    //VEL_LIMIT: turns/s <- POS_RPM rpm
+	{EP_CURRENT_SOFT_MAX-0x100, 58, 1, 100},    //CURRENT_SOFT_MAX: A <- FOC_IMAX 0.1 A
+	{EP_PHASE_RESISTANCE-0x100, 20, 3, 300},    //PHASE_RESISTANCE: Ohm <- MOTOR_R mOhm
+	{EP_WATCHDOG_TIMEOUT-0x100, 47, 3|RAW, 0},    //WATCHDOG_TIMEOUT: s <- SERIAL_TIMEOUT ms
+	{EP_UNDERVOLTAGE-0x100, 46, 3|RAW, 0},    //UNDERVOLTAGE: V <- BAT_EMPTY mV (low battery cut-off; <= 20 V: off)
+	{EP_POS_DERIVATIVE_GAIN-0x100, 75, 2, 0},    //POS_DERIVATIVE_GAIN: (turns/s)/(turns/s) <- POS_KD 0.01
 };
+
+//FOC speed loop gain word w (FOC_SPD_KP/KI/KD) <-> ODrive units: word * c * kt. Shared by the three
+//cases (noinline: LTO copied it into each); same float operations in the same order as written out
+static __attribute__((noinline)) float velGain(uint8_t w, uint8_t write, float f, float c, float kt, int32_t def){
+	if(write) pinstorage[w] = toWord(f/(c*kt));
+	return (float)cfgOrDefault(pinstorage[w], def)*c*kt;
+}
 
 //ODrive parameter <-> config word, value in ODrive units; returns 0 if ep is not one of them
 static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 	float kt = TorqueConstant(), spt = (float)StepsPerTurn();
-	int8_t k = ep>=EP_VEL_RAMP_RATE&&ep<=EP_FW_ADVANCE ? (int8_t)(ep-EP_VEL_RAMP_RATE) :
-	           (ep>=EP_HOLD_CURRENT&&ep<=EP_PHASE_L ? (int8_t)(ep-EP_HOLD_CURRENT+7) : -1);
-	if(k>=0){
-		const uint8_t w = scaled[k].w; float sc = p10[scaled[k].e];
+	for(uint8_t k=0;k<sizeof scaled/sizeof scaled[0];k++){
+		if(ep!=0x100+scaled[k].ep) continue;
+		const uint8_t w = scaled[k].w; float sc = p10[scaled[k].e&7];
 		if(write) pinstorage[w] = toWord(f*sc);
-		*val = (float)cfgOrDefault(pinstorage[w], scaled[k].def)/sc; return 1;
+		*val = (float)(scaled[k].e&RAW ? pinstorage[w] : cfgOrDefault(pinstorage[w], scaled[k].def))/sc; return 1;
 	}
 	if(ep>=EP_HOLD_ENABLE&&ep<=EP_TORQUE_VEL_LIMIT){    //bools: word 1 false, 2 true, 0/65535 default
 		static const uint8_t bw[3] = { 65, 71, 72 }, bd[3] = { 1, 0, 1 };
@@ -337,30 +361,18 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 			if(write){ CUR_KP = toWord(f*l/1000.0f); CUR_KI = toWord(f*(float)cfgOrDefault(MOTOR_R, 300)/1000.0f); }
 			*val = (float)cfgOrDefault(CUR_KP, 400)*1000.0f/l; return 1;
 		}
-		case EP_VEL_LIMIT:    //turns/s <- rpm
-			if(write) POS_RPM = toWord(f*60.0f);
-			*val = (float)cfgOrDefault(POS_RPM, 300)/60.0f; return 1;
 		case EP_POS_GAIN:    //(turns/s)/turn <- 0.1 rpm per hall step
 			if(write) POS_KP = toWord(f*600.0f/spt);
 			*val = (float)PosGain()*spt/600.0f; return 1;
 		case EP_VEL_GAIN:    //Nm/(turns/s) <- FOC speed loop mA/rpm
-			if(write) FOC_SPD_KP = toWord(f/(0.06f*kt));
-			*val = (float)cfgOrDefault(FOC_SPD_KP, 30)*0.06f*kt; return 1;
+			*val = velGain(61, write, f, 0.06f, kt, 30); return 1;
 		case EP_POS_INTEGRATOR_GAIN:    //((turns/s)/turn)/s <- 0.1 rpm per (hall step * s)
 			if(write) POS_KI = toWord(f*600.0f/spt);
 			*val = (float)cfgOrDefault(POS_KI, 0)*spt/600.0f; return 1;
-		case EP_POS_DERIVATIVE_GAIN:    //(turns/s)/(turns/s) <- 0.01
-			if(write) POS_KD = toWord(f*100.0f);
-			*val = (float)cfgOrDefault(POS_KD, 0)/100.0f; return 1;
 		case EP_VEL_DERIVATIVE_GAIN:    //Nm/(turns/s^2) <- 0.01 mA per rpm/s
-			if(write) FOC_SPD_KD = toWord(f/(0.0006f*kt));
-			*val = (float)cfgOrDefault(FOC_SPD_KD, 0)*0.0006f*kt; return 1;
+			*val = velGain(76, write, f, 0.0006f, kt, 0); return 1;
 		case EP_VEL_INTEGRATOR_GAIN:    //(Nm/s)/(turns/s) <- mA/(rpm*s)
-			if(write) FOC_SPD_KI = toWord(f/(0.06f*kt));
-			*val = (float)cfgOrDefault(FOC_SPD_KI, 100)*0.06f*kt; return 1;
-		case EP_CURRENT_SOFT_MAX:    //A <- 0.1 A
-			if(write) FOC_IMAX = toWord(f*10.0f);
-			*val = (float)cfgOrDefault(FOC_IMAX, 100)/10.0f; return 1;
+			*val = velGain(62, write, f, 0.06f, kt, 100); return 1;
 		case EP_CURRENT_HARD_MAX:    //A <- 0.1 A
 			if(write) CUR_TRIP = toWord(f*10.0f);
 			*val = (float)CurrentHardMax()/1000.0f; return 1;
@@ -370,15 +382,6 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 		case EP_POLE_PAIRS:
 			if(write&&ConfigWordValid(39, toWord(f*2.0f))) WINDINGS = toWord(f*2.0f);
 			*val = (float)WINDINGS/2.0f; return 1;
-		case EP_PHASE_RESISTANCE:    //Ohm <- mOhm
-			if(write) MOTOR_R = toWord(f*1000.0f);
-			*val = (float)cfgOrDefault(MOTOR_R, 300)/1000.0f; return 1;
-		case EP_WATCHDOG_TIMEOUT:    //s <- ms
-			if(write) SERIAL_TIMEOUT = toWord(f*1000.0f);
-			*val = (float)SERIAL_TIMEOUT/1000.0f; return 1;
-		case EP_UNDERVOLTAGE:    //V <- mV (low battery cut-off; <= 20 V: off)
-			if(write) BAT_EMPTY = toWord(f*1000.0f);
-			*val = (float)BAT_EMPTY/1000.0f; return 1;
 		case EP_OVERVOLTAGE:    //V: coast above battery full + 3 V
 			if(write) BAT_FULL = toWord((f-3.0f)*1000.0f);
 			*val = (float)BAT_FULL/1000.0f+3.0f; return 1;
@@ -416,7 +419,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_VBUS: wrF((uint8_t*)&r, (float)fvbat/100.0f); break;
 			case EP_IBUS: wrF((uint8_t*)&r, (float)BusCurrent()/100.0f); break;
 			case EP_POS_ESTIMATE:
-				if(write){ int32_t steps = clampF(f*(float)StepsPerTurn(), 2000000000); posOffset = iOdom-steps; posCmd = hallPosFine; }
+				if(write) setPosition(f);
 				wrF((uint8_t*)&r, posTurns()); break;
 			case EP_VEL_ESTIMATE: wrF((uint8_t*)&r, (float)realspeed/60.0f); break;
 			case EP_IQ_MEASURED: case EP_IQ_SETPOINT:{
@@ -424,7 +427,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 				memcpy(&r, ep==EP_IQ_MEASURED ? q+4 : q, 4); break;
 			}
 			case EP_AXIS_STATE:
-				if(write){ cmdSource = 2; if(v==AXIS_IDLE) axisState = AXIS_IDLE; else if(v==AXIS_CLOSED_LOOP&&!axisDisarm) axisState = AXIS_CLOSED_LOOP; }
+				if(write) setAxisState(v);
 				r = axisState; break;
 			case EP_ACTIVE_ERRORS: r = axisErrors; break;
 			case EP_DISARM_REASON: r = axisDisarm; break;
@@ -438,7 +441,7 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 				if(write&&v<=COMMUT_FOC) SetDriveMode((uint8_t)(v*4+CONTROL(DRIVEMODE)));
 				r = COMMUTATION(DRIVEMODE); break;
 			case EP_INPUT_POS:
-				if(write){ posCmd = clampF(f*(float)StepsPerTurn()*POS_FINE, 2000000000)+posOffset*POS_FINE; inputArrived(); }
+				if(write){ setInputPos(f); inputArrived(); }
 				wrF((uint8_t*)&r, (float)(posCmd-posOffset*POS_FINE)/((float)StepsPerTurn()*POS_FINE)); break;
 			case EP_INPUT_VEL:
 				if(write&&CONTROL(DRIVEMODE)==CTRL_SPEED){ speed = clampF(f*60.0f, 1000); inputArrived(); }
