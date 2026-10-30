@@ -1,6 +1,7 @@
-//IMU search: I2C lines have external pull-ups, so the candidates are the free pins that stay high with the
-//internal pull-down on. Every pair of them is tried as SDA/SCL (bit-banged, open drain, ~50 kHz): the
-//addresses that acknowledge, and the id register of the usual IMUs / accelerometers (i2c.c).
+//IMU search: every pair of free pins is tried as SDA/SCL, with or without the board's pull-ups (a soft
+//bus: released = input with the internal pull-up, low = driven low; ~20 kHz), at the usual IMU addresses;
+//a hit is checked against a full address scan (a pair that is no bus acknowledges everything) and the id
+//register of the usual IMUs / accelerometers names the chip. The main firmware then uses i2c.c.
 #include "pf.h"
 #include "i2c.h"
 #include "imumath.h"
@@ -21,67 +22,95 @@ static const char chipNames[] = T(
 	"LSM6DSL/DS3TR-C\0" "LSM6DSO\0" "QMI8658\0" "LIS3DH\0"
 	"SC7A20\0" "QMA7981\0" "QMA6981\0");
 
-static void pairRelease(uint16_t sda, uint16_t scl){    //I2cRelease floats them: back to the rest state
-	I2cRelease();
-	PinRest(sda);
-	PinRest(scl);
+//the soft bus (pf_imu only): pins can be any two free pins
+static uint8_t bSda, bScl;
+static void hi(uint8_t p){ pinMode(p, INPUT_PULLUP); WaitUs(10); }
+static void lo(uint8_t p){ digitalWrite(p, 0); pinMode(p, OUTPUT); WaitUs(10); }
+static void bStart(void){ hi(bSda); hi(bScl); lo(bSda); lo(bScl); }
+static void bStop(void){ lo(bSda); hi(bScl); hi(bSda); }
+static uint8_t bWrite(uint8_t v){    //1 = acknowledged
+	for(uint8_t i=0;i<8;i++,v=(uint8_t)(v<<1)){ if(v&0x80) hi(bSda); else lo(bSda); hi(bScl); lo(bScl); }
+	hi(bSda); hi(bScl);
+	uint8_t a = !digitalRead(bSda);
+	lo(bScl);
+	return a;
+}
+static uint8_t bProbe(uint8_t a){ bStart(); uint8_t r = bWrite((uint8_t)(a<<1)); bStop(); return r; }
+static int16_t bReg(uint8_t a, uint8_t reg){
+	bStart();
+	if(!bWrite((uint8_t)(a<<1))||!bWrite(reg)){ bStop(); return -1; }
+	bStart();
+	if(!bWrite((uint8_t)(a<<1|1))){ bStop(); return -1; }
+	uint8_t v = 0;
+	hi(bSda);
+	for(uint8_t i=0;i<8;i++){ hi(bScl); v = (uint8_t)(v<<1|digitalRead(bSda)); lo(bScl); }
+	hi(bSda); hi(bScl); lo(bScl);    //no acknowledge: the last byte
+	bStop();
+	return v;
 }
 
 void DetectImu(void){
-	uint8_t cand[8], n = 0;
+	static const uint8_t imuAddr[] = { 0x68, 0x69, 0x6A, 0x6B, 0x18, 0x19, 0x12, 0x13 };
+	uint8_t cand[PINCOUNT], n = 0;
 	uint16_t keep[2] = { IMU_SDA, IMU_SCL };
 	IMU_SDA = IMU_SCL = PIN_NONE;
-	for(uint16_t p=0;p<PINCOUNT&&n<8;p++){    //external pull-up: high against the internal pull-down
-		if(!PinFree(p)) continue;
-		pinMode((uint8_t)p, INPUT_PULLDOWN);
-		WaitUs(50);
-		if(digitalRead((uint8_t)p)) cand[n++] = (uint8_t)p;
-		PinRest(p);    //pulled up again while the latch is unknown: floating it may switch the board off
-	}
-	for(uint8_t i=0;i<n;i++) kvp("pullup", cand[i]);
+	for(uint16_t p=0;p<PINCOUNT;p++) if(PinFree(p)&&p!=TXPIN&&p!=RXPIN) cand[n++] = (uint8_t)p;
 	uint8_t found = 0;
-	for(uint8_t i=0;i<n&&!found;i++) for(uint8_t j=0;j<n&&!found;j++){
-		if(i==j) continue;
-		progress(i*n+j+1, n*n);    //every pair probes 112 addresses: seconds without output otherwise
-		uint8_t sda = cand[i], scl = cand[j];
-		I2cPins(sda, scl, 1);
-		if(!I2cHigh()){ pairRelease(sda, scl); continue; }
-		I2cUnstick();
-		uint8_t acks = 0;
-		for(uint8_t a=0x08;a<0x78&&acks<=8;a++) acks = (uint8_t)(acks+I2cProbe(a));
-		if(!acks||acks>8){ pairRelease(sda, scl); continue; }    //nothing, or SDA does not follow (not an I2C pair)
-		for(uint8_t a=0x08;a<0x78;a++){
-			if(!I2cProbe(a)) continue;
-			found = 1;
-			kv("i2c"); out("sda "); outpin(sda); out(" scl "); outpin(scl); out(" addr "); outi(a);
-			static const uint8_t idregs[3] = { 0x00, 0x0F, 0x75 };    //the usual id registers
-			for(uint8_t r=0;r<3;r++){ out(" reg"); outi(idregs[r]); outc('='); outi(I2cReadReg(a, idregs[r])); }
-			nl();
-			uint8_t known = 0;
-			const char* name = chipNames;
-			for(uint8_t c=0;c<sizeof(chips)/sizeof(chips[0])&&!known;c++,name+=strlen(name)+1){
-				if((chips[c].addr&0xFE)!=(a&0xFE)) continue;    //the chips' two addresses (SA0)
-				int16_t v = I2cReadReg(a, chips[c].reg);
-				if(v!=chips[c].val) continue;
-				kvs("imu", name);
-				IMU_SDA = sda; IMU_SCL = scl; IMU_ADDR = a; IMU_ID = (uint16_t)v;
-				known = 1;
+	for(uint8_t i=0;i<n&&IMU_SDA==PIN_NONE;i++){
+		progress(i+1, n);
+		for(uint8_t j=0;j<n&&IMU_SDA==PIN_NONE;j++){
+			if(i==j) continue;
+			bSda = cand[i]; bScl = cand[j];
+			hi(bSda); hi(bScl);
+			uint8_t hit = 0;
+			if(digitalRead(bSda)&&digitalRead(bScl)){    //something holding a line low: not this pair
+				for(uint8_t k=0;k<9;k++){ lo(bScl); hi(bScl); }    //a slave stuck mid-byte lets go
+				bStop();
+				for(uint8_t k=0;k<sizeof(imuAddr)&&!hit;k++) hit = bProbe(imuAddr[k]);
 			}
-			//an unknown chip at a usual IMU / accelerometer address (clones answer with other ids): keep it
-			if(!known&&IMU_SDA==PIN_NONE&&((a&0xFE)==0x68||(a&0xFE)==0x6A||(a&0xFE)==0x18||(a&0xFE)==0x12)){
-				int16_t v = I2cReadReg(a, (a&0xFE)==0x68 ? 0x75 : ((a&0xFE)==0x12 ? 0x00 : 0x0F));
-				warn("unknown chip at an IMU address: kept");
-				kvs("imu", "unknown");
-				IMU_SDA = sda; IMU_SCL = scl; IMU_ADDR = a; IMU_ID = (uint16_t)(v<0 ? 0 : v);
+			if(hit){
+				uint8_t acks = 0;
+				for(uint8_t a=0x08;a<0x78&&acks<=8;a++) acks = (uint8_t)(acks+bProbe(a));
+				if(acks<=8) for(uint8_t a=0x08;a<0x78;a++){
+					if(!bProbe(a)) continue;
+					found = 1;
+					kv("i2c"); out("sda "); outpin(bSda); out(" scl "); outpin(bScl); out(" addr "); outi(a);
+					static const uint8_t idregs[3] = { 0x00, 0x0F, 0x75 };    //the usual id registers
+					for(uint8_t r=0;r<3;r++){ out(" reg"); outi(idregs[r]); outc('='); outi(bReg(a, idregs[r])); }
+					nl();
+					uint8_t known = 0;
+					const char* name = chipNames;
+					for(uint8_t c=0;c<sizeof(chips)/sizeof(chips[0])&&!known;c++,name+=strlen(name)+1){
+						if((chips[c].addr&0xFE)!=(a&0xFE)) continue;    //the chips' two addresses (SA0)
+						int16_t v = bReg(a, chips[c].reg);
+						if(v!=chips[c].val) continue;
+						kvs("imu", name);
+						IMU_SDA = bSda; IMU_SCL = bScl; IMU_ADDR = a; IMU_ID = (uint16_t)v;
+						known = 1;
+					}
+					//an unknown chip at a usual IMU / accelerometer address (clones answer with other ids): keep it
+					if(!known&&IMU_SDA==PIN_NONE&&((a&0xFE)==0x68||(a&0xFE)==0x6A||(a&0xFE)==0x18||(a&0xFE)==0x12)){
+						int16_t v = bReg(a, (a&0xFE)==0x68 ? 0x75 : ((a&0xFE)==0x12 ? 0x00 : 0x0F));
+						warn("unknown chip at an IMU address: kept");
+						kvs("imu", "unknown");
+						IMU_SDA = bSda; IMU_SCL = bScl; IMU_ADDR = a; IMU_ID = (uint16_t)(v<0 ? 0 : v);
+					}
+				}
 			}
+			PinRest(bSda); PinRest(bScl);
 		}
-		pairRelease(sda, scl);
 	}
 	progressEnd();
 	if(IMU_SDA==PIN_NONE){
 		IMU_SDA = keep[0]; IMU_SCL = keep[1];
-		err(found ? "i2c devices found, no known IMU" : (n<2 ? "fewer than 2 free pins with a pull-up" : "no i2c device answers"));
+		err(found ? "i2c devices found, no known IMU" : "no IMU answers on any pair of free pins");
 		return;
+	}
+	for(uint8_t k=0;k<2;k++){    //the main firmware's I2C needs the board's pull-ups (the soft bus did not)
+		uint8_t p = (uint8_t)(k ? IMU_SCL : IMU_SDA);
+		pinMode(p, INPUT_PULLDOWN); WaitUs(50);
+		if(!digitalRead(p)){ warn("no pull-up on the board: the main firmware's I2C needs one"); kvp("no_pullup", p); }
+		PinRest(p);
 	}
 	kvp("imusda", IMU_SDA);
 	kvp("imuscl", IMU_SCL);

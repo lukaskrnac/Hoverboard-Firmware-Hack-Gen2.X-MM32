@@ -467,35 +467,45 @@ static uint8_t debuggerAttached(void){
 	return (*(volatile uint32_t*)0xE000EDF0&1u)!=0;    //DHCSR C_DEBUGEN (no CoreDebug in core_cm0.h)
 }
 
-//Releases the free pins one at a time; before each the pin is saved as LATCHPIN. If the board switches
-//off, it was the latch: the next start holds it. If all pins pass, the board has no latch (slave board).
-void LatchFind(void){
-	if(debuggerAttached()) warn("debugger attached: may power the MCU");
-	note("release button; board turns off at the latch: turn it on again");
-	Wait(2000);
+//Two phases, the user in between. 1: every free pin is driven high (an internal pull-up is too weak for
+//many latch transistors: the board went off as soon as the button was let go) and PinFinder waits: the user
+//lets go of the power button (removes the short) and sends any key / Continue. 2: the free pins are
+//released (pulled down) one at a time and STAY released; before each the pin is saved as LATCHPIN. The board
+//switches off when the last pin holding it is released (a board held by either of two pins too): the next
+//start drives that pin. Still on after all pins: no latch (slave board). Esc in phase 1 cancels.
+static uint8_t latchCand(uint16_t p){ return PinFree(p)&&p!=TXPIN&&p!=RXPIN; }
+static void latchRestore(void){
+	LATCHPIN = PIN_NONE;
 	holdAll = 1;
-	uint16_t keep = LATCHPIN;
-	LATCHPIN = PIN_NONE;
-	releasePins();
-	if(keep<PINCOUNT){ pinMode(keep, INPUT_PULLUP); }
-	for(uint16_t p=0;p<PINCOUNT;p++){
-		if(!PinFree(p)||p==TXPIN||p==RXPIN) continue;
-		LATCHPIN = p;
-		CfgSave();
-		LATCHPIN = PIN_NONE;
-		kvp("trying", p);
-		pinMode((uint8_t)p, INPUT_PULLDOWN);
-		Wait(400);
-		pinMode((uint8_t)p, INPUT_PULLUP);
-		Wait(100);
-	}
-	LATCHPIN = PIN_NONE;
-	CfgSave();
-	holdAll = 0;
 	master = 0;
 	releasePins();
+}
+void LatchFind(void){
+	if(debuggerAttached()) warn("debugger attached: may power the MCU");
+	LATCHPIN = PIN_NONE;
+	holdAll = 1;
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		if(latchCand(p)){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 1); }
+	}
+	note("all free pins high: let go of the power button (remove the short), then press Continue (any key)");
+	for(uint32_t t=millis;!aborted();){
+		if(millis-t>120000){ latchRestore(); err("no Continue within 2 min"); return; }
+	}
+	if(abortKey==0x1b){ latchRestore(); err("cancelled"); return; }
+	note("still on: releasing the pins one at a time; the board switches off at the latch, then switch it on again");
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		if(!latchCand(p)) continue;
+		LATCHPIN = p;
+		CfgSave();    //saved before the release: if the board goes off now, the next start holds this pin
+		LATCHPIN = PIN_NONE;
+		kvp("trying", p);
+		pinMode((uint8_t)p, INPUT_PULLDOWN);    //stays released
+		Wait(400);
+	}
+	CfgSave();    //LATCHPIN none again
+	latchRestore();
 	kvp("latch", PIN_NONE);
-	note("still powered: no latch (slave?)");
+	note("still powered with every pin released: no latch (slave board, or the button still held)");
 	ok();
 }
 
