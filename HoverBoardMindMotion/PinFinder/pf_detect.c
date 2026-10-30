@@ -467,9 +467,10 @@ static uint8_t debuggerAttached(void){
 	return (*(volatile uint32_t*)0xE000EDF0&1u)!=0;    //DHCSR C_DEBUGEN (no CoreDebug in core_cm0.h)
 }
 
-//Two phases, the user in between. 1: every free pin is driven high (an internal pull-up is too weak for
-//many latch transistors: the board went off as soon as the button was let go) and PinFinder waits: the user
-//lets go of the power button (removes the short) and sends any key / Continue. 2: the free pins are
+//Two phases, the user in between. 1: every free pin is pulled up (never driven: no pin is an output before
+//it is known) and PinFinder waits: the user lets go of the power button (removes the short) and sends any
+//key / Continue. If the pull-ups cannot hold the board it goes off here: the latch is then set by hand
+//(set latch <pin>, driven at once). 2: the free pins are
 //released (pulled down) one at a time and STAY released; before each the pin is saved as LATCHPIN. The board
 //switches off when the last pin holding it is released (a board held by either of two pins too): the next
 //start drives that pin. Still on after all pins: no latch (slave board). Esc in phase 1 cancels.
@@ -484,10 +485,8 @@ void LatchFind(void){
 	if(debuggerAttached()) warn("debugger attached: may power the MCU");
 	LATCHPIN = PIN_NONE;
 	holdAll = 1;
-	for(uint16_t p=0;p<PINCOUNT;p++){
-		if(latchCand(p)){ pinMode((uint8_t)p, OUTPUT); digitalWrite((uint8_t)p, 1); }
-	}
-	note("all free pins high: let go of the power button (remove the short), then press Continue (any key)");
+	releasePins();    //pulled up
+	note("all free pins pulled up: let go of the power button (remove the short), then press Continue (any key). Off at once: set the latch by hand");
 	for(uint32_t t=millis;!aborted();){
 		if(millis-t>120000){ latchRestore(); err("no Continue within 2 min"); return; }
 	}

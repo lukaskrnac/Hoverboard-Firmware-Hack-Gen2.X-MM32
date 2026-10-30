@@ -75,6 +75,7 @@ static void setWord(const char* name, const char* val){
 	}
 	pinstorage[idx] = (uint16_t)v;
 	if(&pinstorage[idx]==&INVERT_LOWSIDE) MotorInit();    //the gate polarity at once (TIM1_init reads it)
+	if(&pinstorage[idx]==&LATCHPIN) LatchHold();    //a latch set by hand is driven at once (none: pull-ups again)
 	CfgPrint((uint8_t)idx);
 	ok();
 }
