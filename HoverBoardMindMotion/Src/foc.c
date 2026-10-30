@@ -480,9 +480,19 @@ void FocControl(void){
 		//on/off: the wheel coasted past a position target, the speed loop wound up meanwhile and fired
 		//-13.5 A of braking once the bus fell back: the bus jumped to ~60 V and the board lost power
 		//(F031 bench). regenLim stops the speed loop's integrator in the braking direction.
+		//Above BAT_FULL the braking power is burnt in the motor first: negative d current (no torque, only
+		//copper loss) up to the current limit at BAT_FULL + 0.5 V; only then the braking current falls, to 0
+		//at + 1.5 V. A bench supply cannot sink and the bus capacitors take ~0.1 J per 3 V (a wheel at
+		//3 turns/s carries ~2 J): with the braking cut the wheel coasted past position targets (F031: a half
+		//turn overshot 9-16 steps, the bus at the limit, then CURRENT_LIMIT_VIOLATION on the way back).
 		regenLim = 0;
 		if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL&&((iqRef>0&&realspeed>0)||(iqRef<0&&realspeed<0))){
-			int32_t lim = iqmax*((int32_t)BAT_FULL+1000-vbat*10)/1000;
+			int32_t over = vbat*10-(int32_t)BAT_FULL;
+			int32_t dump = imax*(over>500 ? 500 : over)/500;
+			if(idRef>-dump) idRef = -dump;
+			focIdNow = idRef;
+			int32_t lim = MCM_Sqrt((imax/10)*(imax/10)-(idRef/10)*(idRef/10))*10;
+			if(over>500) lim = lim*(1500-over)/1000;
 			if(lim<0) lim = 0;
 			if(iqRef>lim){ iqRef = lim; regenLim = 1; }
 			else if(iqRef<-lim){ iqRef = -lim; regenLim = 1; }
