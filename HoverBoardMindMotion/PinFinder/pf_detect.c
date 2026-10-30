@@ -491,15 +491,31 @@ void LatchFind(void){
 		if(millis-t>120000){ latchRestore(); err("no Continue within 2 min"); return; }
 	}
 	if(abortKey==0x1b){ latchRestore(); err("cancelled"); return; }
-	note("still on: releasing the pins one at a time; the board switches off at the latch, then switch it on again");
+	note("still on: releasing the pins one at a time; at the latch the supply drops and the pin is held again");
+	//the latch pin is found by the supply dropping right after its release (battery pin, else the MCU supply):
+	//the pin is pulled up again at once and the board stays on. Waiting for the board to die instead saved a
+	//later pin: its capacitors kept it running for a while after the latch let go
+	int32_t vb0 = VbatMv(), vd0 = VddMv();
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		if(!latchCand(p)) continue;
 		LATCHPIN = p;
-		CfgSave();    //saved before the release: if the board goes off now, the next start holds this pin
+		CfgSave();    //saved before the release: if the board goes off at once, the next start holds this pin
 		LATCHPIN = PIN_NONE;
 		kvp("trying", p);
 		pinMode((uint8_t)p, INPUT_PULLDOWN);    //stays released
-		Wait(400);
+		for(uint32_t t=millis;millis-t<(vb0>0 ? 400u : 1500u);){
+			int32_t vb = VbatMv(), vd = VddMv();
+			if((vb0>0&&vb<vb0*9/10)||vd<vd0-150){    //the supply falls: this is the latch
+				pinMode((uint8_t)p, INPUT_PULLUP);
+				LATCHPIN = p;
+				LatchHold();    //confirmed: driven from now on
+				CfgSave();
+				if(vb0>0) kvmv("battery_dropped_to", vb);
+				kvp("latch", p);
+				ok();
+				return;
+			}
+		}
 	}
 	CfgSave();    //LATCHPIN none again
 	latchRestore();
