@@ -76,9 +76,8 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         SystemCoreClock (-150 B in both images). Register maps (2026-10-31, imumath.c table shared with
         PinFinder's calibrate imu): InvenSense (default), ICM-42605/42688, BMI160, LSM6DS3/DS3TR-C/DSO, QMI8658
         from their datasheets (+-4 g, gyro scaled to 32.8 LSB per deg/s); only the InvenSense map tried on
-        hardware; BMI270 not supported (needs an 8 KB config upload). Open: a non axis-aligned mounting is only
-        levelled (pitch / roll stay about the nearest axes): needs a rotation from calibrate imu (config words +
-        float matrix in both images): no flash for it (SPIN25 16 B free).
+        hardware; BMI270 not supported (needs an 8 KB config upload). A non axis-aligned mounting: not needed (user
+        2026-10-31: boards are mounted along the axes).
       - **Done:** charger detect pin (`detect charger`, tried by the user) and the hall angle calibration
         (`calibrate hall`, see Calibrations).
       - **Done (2026-10-28): infrared foot sensors** (`detect ir`: ir1, ir2, irmode = level + pull per sensor,
