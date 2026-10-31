@@ -1,5 +1,48 @@
 //IMU mounting and angle math (imumath.h)
 #include "imumath.h"
+#include "i2c.h"
+
+extern volatile uint32_t millis;
+
+//InvenSense MPU-6050/6500/9250, ICM-206xx and clones (the default at 0x68 / 0x69), ICM-42605/42688,
+//BMI160, LSM6DS3/DS3TR-C/DSO (0x6A / 0x6B), QMI8658 (0x6A / 0x6B). Datasheet register maps; only the
+//InvenSense one tried on hardware (the bench board's MPU-6050 clone).
+static const ImuMap maps[] = {
+	{ { 0 }, 0x3B, 14, 0, 8, 6, 0, 0x6B, 0x01, 131, 34000, 3653,    //PWR_MGMT_1 run, 44 Hz low pass, 1000 dps, 4 g
+	  { 0x6B, 0x01, 0x6C, 0x00, 0x1A, 0x03, 0x1B, 0x10, 0x1C, 0x08 } },
+	{ { 0x42, 0x47 }, 0x1D, 14, 2, 8, 0, 0, 0x4E, 0x0F, 131, 13248, 2500,    //PWR_MGMT0 low noise, 1 kHz
+	  { 0x4E, 0x0F, 0xFF, 1, 0x4F, 0x26, 0x50, 0x46 } },
+	{ { 0xD1 }, 0x0C, 12, 6, 0, 0xFF, 1, 0x03, 0x14, 131, 1, 0,    //CMD acc / gyro normal mode, PMU_STATUS
+	  { 0x7E, 0x11, 0xFF, 5, 0x7E, 0x15, 0xFF, 81, 0x41, 0x05, 0x43, 0x01 } },
+	{ { 0x69, 0x6A, 0x6C }, 0x20, 14, 8, 2, 0, 1, 0x10, 0x48, 114, 25600, 2500,    //BDU + auto increment, 104 Hz
+	  { 0x12, 0x44, 0x10, 0x48, 0x11, 0x48 } },
+	{ { 0x05 }, 0x33, 14, 2, 8, 0, 1, 0x08, 0x03, 128, 25600, 0,    //auto increment little endian, 1024 dps
+	  { 0x02, 0x40, 0x03, 0x13, 0x04, 0x63, 0x08, 0x03 } },
+};
+
+const ImuMap* ImuMapFor(uint16_t addr, uint16_t id){
+	uint8_t a = (uint8_t)(addr&0xFE);
+	if(a!=0x68&&a!=0x6A) return 0;
+	for(uint8_t i=1;i<sizeof(maps)/sizeof(maps[0]);i++)
+		for(uint8_t k=0;k<3;k++) if(maps[i].ids[k]&&maps[i].ids[k]==id) return (i>=3)==(a==0x6A) ? &maps[i] : 0;    //entries 3, 4 at 0x6A
+	return a==0x68&&id!=0x24 ? &maps[0] : 0;
+}
+
+uint8_t ImuSetup(const ImuMap* m, uint8_t addr){
+	for(const uint8_t* p=m->init;p<m->init+sizeof(m->init)&&*p;p+=2){
+		if(*p==0xFF){ uint32_t t = millis; while(millis-t<p[1]); }
+		else if(!I2cWriteReg(addr, p[0], p[1])) return 0;
+	}
+	return 1;
+}
+
+void ImuParse(const ImuMap* m, const uint8_t* b, int16_t* raw){
+	for(uint8_t k=0;k<7;k++){
+		int16_t o = k<3 ? m->oa+2*k : (k==3 ? (m->ot==0xFF ? -1 : m->ot) : m->og+2*(k-4));
+		int32_t v = o<0 ? 0 : (int16_t)(m->le ? b[o]|b[o+1]<<8 : b[o]<<8|b[o+1]);
+		raw[k] = (int16_t)(k>3&&m->glsb4!=131 ? v*131/m->glsb4 : v);    //gyro in 32.8 LSB per deg/s
+	}
+}
 
 uint8_t ImuAxes(uint16_t mount, int8_t* ax){
 	if(mount==0||mount>36) return 0;

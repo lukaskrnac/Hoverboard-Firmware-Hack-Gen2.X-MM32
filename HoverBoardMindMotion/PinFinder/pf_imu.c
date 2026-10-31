@@ -125,12 +125,14 @@ void DetectImu(void){
 //driving: gravity gives up, and is kept as the level (the main firmware's zero pitch and roll). 2) It is
 //tilted forward (front down: the side the wheel moves to at positive speed) and held: gravity gains a
 //component along -forward, so forward is the largest change across up. Units 1/8 of the chip's (1 g = 1024).
-static uint8_t gravity(int16_t* g){    //accel averaged over 32 readings (~0.2 s)
+static uint8_t gravity(const ImuMap* mp, int16_t* g){    //accel averaged over 32 readings (~0.2 s)
 	int32_t s[3] = { 0, 0, 0 };
 	for(uint8_t n=0;n<32;n++){
-		uint8_t b[6];
-		if(!I2cRead((uint8_t)IMU_ADDR, 0x3B, b, 6)) return 0;
-		for(uint8_t k=0;k<3;k++) s[k] += (int16_t)(b[2*k]<<8|b[2*k+1]);
+		uint8_t b[14];
+		int16_t r[7];
+		if(!I2cRead((uint8_t)IMU_ADDR, mp->data, b, mp->n)) return 0;
+		ImuParse(mp, b, r);
+		for(uint8_t k=0;k<3;k++) s[k] += r[k];
 		Wait(5);
 	}
 	for(uint8_t k=0;k<3;k++) g[k] = (int16_t)(s[k]/256);
@@ -145,20 +147,21 @@ static int8_t dominant(const int32_t* v){    //chip axis code of the largest com
 
 void CalImu(void){
 	static const char axis[6][3] = { "+x", "+y", "+z", "-x", "-y", "-z" };
-	if(IMU_SDA>=PINCOUNT||IMU_SCL>=PINCOUNT||(IMU_ADDR&0xFE)!=0x68){ err("no IMU at 0x68/0x69 (detect imu)"); return; }
+	const ImuMap* mp = ImuMapFor(IMU_ADDR, IMU_ID);
+	if(IMU_SDA>=PINCOUNT||IMU_SCL>=PINCOUNT||!mp){ err("no supported IMU (detect imu)"); return; }
 	I2cPins((uint8_t)IMU_SDA, (uint8_t)IMU_SCL, 0);
 	I2cUnstick();
 	int16_t g0[3], g1[3], prev[3];
 	int32_t d[3] = { 0, 0, 0 }, n0 = 0;
-	uint8_t a = (uint8_t)IMU_ADDR, good = I2cWriteReg(a, 0x6B, 0x01)&&I2cWriteReg(a, 0x1C, 0x08), done = 0;
+	uint8_t good = ImuSetup(mp, (uint8_t)IMU_ADDR), done = 0;
 	note("keep the board still as when driving");
 	Wait(1500);
-	good = good&&gravity(g0);
+	good = good&&gravity(mp, g0);
 	for(uint8_t k=0;k<3;k++){ prev[k] = g0[k]; n0 += g0[k]*g0[k]; d[k] = g0[k]; }
 	int8_t up = dominant(d);
 	note("tilt the front down 20-60 deg, hold");
 	for(uint8_t t=0;good&&!done&&t<150&&!aborted();t++){    //~30 s
-		good = gravity(g1);
+		good = gravity(mp, g1);
 		//steady (within ~2 deg of the last reading) and turned more than ~15 deg across up
 		int32_t m = 0, h = 0;
 		for(uint8_t k=0;k<3;k++){

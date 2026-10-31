@@ -1,7 +1,7 @@
-//IMU (imu.h). The chip is read in the main loop every 10 ms: accel, temperature and gyro in one burst from
-//0x3B (14 bytes, big endian) over I2C1 by DMA (i2chw.c), started and polled from the main loop. Ranges
-//+-4 g and +-1000 deg/s, 44 Hz low pass. Once a second PWR_MGMT_1 is checked: a chip that was reset
-//(supply dip) is set up again. Bench board: a clone at 0x69 (WHO_AM_I 0x2E instead of 0x68) with the
+//IMU (imu.h). The chip is read in the main loop every 10 ms: accel, temperature and gyro in one burst
+//over I2C1 by DMA (i2chw.c), started and polled from the main loop; register maps in imumath.c (InvenSense,
+//ICM-426xx, BMI160, LSM6DS*, QMI8658). Ranges +-4 g and ~1000 deg/s. Once a second a register is checked:
+//a chip that was reset (supply dip) is set up again. Bench board: a clone at 0x69 (WHO_AM_I 0x2E instead of 0x68) with the
 //MPU-6050 register map (accel offsets at 0x06, self test at 0x0D-0x10).
 #include "imu.h"
 #include "i2c.h"
@@ -10,37 +10,26 @@
 #include "main.h"
 #include "imumath.h"
 
-#define REG_CONFIG 0x1A
-#define REG_GYRO_CONFIG 0x1B
-#define REG_ACCEL_CONFIG 0x1C
-#define REG_DATA 0x3B
-#define REG_PWR_MGMT_1 0x6B
-#define REG_PWR_MGMT_2 0x6C            //standby bits per axis: all 0
-#define PWR_RUN 0x01               //awake, clock from the X gyro's PLL
 #define ACC_LSB_G 8192.0f          //+-4 g
-#define GYRO_LSB_DPS 32.8f         //+-1000 deg/s
+#define GYRO_LSB_DPS 32.8f         //+-1000 deg/s (ImuParse scales every map to it)
 
 volatile uint8_t imuState;
 volatile int16_t imuRaw[7];
 static uint32_t imuT, checkT, angT;
 static uint8_t fails, nBias, angles;
+static const ImuMap* map;
 static int8_t ax[3] = { 0, 1, 2 };    //board X, Y, Z as chip axis codes (calibrate imu; else the chip's)
 static float acc[3], rate[3], bsum[3], bias[3], pitch0, roll0, pitch, roll;    //board axes, chip units / deg
 
-static uint8_t setup(void){
-	uint8_t a = (uint8_t)IMU_ADDR;
-	return I2cWriteReg(a, REG_PWR_MGMT_1, PWR_RUN)&&I2cWriteReg(a, REG_PWR_MGMT_2, 0)&&I2cWriteReg(a, REG_CONFIG, 0x03)
-	       &&I2cWriteReg(a, REG_GYRO_CONFIG, 0x10)&&I2cWriteReg(a, REG_ACCEL_CONFIG, 0x08);
-}
+static uint8_t setup(void){ return ImuSetup(map, (uint8_t)IMU_ADDR); }
 
 void ImuInit(void){
 	imuState = IMU_OFF;
 #ifdef FOC_TRACE
 	return;    //make TRACE=1 (a debug build): no IMU, for the room the trace needs
 #endif
-	if(IMU_SDA>=PINCOUNT||IMU_SCL>=PINCOUNT||(IMU_ADDR&0xFE)!=0x68) return;    //not configured / another map
-	//at 0x68 / 0x69 too, with other register maps (imuid from PinFinder): ICM-42605 / 42688, BMI160 / 270
-	if(IMU_ID==0x42||IMU_ID==0x47||IMU_ID==0xD1||IMU_ID==0x24) return;
+	map = ImuMapFor(IMU_ADDR, IMU_ID);
+	if(IMU_SDA>=PINCOUNT||IMU_SCL>=PINCOUNT||!map) return;    //not configured / not supported (BMI270)
 	//the level: gravity at rest (calibrate imu) is zero pitch and roll; not calibrated (unset words, read as
 	//-1 each: ~135 deg) the chip's own level
 	if(ImuAxes(IMU_MOUNT, ax)&&!(IMU_REST(0)==0xFFFF&&IMU_REST(1)==0xFFFF&&IMU_REST(2)==0xFFFF)){
@@ -88,7 +77,7 @@ void ImuPoll(void){
 	uint8_t s = I2cPoll();    //the running read (DMA)
 	if(s==I2C_BUSY) return;
 	if(s==I2C_DONE){
-		for(uint8_t k=0;k<7;k++) imuRaw[k] = (int16_t)(b[2*k]<<8|b[2*k+1]);
+		ImuParse(map, b, (int16_t*)imuRaw);
 		update();
 		imuState = IMU_RUNNING;
 		fails = 0;
@@ -100,18 +89,18 @@ void ImuPoll(void){
 	imuT = millis;
 	if(millis-checkT>=1000){    //reset (it sleeps again) or never answered: set up again (~0.3 ms)
 		checkT = millis;
-		if(I2cReadReg((uint8_t)IMU_ADDR, REG_PWR_MGMT_1)!=PWR_RUN){
+		if(I2cReadReg((uint8_t)IMU_ADDR, map->chk)!=map->run){
 			I2cUnstick();
 			if(!setup()){ imuState = IMU_NO_ANSWER; return; }
 		}
 	}
-	I2cReadAsync((uint8_t)IMU_ADDR, REG_DATA, b, 14);
+	I2cReadAsync((uint8_t)IMU_ADDR, map->data, b, map->n);
 }
 
 float ImuValue(uint8_t k){
 	if(imuState!=IMU_RUNNING||k>8) return __builtin_nanf("");
 	if(k<3) return acc[k]*(9.80665f/ACC_LSB_G);
 	if(k<6) return rate[k-3]/GYRO_LSB_DPS;
-	if(k==6) return (float)imuRaw[3]/340.0f+36.53f;    //MPU-6050 temperature scale
+	if(k==6) return map->ot==0xFF ? __builtin_nanf("") : (float)imuRaw[3]*100.0f/(float)map->tdiv+(float)map->t0*0.01f;
 	return k==7 ? pitch : roll;
 }

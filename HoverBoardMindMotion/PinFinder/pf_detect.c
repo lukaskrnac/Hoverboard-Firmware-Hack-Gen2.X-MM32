@@ -667,16 +667,19 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		int32_t r = (int32_t)cfgOrDefault(MOTOR_R, 300);
 		kvi("iphasegain_from_motorr", mv*10000/r/((amp[a]+amp[b])/2));    //0.1 mA per count
 	}
-	//bus current pin: phase X high, the others low (k = 4X-7: cos = 1 for X), sampled in the active vector
-	if(IPHASEAPIN>=PINCOUNT){ ok(); return; }
+	//bus current pin: phase X high, the others low (k = 4X-7: cos = 1 for X), sampled in the active vector.
+	//Without phase current pins the reference is the static field's current V / motorr (phase A high): it
+	//finds the pin and its zero (the intercept, whatever the scale); the divider then needs the shunt value
+	uint8_t nophase = IPHASEAPIN>=PINCOUNT;
+	int32_t rm = (int32_t)cfgOrDefault(MOTOR_R, 300);
 	int32_t gain = (int32_t)cfgOrDefault(IPHASE_GAIN, 515);    //0.1 mA per count
 	uint8_t pa = (uint8_t)(IPHASE_CFG&3), ph[2] = { (uint8_t)(pa==1 ? 1 : 0), (uint8_t)(pa==0 ? 1 : 2) };
 	int8_t ca = AdcChannel(IPHASEAPIN), cb = AdcChannel(IPHASEBPIN);
 	int8_t sg = (IPHASE_CFG&4) ? 1 : -1;
-	uint8_t x = (uint8_t)(3-ph[0]-ph[1]);    //the phase without a pin is high: I = -(Ia + Ib)
+	uint8_t x = nophase ? 0 : (uint8_t)(3-ph[0]-ph[1]);    //the phase without a pin is high: I = -(Ia + Ib)
 	uint8_t kx = (uint8_t)((4*x+12-7)%12);
 	//phase x's current from the phase current pins (I_x = -(I_a + I_b)), mA
-	#define PHASE_X_MA() (-(((v[ca]-zero[ca])/16)*sg+((v[cb]-zero[cb])/16)*sg)*gain/10)
+	#define PHASE_X_MA() (nophase ? mv*(s+3)/4*1000/rm : -(((v[ca]-zero[ca])/16)*sg+((v[cb]-zero[cb])/16)*sg)*gain/10)
 	//8 levels (0.75 .. 2.5 x mv), every candidate pin sampled in the middle of the active vector, one channel
 	//per conversion (a scan converts its channels ~1.7 us apart, the window is ~+-7 us). The bus pin is the
 	//one that rises steadily with the current (op-amp inputs read high-impedance noise there: flat or jumpy)
@@ -752,14 +755,15 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	int32_t div = (int32_t)(4096000.0f/(slope*(float)VddMv()));    //divider = A / V = 1 / (counts per A x VDD / 4096)
 	kvi("counts_per_a_x100", (int32_t)(slope*100.0f));
 	kvi("zero_counts_x100", (int32_t)(z*100.0f));
+	if(nophase) div = 0;    //the reference was a model: no divider from it
 	if(shunt_uohm>0){
 		//the shunt value is the reference: counts per A = R x 4096 / VDD; the phase currents read the measured
 		//slope / that too high, so the phase gain scales by it
 		float cTrue = (float)shunt_uohm*4.096f/(float)VddMv();    //uOhm * 4096 / mV / 1000
 		int32_t g = (int32_t)((float)gain*slope/cTrue);    //(the zero is in counts: unchanged)
 		div = (int32_t)(1000000.0f/(float)shunt_uohm);
-		if(g>50&&g<5000){ IPHASE_GAIN = (uint16_t)g; kvi("iphasegain", g); }
-	}
+		if(!nophase&&g>50&&g<5000){ IPHASE_GAIN = (uint16_t)g; kvi("iphasegain", g); }
+	}else if(nophase) note("no phase current pins: give the shunt value for the divider (detect current <mV> <mOhm>)");
 	if(div>0&&div<65535){ ITOTAL_DIVIDER = (uint16_t)div; kvi("itotaldivider", div); }
 	ITOTAL_ZERO = (uint16_t)(z<0.0f ? (int32_t)(-z*100.0f) : 0);
 	kvi("itotalzero", ITOTAL_ZERO);

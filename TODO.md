@@ -57,7 +57,9 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         the active vector (one phase high) sampled in its middle, one channel per conversion, against
         I_x = -(I_a + I_b): 8 linear points, 2.35 counts/A, zero -3.5..-4.6 counts -> itotaldivider ~330,
         itotalzero ~400 (blockcal.py's 419 / 145 was wrong: the shunt is R003, see Calibrations). Boards
-        without phase current pins: the bus pin is not searched yet (needs a reference: motorr).
+        without phase current pins (2026-10-31): the bus pin and its zero from the static field's current V /
+        motorr; the divider from the shunt value (without it: a note, the divider kept). F031 with the phase
+        pins forced off in a test build: PA7 filtered, zero 4.39 / 4.70 counts (with phase pins 4.15), divider 200.
       - **Done (`detect imu`):** pull-up pins -> I2C pairs (a pair where > 8 addresses acknowledge is not I2C:
         bench PB3), id registers. Bench: unknown chip at 0x69 on SDA PD0 / SCL PD1, WHO_AM_I (0x75) = 0x2E,
         reg 0x0F = 0x7D, reg 0x00 = 0 (a clone? identify, then read it in the main firmware). Words 83-86.
@@ -71,8 +73,12 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
         0x150-0x159. Mounting (`calibrate imu`, words 97-100): board axes, gyro bias, pitch / roll by a
         complementary filter (bench: signs and level verified by tilting the board). PinFinder space: the
         config name table and the IMU chip table packed (-480 B), messages shortened, UART baud from
-        SystemCoreClock (-150 B in both images). Open: other register maps (ICM-426xx, BMI160/270, LSM6DS*,
-        QMI8658); a non axis-aligned mounting is only levelled (pitch / roll stay about the nearest axes).
+        SystemCoreClock (-150 B in both images). Register maps (2026-10-31, imumath.c table shared with
+        PinFinder's calibrate imu): InvenSense (default), ICM-42605/42688, BMI160, LSM6DS3/DS3TR-C/DSO, QMI8658
+        from their datasheets (+-4 g, gyro scaled to 32.8 LSB per deg/s); only the InvenSense map tried on
+        hardware; BMI270 not supported (needs an 8 KB config upload). Open: a non axis-aligned mounting is only
+        levelled (pitch / roll stay about the nearest axes): needs a rotation from calibrate imu (config words +
+        float matrix in both images): no flash for it (SPIN25 16 B free).
       - **Done:** charger detect pin (`detect charger`, tried by the user) and the hall angle calibration
         (`calibrate hall`, see Calibrations).
       - **Done (2026-10-28): infrared foot sensors** (`detect ir`: ir1, ir2, irmode = level + pull per sensor,
@@ -117,14 +123,19 @@ it shares `hardware.c`, the HAL, the config layout (`pinout.h`) and the flasher.
       MM32F031 board: same die as the SPIN05 (IDCODE 0xCC4460B1, 32 KB), PinFinder answers on PB6/PB7;
       paused (hardware trouble on that board). Stock firmware: `backups/` (not in git).
       Open:
-      - SPIN06 / SPIN25 untested on hardware; their IDCODEs are unknown. Runtime check (PinFinder
-        reports the chip and refuses a firmware for another MCU; the flasher checks before programming):
-        needs the IDCODEs first. SPIN05 and F031 cannot be told apart by IDCODE (same die).
+      - SPIN06 / SPIN25 untested on hardware. IDCODEs (DBGMCU_IDCODE 0x40013400), researched 2026-10-31
+        (scratch idcode-research/REPORT.md): SPIN05 / F031 0xCC4460B1 (UM + hardware); SPIN06 0xCC5680C1
+        (UM_MM32SPIN06x_s_EN 1.01 table 82, no hardware read published); SPIN2x 0xCC56A091 (UM_MM32SPIN2x_p_SC
+        1.19 28.3.2; a real SPIN27 reads 0xCC56A097 in Black Magic Probe's stm32f1.c: the last digit is likely
+        the revision); SPIN25 nothing chip specific (same UM / pack / header as the SPIN27). No flash size
+        register on any of them; UID at 0x1FFFF7E8. Runtime check (PinFinder reports the chip and refuses a
+        firmware for another MCU; the flasher checks before programming): compare with the last digit masked
+        (0xCC5680C0 / 0xCC56A090), log unknown ids rather than refuse until read on real boards.
       - PinFinder on SPIN25: `detect current` scans ADC pins, but the op-amp outputs only drive their pins
         when enabled; enable OP1-3 during the scan (their pins must be free).
       - SPIN06 has 16 KB RAM / 64 KB flash, SPIN25 8 KB RAM: unused (all images use the 32 KB / 4 KB layout).
       - MM32F030 / the `origin/pinfinder-spin280` branch's MM32SPIN0280: not looked at.
-- [ ] **P9 Still not detected / features to consider** (review, then promote to items):
+- [x] **P9 Still not detected / features to consider**: closed by the user 2026-10-31 (the rest not wanted or done):
       - E-stop input (bench PB0) and WS2812 header (PB12): detect + support (E-stop = disarm like the
         CANSimple Estop; WS2812 status LED like the RGB LED).
       - (Done since: pole count, motor R / L, kv, battery divider, battery cell count -> full / empty: see
@@ -433,7 +444,7 @@ Done: DRV_FAULT (break input only; the adc watchdog just holds the gates off 2 p
 DRV_FAULT/spinout/regen, overflows, FOC voltage mode regen limit, gates off during a config save, config
 magic written last, range checks (baud, node id, poles, pins), invlowside = 1 only, v1 speed clamp.
 Open:
-- [ ] Flash is nearly full: SPIN25 main image 24 B free, SPIN05 164 B. Next feature needs savings first.
+- [x] Flash room (2026-10-31, three refactor rounds, -1.3 KB): clean builds SPIN05/06 31268, SPIN25 31380 (364 B free), F031 31240 of 31744 B.
 - [ ] Not tried on hardware: the v1 latch path, the adc watchdog hold with a real over-current, a board with
       an OCP comparator (the bench DRV_FAULT test used software break events over SWD).
 - [ ] A config page erase (every 4th save) is still a ~25 ms window where a power cut loses the config
