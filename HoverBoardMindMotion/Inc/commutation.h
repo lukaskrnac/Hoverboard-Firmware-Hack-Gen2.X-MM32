@@ -26,8 +26,11 @@
 //inverted low sides (invlowside) "disabled" was "on": the open phase's low side conducted (the motor
 //braked itself every step: 6 W unloaded at 50 rpm, shaking) and so did the chopping phase's own (shoot
 //through in every on-time). Channel with only CCxNE (low side): N follows OCxREF; with both (the
-//chopping high side): N is its complement, the low side rectifies in the off-time.
-#define BLOCK_CCER_LOW (TIM_CCER_CC1NEN|TIM_CCER_CC2NEN|TIM_CCER_CC3NEN)
+//chopping high side): N is its complement, the low side rectifies in the off-time. Only with inverted low
+//sides: on a board with normal ones the disabled outputs are off as wanted, and the rectifying low side
+//let the current reverse at low duty (SPIN05 bench: a 3 turn block position move braked into
+//DC_BUS_OVER_CURRENT and overshot 0.67 turns; without it 0.02).
+#define BLOCK_CCER_LOW (INVERT_LOWSIDE==1 ? TIM_CCER_CC1NEN|TIM_CCER_CC2NEN|TIM_CCER_CC3NEN : 0)
 static inline uint32_t BlockOcMode(uint32_t ccer, uint8_t k){
 	uint32_t c = ccer>>(4*k)&(TIM_CCER_CC1EN|TIM_CCER_CC1NEN);
 	return c==TIM_CCER_CC1NEN ? TIM_ForcedAction_Active : (c ? TIM_OCMode_PWM1 : TIM_ForcedAction_InActive);

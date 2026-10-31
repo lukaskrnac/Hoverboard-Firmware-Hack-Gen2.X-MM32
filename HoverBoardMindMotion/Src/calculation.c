@@ -71,10 +71,10 @@ void SpeedParams(uint8_t mode, SpeedPlant* p){    //config fields, 0 = default
 	static const uint16_t def[2][5] = { { 50, 100, 0, 355, 53 }, { 5, 85, 0, 242, 10 } };
 	uint8_t s = mode==SINE_SPEED;
 	int32_t* f = &p->kp;
-	for(uint8_t k=0;k<5;k++) f[k] = cfgOrDefault(pinstorage[w[s][k]], def[s][k]);
+	for(uint8_t k=0;k<5;k++) f[k] = cfgDef(pinstorage[w[s][k]], def[s][k]);
 	p->tref = s ? 100 : 350;
 	//above 100 % the sine path turns the excess into phase advance (field weakening), if enabled
-	p->umax = s&&cfgOrDefault(FW_ADVANCE, 0) ? (1220<<8) : SPD_UMAX;
+	p->umax = s&&cfgDef(FW_ADVANCE, 0) ? (1220<<8) : SPD_UMAX;
 }
 
 void SpeedCtrlReset(void){

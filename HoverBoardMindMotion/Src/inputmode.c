@@ -25,7 +25,7 @@ static float rel;          //position set point - base, steps
 static uint8_t planned;
 static float Xi, Xf, Vi, Ar, Dr, Vr, Ta, Tv, Td, Tf, yAcc, t;    //the trapezoid, as ODrive names it
 
-static float centi(uint16_t w, int32_t def){ return (float)cfgOrDefault(w, def)/100.0f; }
+static float centi(uint16_t w, int32_t def){ return (float)cfgDef(w, def)/100.0f; }
 static int32_t roundF(float f){ return (int32_t)(f<0 ? f-0.5f : f+0.5f); }
 
 static float sqrtF(float x){    //Newton from the exponent halved (soft float: no sqrtf from libm)
@@ -47,7 +47,7 @@ int32_t InputTorque(int32_t cmd, int32_t dtms, uint8_t held){
 	if(held) trqSp = 0.0f;    //armed again: from 0
 	else if(InputMode()!=IM_TORQUE_RAMP) trqSp = (float)cmd;
 	else{
-		float st = (float)cfgOrDefault(TORQUE_RAMP_RATE, 1)*(float)dtms/(TorqueConstant()*1000.0f);    //0.01 Nm/s -> 0.01 A
+		float st = (float)cfgDef(TORQUE_RAMP_RATE, 1)*(float)dtms/(TorqueConstant()*1000.0f);    //0.01 Nm/s -> 0.01 A
 		float d = (float)cmd-trqSp;
 		trqSp += d>st ? st : (d<-st ? -st : d);
 	}
@@ -155,7 +155,7 @@ int32_t InputPos(int32_t target, int32_t ffRpm, int32_t dtms, int32_t* velFf){
 			//and the speed it can still stop from at that rate. Unlimited, a half turn at bandwidth 4 asked
 			//for 32 turns/s^2 against the loop's 20: the wheel fell 40 steps behind, caught up at 233 rpm
 			//(the set point ~90) and overshot the target by 3.6-4.4 steps. Small moves stay the plain filter.
-			float am = centi(POS_ACCEL, 2000)*spt*0.75f, vm = (float)cfgOrDefault(POS_RPM, 300)*spt/60.0f;
+			float am = centi(POS_ACCEL, 2000)*spt*0.75f, vm = (float)cfgDef(POS_RPM, 300)*spt/60.0f;
 			if(acc>am) acc = am; else if(acc<-am) acc = -am;
 			accSp = acc;
 			inVelSp += dt*acc;

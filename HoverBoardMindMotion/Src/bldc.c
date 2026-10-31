@@ -43,9 +43,9 @@ static int32_t posI;              //position I, rpm << 4
 static int32_t PosID(int32_t errF, int32_t ff, int32_t meas, int32_t dtms, int32_t vlim, uint8_t run){
 	if(!run){ posI = 0; return 0; }
 	if(errF>4*POS_FINE||errF<-4*POS_FINE) posI = 0;
-	else posI += cfgOrDefault(POS_KI, 0)*errF/POS_FINE*dtms*16/10000;
+	else posI += cfgDef(POS_KI, 0)*errF/POS_FINE*dtms*16/10000;
 	if(posI>vlim<<4) posI = vlim<<4; else if(posI<-(vlim<<4)) posI = -(vlim<<4);
-	return (posI>>4)+cfgOrDefault(POS_KD, 0)*(ff-meas)/100;
+	return (posI>>4)+cfgDef(POS_KD, 0)*(ff-meas)/100;
 }
 
 //speed for the FOC speed loop: fastspeed (the last hall interval) below 60 rpm, realspeed (6 intervals,
@@ -74,7 +74,7 @@ static int32_t FocSpeedMeas(void){ return LowSpeedMeas(); }
 //(60 overshot short moves by 0.13 turns)
 int32_t PosGain(void){
 	static const uint8_t def[3] = { 20, 60, 133 };    //block, sine, FOC
-	return cfgOrDefault(POS_KP, def[COMMUTATION(DRIVEMODE)]);
+	return cfgDef(POS_KP, def[COMMUTATION(DRIVEMODE)]);
 }
 
 uint8_t lowbatcount=0;
@@ -105,7 +105,7 @@ uint8_t hallpos(uint8_t forward){
 
 	//inverted halls (HALL_INVERT, PinFinder's detect hall): 7 - state, like the other direction
 	HallValue = (uint8_t)(HallC*4 + HallB*2 + HallA);
-	if((forward == 1) == cfgBool(HALL_INVERT, 0)) HallValue = (uint8_t)(7-HallValue);
+	if((forward == 1) == cfgFlag(HALL_INVERT, 0)) HallValue = (uint8_t)(7-HallValue);
 
 	//return hall_to_pos[HallValue];
 	return HallValue;
@@ -165,16 +165,16 @@ void speedupdate(void){
 		//The temperature over the limit for 0.5 s (250 passes): single readings glitch at high current (a hard
 		//speed step tripped it at ~40 C), a real temperature does not change that fast.
 		static uint8_t hot, hotN;
-		int32_t tl = cfgOrDefault(TEMP_LIMIT, 85)*10, tc = McuTemp();
+		int32_t tl = cfgDef(TEMP_LIMIT, 85)*10, tc = McuTemp();
 		if(tc<=tl) hotN = 0; else if(hotN<250) hotN++;
 		if(hotN>=250) hot = 1; else if(tc<tl-50) hot = 0;
 		//derating (TEMP_DERATE, off by default): the limit falls from 100 % at templimit - band to 0 at templimit,
 		//slewed 1/1024 per pass (~2 s for the full range: single glitched readings do not jerk the motor)
 		//(target (tl - tc) * 1024 / band, compared without the division)
-		int32_t band = cfgOrDefault(TEMP_DERATE, 0)*10, dr = (tl-tc)*1024-derate*band;
+		int32_t band = cfgDef(TEMP_DERATE, 0)*10, dr = (tl-tc)*1024-derate*band;
 		if((!band||dr>0)&&derate<1024) derate++; else if(dr<0&&derate>0) derate--;
 		uint32_t trip = (hot ? ERR_INVERTER_OVER_TEMP : 0)|(overcurrent ? ERR_DC_BUS_OVER_CURRENT : 0)|
-		                (fitotal<-(int32_t)cfgOrDefault(REGEN_MAX, 6553)*10 ? ERR_DC_BUS_OVER_REGEN_CURRENT : 0);
+		                (fitotal<-(int32_t)cfgDef(REGEN_MAX, 6553)*10 ? ERR_DC_BUS_OVER_REGEN_CURRENT : 0);
 		//spinout (ODrive): FOC draws power (electrical > SPIN_ELEC W) while I_q * kt * speed says it brakes
 		//(mechanical < -SPIN_MECH W) for 50 ms: the rotor angle is wrong (hall angles, a slipped tracker).
 		//Both signed only with the phase currents. Bus power: vbat * the phase-derived bus current.
@@ -182,7 +182,7 @@ void speedupdate(void){
 		if(COMMUTATION(DRIVEMODE)==COMMUT_FOC&&FocSensing()&&!gatesoff){
 			float pe = (float)fvbat*(float)BusCurrent()*1e-4f;
 			float pm = (float)focIqF*1e-3f*TorqueConstant()*(float)realspeed*(6.2831853f/60.0f);
-			if(pe>(float)cfgOrDefault(SPIN_ELEC, 10)&&pm<-(float)cfgOrDefault(SPIN_MECH, 10)){ if(spin<25) spin++; }
+			if(pe>(float)cfgDef(SPIN_ELEC, 10)&&pm<-(float)cfgDef(SPIN_MECH, 10)){ if(spin<25) spin++; }
 			else spin = 0;
 		}else spin = 0;
 		if(spin>=25) trip |= ERR_SPINOUT_DETECTED;
@@ -194,7 +194,7 @@ void speedupdate(void){
 		if(cmdSource==2||idle||(speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)) v1Trip = 0;
 		if(trip&&cmdSource==2) axisDisarm |= trip;
 		else v1Trip |= trip&(ERR_SPINOUT_DETECTED|ERR_DC_BUS_OVER_REGEN_CURRENT|ERR_DRV_FAULT);
-		gatesoff = lowbatperm || axisDisarm || v1Trip || idle || hot || (charging&&cfgBool(CHARGE_LOCK, 0));
+		gatesoff = lowbatperm || axisDisarm || v1Trip || idle || hot || (charging&&cfgFlag(CHARGE_LOCK, 0));
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a
 		//bench supply: coast while the bus is 3 V above the full battery voltage
@@ -214,7 +214,7 @@ void speedupdate(void){
 		//through the body diodes). Estop / IDLE still switch the gates off at once.
 		int32_t posErr = 0, posSpeed = 0;
 		uint8_t posRest = 0;    //FOC position without the hold: at the target, standing
-		int32_t vlim = cfgOrDefault(POS_RPM, 300);    //vel_limit, rpm
+		int32_t vlim = cfgDef(POS_RPM, 300);    //vel_limit, rpm
 		int32_t dtms = (int32_t)(millis-inT);
 		inT = millis;
 		if(dtms>20) dtms = 20;
@@ -242,10 +242,10 @@ void speedupdate(void){
 		//and sine (voltage drives) cap their voltage at the one for vel_limit (block torque ran an unloaded wheel
 		//to 9.4 turns/s at vel_limit 3; a torque clamped to 0 coasted it there and the loop surged back to full
 		//duty at speed: the bench supply's 4.5 A limit browned the MCU out)
-		int32_t tvl = cfgBool(TORQUE_VEL_LIMIT, 1) ? vlim : 0;
+		int32_t tvl = cfgFlag(TORQUE_VEL_LIMIT, 1) ? vlim : 0;
 		//enable_overspeed_error: disarm above vel_limit * vel_limit_tolerance (ODrive)
-		if(cfgBool(OVERSPEED_ERROR, 0)&&!gatesoff){
-			int32_t lim = vlim*cfgOrDefault(VEL_LIMIT_TOL, 120)/100;
+		if(cfgFlag(OVERSPEED_ERROR, 0)&&!gatesoff){
+			int32_t lim = vlim*cfgDef(VEL_LIMIT_TOL, 120)/100;
 			if(realspeed>lim||realspeed<-lim) axisDisarm |= ERR_VELOCITY_LIMIT_VIOLATION;
 		}
 		uint8_t focPos = ctl==CTRL_POSITION&&COMMUTATION(DRIVEMODE)==COMMUT_FOC&&!held;
@@ -271,7 +271,7 @@ void speedupdate(void){
 			//1.7-1.9 s for half a turn, stopped a step short, and 10 turns asked 1800 rpm (vel_limit 30 turns/s):
 			//top speed, 1.2 turns overshoot, once 5.5 and a CURRENT_LIMIT_VIOLATION (block: the same P).
 			int32_t ae = errF<0 ? -errF : errF; if(ae>1000000) ae = 1000000;
-			int32_t ac = cfgOrDefault(POS_ACCEL, 2000);    //0.01 turns/s^2
+			int32_t ac = cfgDef(POS_ACCEL, 2000);    //0.01 turns/s^2
 			int32_t pl = (int32_t)MCM_Sqrt(ae/16*(ac*9/80))*2/3, sl = ac*3*dtms/5000+1;
 			int32_t p = errF/POS_FINE*PosGain()/10+(errF%POS_FINE)*PosGain()/10/POS_FINE;
 			if(focPos){
@@ -279,8 +279,8 @@ void speedupdate(void){
 				//target's electrical angle. (It was P with a +-1 step dead band at 2 rpm per step: a 1 step
 				//command did nothing, it stopped up to 4 deg off, ~1.2 s for half a turn.)
 				int32_t af = fastspeed<0 ? -fastspeed : fastspeed;
-				uint8_t holdOn = (uint8_t)cfgBool(HOLD_ENABLE, 1);
-				int32_t hw = cfgOrDefault(HOLD_WINDOW, 150)*POS_FINE/100;
+				uint8_t holdOn = (uint8_t)cfgFlag(HOLD_ENABLE, 1);
+				int32_t hw = cfgDef(HOLD_WINDOW, 150)*POS_FINE/100;
 				if(focHold){
 					int32_t dh = target-focHoldPos;
 					if(focHoldSlip||dh>3*POS_FINE||dh<-3*POS_FINE){ FocHoldStop(); FocSpeedReset(); }
@@ -332,7 +332,7 @@ void speedupdate(void){
 					if(ctl==CTRL_TORQUE){
 						i = tq*10;    //0.01 A
 						if(tvl){
-							int32_t kv = cfgOrDefault(FOC_SPD_KP, 30), hi = kv*(tvl-realspeed), lo = kv*(-tvl-realspeed);
+							int32_t kv = cfgDef(FOC_SPD_KP, 30), hi = kv*(tvl-realspeed), lo = kv*(-tvl-realspeed);
 							if(i>hi) i = hi; else if(i<lo) i = lo;
 						}
 					}else if(ctl==CTRL_POSITION){
@@ -396,7 +396,7 @@ void speedupdate(void){
 						int32_t v = vbat>1000 ? vbat : 2400;
 						SpeedPlant p;
 						SpeedParams(SINE_SPEED, &p);
-						int32_t r = cfgOrDefault(MOTOR_R, 300);
+						int32_t r = cfgDef(MOTOR_R, 300);
 						int32_t w = tvl&&fastspeed>tvl ? tvl : (tvl&&fastspeed<-tvl ? -tvl : fastspeed);    //back emf of at most vel_limit: brakes above it
 						int32_t mv = tq*(r>5000 ? 5000 : r)/100+w*5774/p.kv;    //(tq*10*r/1000 in 32 bit)
 						pwm = mv*5676/v+(tq>0 ? 1 : -1)*p.d0*32768/1000;

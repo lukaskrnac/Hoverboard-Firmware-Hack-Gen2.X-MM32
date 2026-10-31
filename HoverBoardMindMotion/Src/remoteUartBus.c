@@ -103,15 +103,14 @@ static int32_t v1Speed(int16_t v){
 }
 static uint8_t bConfigSave = 0;
 
+//a battery voltage from a config frame, V: 0 .. 60 taken (mV), anything else ignored
+static void __attribute__((noinline)) batSet(uint16_t* w, float v){
+	if(v>0&&v<60.0f) *w = (uint16_t)(v*1000);
+}
+
 static void ApplyConfig(const SerialServer2HoverConfig* pData){
-	if (	(pData->fBattFull > 0) && (pData->fBattFull < 60.0)	)
-	{
-		BAT_FULL = pData->fBattFull * 1000;
-	}
-	if (	(pData->fBattEmpty > 0) && (pData->fBattEmpty < 60.0)	)
-	{
-		BAT_EMPTY = pData->fBattEmpty * 1000;
-	}
+	batSet(&BAT_FULL, pData->fBattFull);
+	batSet(&BAT_EMPTY, pData->fBattEmpty);
 	SetDriveMode(pData->iDriveMode);    //ignored if not supported
 	if (pData->iSlaveNew >= 0 && pData->iSlaveNew <= 62)    //63: the CANSimple broadcast
 	       //-1: keep; the new id answers from now on, saved below
@@ -143,7 +142,7 @@ uint8_t RemoteTimedOut(void){
 
 void RemoteUpdate(void){
 
-	if (millis - iTimeLastRx > SERIAL_TIMEOUT){
+	if (RemoteTimedOut()){
 		speed = 0;
 	}
 	if (bConfigSave && speed == 0 && realspeed == 0)    //save only with the wheel stopped
@@ -229,20 +228,13 @@ static void feedV1(uint8_t cRead){
 
 			switch (iRxDataType)
 			{
-				case 0:
+				case 0:    //the two command frames: iSpeed at the same place, wState after iSteer in type 1
+				case 1:
 				{
 					SerialServer2Hover* pData = (SerialServer2Hover*) aReceiveBuffer;
 					speed = v1Speed(pData->iSpeed);
-					wState = pData->wState;
+					wState = iRxDataType ? ((SerialServer2HoverMaster*) aReceiveBuffer)->wState : pData->wState;
 					if(wState&STATE_SHUTOFF) powerOffReq = 1;    //the power button's shutdown (boards with a latch)
-					break;
-				}
-				case 1:
-				{
-					SerialServer2HoverMaster* pData = (SerialServer2HoverMaster*) aReceiveBuffer;
-					speed = v1Speed(pData->iSpeed);
-					wState = pData->wState;
-					if(wState&STATE_SHUTOFF) powerOffReq = 1;
 					break;
 				}
 				case 2:

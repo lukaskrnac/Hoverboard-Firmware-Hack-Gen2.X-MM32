@@ -164,8 +164,10 @@ void ADC1_COMP_IRQHandler(void){
 				if(vbat>0&&(vb>vbat+vbat/12||vb<vbat-vbat/12)&&vbHeld<3) vbHeld++;
 				else{ vbat = vb; vbHeld = 0; }
 				//a zero below adc 0 (ITOTAL_ZERO) reads 0 up to that current (0.76 A on the bench board), then
-				//the shifted value
-				itotal = shuntCurrent(analogRead(ITOTALPIN));
+				//the shifted value. The block brake (high sides off) draws nothing from the bus: 0. The shunt read up
+				//to 267 counts (~110 A) in its ramp from a near standstill, the 10 A soft limit disarmed block velocity
+				//mode at its start (SPIN05 bench, now and then).
+				itotal = blockbrake ? 0 : shuntCurrent(analogRead(ITOTALPIN));
 			}
 			uint8_t foc = COMMUTATION(DRIVEMODE)==COMMUT_FOC, sine = COMMUTATION(DRIVEMODE)==COMMUT_SINE;
 			//sine: the bus current from the active vectors (above; with phase pins FocMeasure() replaces it while
@@ -213,6 +215,12 @@ void ADC1_COMP_IRQHandler(void){
 				pwm_gen.Beta  = ipark1.Beta;
 				PWM_GEN_calc(&pwm_gen);
 				Update_PWM(&pwm_gen);
+				//bus above BAT_FULL + 0.5 V (regenerating into a full battery / a bench supply): the three low sides
+				//on, no switching (PWM2, CCR above ARR), the motor shorted, nothing into the bus (as the block brake).
+				//Sine has no current based regen limit: braking from 5 turns/s lifted the SPIN05 bench bus to 30.7 V
+				//and once tripped the supply's OVP. (The zero vector still switched: the short circuit current went
+				//through the diodes into the bus in every dead time.)
+				if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL+500) TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD+1;
 				FocObserve();
 			}else if(foc){
 				FocControl();

@@ -1,4 +1,5 @@
 #include "hardware.h"
+#include "pinout.h"
 
 //pins[]: port (IOA..IOD) in the high nibble, pin number in the low one
 #define P(port, n) (((port)-IOA)<<4|(n))
@@ -315,3 +316,6 @@ uint16_t analogRead(uint16_t io){    //the last conversion of the pin's channel;
 	}
 	return 0;
 }
+
+__attribute__((noinline)) int32_t cfgDef(uint16_t v, int32_t def){ return cfgOrDefault(v, def); }
+__attribute__((noinline)) int cfgFlag(uint16_t v, int def){ return cfgBool(v, def); }

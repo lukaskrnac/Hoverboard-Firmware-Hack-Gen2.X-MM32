@@ -154,6 +154,9 @@ extern uint8_t pwmDiv;
 #define CFG_VERSION_CURRENT 3    //2: BAUD in units of 100 baud, 3: input mode words 28-31, 35, 43
 
 static inline int32_t cfgOrDefault(uint16_t v, int32_t def){ return (v==0||v==0xFFFF) ? def : v; }
+//the same out of line (hardware.c), for the code outside the adc isr: inlined at every use they cost ~200 B
+int32_t cfgDef(uint16_t v, int32_t def);
+int cfgFlag(uint16_t v, int def);
 
 //the record a board without a saved configuration starts from (main firmware: does not boot; PinFinder:
 //detects into it). Layout version 0 values (baud 19200 in baud): ConfigMigrate() brings it up to date.

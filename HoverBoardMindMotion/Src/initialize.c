@@ -20,11 +20,11 @@ void io_init(void){
 	BuzzerInit();
 	static const uint8_t pull[] = { INPUT, INPUT, INPUT_PULLUP, INPUT_PULLDOWN };    //0 / 1 floating, 2 up, 3 down
 	if(CHARGEPIN<PINCOUNT){
-		uint32_t p = cfgOrDefault(CHARGE_PULL, 1);
+		uint32_t p = cfgDef(CHARGE_PULL, 1);
 		pinMode(CHARGEPIN, pull[p<=3 ? p : 0]);
 	}
 	for(uint8_t k=0;k<2;k++){    //infrared foot sensors: IR_MODE bits 2-3 (+4 for the second)
-		if(IR_PIN(k)<PINCOUNT) pinMode(IR_PIN(k), pull[cfgOrDefault(IR_MODE, 0)>>(4*k+2)&3]);
+		if(IR_PIN(k)<PINCOUNT) pinMode(IR_PIN(k), pull[cfgDef(IR_MODE, 0)>>(4*k+2)&3]);
 	}
 }
 
@@ -43,7 +43,7 @@ void BuzzerInit(void){
 	digitalWrite(BUZZERPIN, 0);
 	pinMode(BUZZERPIN, OUTPUT);
 	int8_t e = BuzzerEntry();
-	if(!cfgBool(BUZZER_PASSIVE, 0)||e<0) return;
+	if(!cfgFlag(BUZZER_PASSIVE, 0)||e<0) return;
 	uint8_t t = buzs[e].tim&3;
 	TIM_TypeDef* tim = (TIM_TypeDef*)(TIM14_BASE+0x400u*t);    //TIM14, TIM16, TIM17 are 0x400 apart
 	RCC->APB2ENR |= RCC_APB2ENR_TIM14<<t;                       //enable bits 16, 17, 18
@@ -61,7 +61,7 @@ void BuzzerInit(void){
 
 void BuzzerSet(uint8_t on){
 	if(BUZZERPIN>=PINCOUNT) return;
-	if(cfgBool(BUZZER_PASSIVE, 0)) pinMode(BUZZERPIN, on&&buzTimer ? OUTPUT_AF : OUTPUT);    //gpio: low
+	if(cfgFlag(BUZZER_PASSIVE, 0)) pinMode(BUZZERPIN, on&&buzTimer ? OUTPUT_AF : OUTPUT);    //gpio: low
 	else digitalWrite(BUZZERPIN, on);
 }
 
@@ -158,7 +158,7 @@ void TIM1_init(u16 arr, u16 psc){
 	//60 mA), the MOSFETs ran hot. 500 ns: twice the knee. It delays only the start of a low side window,
 	//before the counter's zero: the current samples come after it. MOE stays clear here as after the HAL's
 	//BDTR write: AOE sets it
-	uint32_t dt = cfgOrDefault(DEAD_TIME, 500)*72/1000;
+	uint32_t dt = cfgDef(DEAD_TIME, 500)*72/1000;
 	TIM1->BDTR = TIM_BDTR_OSSR|TIM_BDTR_OSSI|(dt>127 ? 127 : dt)|TIM_BDTR_BKEN|(AWDG ? TIM_BDTR_BKP : 0)|TIM_BDTR_AOEN;
 	if(!AWDG){
 		if(OCPREFPIN<PINCOUNT){
@@ -234,7 +234,7 @@ uint8_t UART_GPIO_Init(void){
 		//open drain: several boards share one RemoteUartBus line, the master's rx must have a pull-up. Its
 		//rising edges limit the baud (above 230400 with the usual pull-ups): txpushpull for one board alone
 		pinModeAF(uarts[t].io,uarts[t].af);
-		pinMode(uarts[t].io, cfgBool(TX_PUSHPULL, 0) ? OUTPUT_AF : OUTPUT_AF_OD);
+		pinMode(uarts[t].io, cfgFlag(TX_PUSHPULL, 0) ? OUTPUT_AF : OUTPUT_AF_OD);
 	}
 	if(r<UARTCOUNT){
 		pinModeAF(uarts[r].io,uarts[r].af);

@@ -89,7 +89,7 @@ static uint16_t toWord(float f){ return !(f>0) ? 0 : (uint16_t)clampF(f, 65534);
 
 int32_t StepsPerTurn(void){ return 3*(int32_t)WINDINGS; }    //hall edges per turn: 6 per pole pair
 float TorqueConstant(void){    //Nm per A (amplitude of the phase current)
-	int32_t kt = cfgOrDefault(TORQUE_CONST, 0);
+	int32_t kt = cfgDef(TORQUE_CONST, 0);
 	if(!kt){    //from the sine kv (0.1 rpm/V at 100 % modulation): 8.27 / kv, as ODrive's estimate
 		int32_t kv = SINE_KV ? SINE_KV : 242;
 		return 82.7f/(float)kv;
@@ -136,6 +136,13 @@ static uint8_t setAxisState(uint32_t st){
 	if(st==AXIS_IDLE) axisState = AXIS_IDLE;
 	else if(st==AXIS_CLOSED_LOOP&&!axisDisarm){ axisState = AXIS_CLOSED_LOOP; return 1; }
 	return 0;
+}
+
+//Set_Input_Vel / _Torque / _Voltage: the command x (rpm, 0.01 A, permille) taken in its control mode only
+static __attribute__((noinline)) uint8_t inputCmd(uint8_t ctl, float x, int32_t lim){
+	if(CONTROL(DRIVEMODE)!=ctl) return 0;
+	speed = clampF(x, lim);
+	return 1;
 }
 
 static void inputArrived(void){    //a set point: commands come from this protocol, the watchdog is fed
@@ -235,19 +242,19 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 			break;
 		case CMD_SET_INPUT_VEL:
 			if(len>=4){
-				if(CONTROL(DRIVEMODE)==CTRL_SPEED) speed = clampF(rdF(d)*60.0f, 1000);    //rpm
+				inputCmd(CTRL_SPEED, rdF(d)*60.0f, 1000);    //rpm
 				inputArrived();
 			}
 			break;
 		case CMD_SET_INPUT_TORQUE:
 			if(len>=4){
-				if(CONTROL(DRIVEMODE)==CTRL_TORQUE) speed = clampF(rdF(d)/TorqueConstant()*100.0f, 30000);    //0.01 A
+				inputCmd(CTRL_TORQUE, rdF(d)/TorqueConstant()*100.0f, 30000);    //0.01 A
 				inputArrived();
 			}
 			break;
 		case CMD_SET_INPUT_VOLTAGE:
 			if(len>=4){
-				if(CONTROL(DRIVEMODE)==CTRL_PWM) speed = clampF(rdF(d)*1000.0f, 1000);    //permille
+				inputCmd(CTRL_PWM, rdF(d)*1000.0f, 1000);    //permille
 				inputArrived();
 			}
 			break;
@@ -337,7 +344,7 @@ static const struct{ uint8_t ep, w, e; uint16_t def; } scaled[] = {    //ep - 0x
 //cases (noinline: LTO copied it into each); same float operations in the same order as written out
 static __attribute__((noinline)) float velGain(uint8_t w, uint8_t write, float f, float c, float kt, int32_t def){
 	if(write) pinstorage[w] = toWord(f/(c*kt));
-	return (float)cfgOrDefault(pinstorage[w], def)*c*kt;
+	return (float)cfgDef(pinstorage[w], def)*c*kt;
 }
 
 //ODrive parameter <-> config word, value in ODrive units; returns 0 if ep is not one of them
@@ -347,19 +354,19 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 		if(ep!=0x100+scaled[k].ep) continue;
 		const uint8_t w = scaled[k].w; float sc = p10[scaled[k].e&7];
 		if(write) pinstorage[w] = toWord(f*sc);
-		*val = (float)(scaled[k].e&RAW ? pinstorage[w] : cfgOrDefault(pinstorage[w], scaled[k].def))/sc; return 1;
+		*val = (float)(scaled[k].e&RAW ? pinstorage[w] : cfgDef(pinstorage[w], scaled[k].def))/sc; return 1;
 	}
 	if(ep>=EP_HOLD_ENABLE&&ep<=EP_TORQUE_VEL_LIMIT){    //bools: word 1 false, 2 true, 0/65535 default
 		static const uint8_t bw[3] = { 65, 71, 72 }, bd[3] = { 1, 0, 1 };
 		const uint8_t w = bw[ep-EP_HOLD_ENABLE];
 		if(write) pinstorage[w] = f>0.5f ? 2 : 1;
-		*val = (float)cfgBool(pinstorage[w], bd[ep-EP_HOLD_ENABLE]); return 1;
+		*val = (float)cfgFlag(pinstorage[w], bd[ep-EP_HOLD_ENABLE]); return 1;
 	}
 	switch(ep){
 		case EP_CURRENT_BW:{    //rad/s: current loop kp = L * bw (mV/A), ki = R * bw (V/(A s)), as ODrive
-			float l = (float)cfgOrDefault(PHASE_L, 460);    //uH
-			if(write){ CUR_KP = toWord(f*l/1000.0f); CUR_KI = toWord(f*(float)cfgOrDefault(MOTOR_R, 300)/1000.0f); }
-			*val = (float)cfgOrDefault(CUR_KP, 400)*1000.0f/l; return 1;
+			float l = (float)cfgDef(PHASE_L, 460);    //uH
+			if(write){ CUR_KP = toWord(f*l/1000.0f); CUR_KI = toWord(f*(float)cfgDef(MOTOR_R, 300)/1000.0f); }
+			*val = (float)cfgDef(CUR_KP, 400)*1000.0f/l; return 1;
 		}
 		case EP_POS_GAIN:    //(turns/s)/turn <- 0.1 rpm per hall step
 			if(write) POS_KP = toWord(f*600.0f/spt);
@@ -368,7 +375,7 @@ static uint8_t odriveParam(uint16_t ep, uint8_t write, float f, float* val){
 			*val = velGain(61, write, f, 0.06f, kt, 30); return 1;
 		case EP_POS_INTEGRATOR_GAIN:    //((turns/s)/turn)/s <- 0.1 rpm per (hall step * s)
 			if(write) POS_KI = toWord(f*600.0f/spt);
-			*val = (float)cfgOrDefault(POS_KI, 0)*spt/600.0f; return 1;
+			*val = (float)cfgDef(POS_KI, 0)*spt/600.0f; return 1;
 		case EP_VEL_DERIVATIVE_GAIN:    //Nm/(turns/s^2) <- 0.01 mA per rpm/s
 			*val = velGain(76, write, f, 0.0006f, kt, 0); return 1;
 		case EP_VEL_INTEGRATOR_GAIN:    //(Nm/s)/(turns/s) <- mA/(rpm*s)
@@ -416,15 +423,14 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 	}else{
 		float kt = TorqueConstant();
 		switch(ep){
-			case EP_VBUS: wrF((uint8_t*)&r, (float)fvbat/100.0f); break;
-			case EP_IBUS: wrF((uint8_t*)&r, (float)BusCurrent()/100.0f); break;
-			case EP_POS_ESTIMATE:
-				if(write) setPosition(f);
-				wrF((uint8_t*)&r, posTurns()); break;
-			case EP_VEL_ESTIMATE: wrF((uint8_t*)&r, (float)realspeed/60.0f); break;
-			case EP_IQ_MEASURED: case EP_IQ_SETPOINT:{
-				uint8_t q[8]; getMsg(CMD_GET_IQ, q);
-				memcpy(&r, ep==EP_IQ_MEASURED ? q+4 : q, 4); break;
+			case EP_VBUS: case EP_IBUS: case EP_POS_ESTIMATE: case EP_VEL_ESTIMATE: case EP_IQ_MEASURED: case EP_IQ_SETPOINT:{
+				//the readings of the Get_ messages, both words computed (reads only), one taken: 0x100 + 2 x
+				//(bus, encoder, iq) + word (iq: measured is the second word, listed first)
+				static const uint8_t cm[3] = { CMD_GET_BUS_VOLTAGE_CURRENT, CMD_GET_ENCODER_ESTIMATES, CMD_GET_IQ };
+				uint8_t k = (uint8_t)(ep-EP_VBUS), q[8];
+				if(write&&ep==EP_POS_ESTIMATE) setPosition(f);
+				getMsg(cm[k>>1], q);
+				memcpy(&r, q+4*((k&1)^(k>>2)), 4); break;
 			}
 			case EP_AXIS_STATE:
 				if(write) setAxisState(v);
@@ -444,13 +450,13 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 				if(write){ setInputPos(f); inputArrived(); }
 				wrF((uint8_t*)&r, (float)(posCmd-posOffset*POS_FINE)/((float)StepsPerTurn()*POS_FINE)); break;
 			case EP_INPUT_VEL:
-				if(write&&CONTROL(DRIVEMODE)==CTRL_SPEED){ speed = clampF(f*60.0f, 1000); inputArrived(); }
+				if(write&&inputCmd(CTRL_SPEED, f*60.0f, 1000)) inputArrived();
 				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_SPEED ? (float)speed/60.0f : 0.0f); break;
 			case EP_INPUT_TORQUE:
-				if(write&&CONTROL(DRIVEMODE)==CTRL_TORQUE){ speed = clampF(f/kt*100.0f, 30000); inputArrived(); }
+				if(write&&inputCmd(CTRL_TORQUE, f/kt*100.0f, 30000)) inputArrived();
 				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_TORQUE ? (float)speed/100.0f*kt : 0.0f); break;
 			case EP_INPUT_VOLTAGE:
-				if(write&&CONTROL(DRIVEMODE)==CTRL_PWM){ speed = clampF(f*1000.0f, 1000); inputArrived(); }
+				if(write&&inputCmd(CTRL_PWM, f*1000.0f, 1000)) inputArrived();
 				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_PWM ? (float)speed/1000.0f : 0.0f); break;
 			case EP_TORQUE_CONSTANT: wrF((uint8_t*)&r, kt); break;
 			case EP_ID_SETPOINT: if(write) focIdRef = (int32_t)v; r = (uint32_t)focIdRef; break;

@@ -184,7 +184,7 @@ s32 main(void){
 			if(on!=alarm){ alarm = on; BuzzerSet(on); }
 		}
 		if(CHARGEPIN<PINCOUNT){    //charger connected, 50 ms debounce
-			uint8_t c = digitalRead(CHARGEPIN)==(cfgOrDefault(CHARGE_LEVEL, 2)==2);
+			uint8_t c = digitalRead(CHARGEPIN)==(cfgDef(CHARGE_LEVEL, 2)==2);
 			if(c!=chargeRaw){ chargeRaw = c; chargeT = millis; }
 			else if(millis-chargeT>50) charging = c;
 		}
@@ -192,7 +192,7 @@ s32 main(void){
 			static uint8_t footRaw;
 			static uint32_t footT[2];
 			if(IR_PIN(k)>=PINCOUNT) continue;
-			uint8_t c = digitalRead(IR_PIN(k))==((cfgOrDefault(IR_MODE, 0)>>(4*k)&3)!=1);    //level 1 low, else high
+			uint8_t c = digitalRead(IR_PIN(k))==((cfgDef(IR_MODE, 0)>>(4*k)&3)!=1);    //level 1 low, else high
 			if(c!=(footRaw>>k&1)){ footRaw ^= (uint8_t)(1<<k); footT[k] = millis; }
 			else if(millis-footT[k]>50) footPads = (uint8_t)((footPads&~(1<<k))|c<<k);
 		}
