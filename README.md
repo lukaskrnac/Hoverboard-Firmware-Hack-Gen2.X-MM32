@@ -21,6 +21,9 @@ Related projects: [Hoverboard-Firmware-Hack-Gen2.x (GD32)](https://github.com/Ro
 [RemoteUartBus web console](https://gitlab.com/ailife8881/remoteuartbus-online) (browser control, PinFinder
 setup wizard, per-board image builder).
 
+The previous Keil-based firmware is kept in the [`legacy-keil`](https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/tree/legacy-keil)
+branch (tag `legacy-keil-final`); it is no longer maintained.
+
 ---
 
 ## Contents
