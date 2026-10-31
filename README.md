@@ -8,6 +8,8 @@ microcontroller (MM32SPIN05PF, MM32SPIN06PF, MM32SPIN25PF, MM32F031). It turns a
   and position modes; field weakening; regenerative braking with bus voltage limiting.
 - **Protocols:** **ODrive CANSimple over UART** (ODrive names and units: turns, turns/s, Nm, A) and the
   original Gen2.x **RemoteUartBus** v1 protocol; several boards on one bus.
+- **ROS 2:** works with ODrive's official ROS 2 driver (`ros_odrive`: `odrive_node`, `odrive_ros2_control`)
+  through the SocketCAN bridge in [`ros/`](ros/README.md).
 - **Any board, no recompile:** the **PinFinder** firmware auto-detects hall sensors, phase / bus current pins,
   battery divider, buttons, power latch, LEDs, buzzer, charger, foot sensors and an I2C IMU, and stores the
   configuration in flash.
@@ -168,6 +170,8 @@ power feedback, heartbeat with ODrive error bits, Estop / Clear_Errors, and ever
 parameter (RxSdo/TxSdo, ids in `tools/endpoints.json`). Arming as in ODrive: `Set_Axis_State` 8
 (CLOSED_LOOP_CONTROL) arms, 1 (IDLE) switches the gates off; a disarming error leaves the axis IDLE until
 Clear_Errors. Host libraries: `tools/cansimple_uart.py` (Python), the web console's `protocol.js`.
+**ROS 2 / ODrive tools on SocketCAN:** `ros/uart_can_bridge.py` makes the boards appear as ODrives on a
+(virtual) CAN interface, see [ros/README.md](ros/README.md).
 
 **RemoteUartBus v1** (frames start with `/`) — the original Gen2.x protocol, unchanged
 ([PROTOCOL.md](https://gitlab.com/ailife8881/remoteuartbus-online/-/blob/main/PROTOCOL.md)). State bit 64
@@ -265,6 +269,7 @@ tools/
   cansimple_uart.py               CANSimple over UART host library
   cfgfields.py, gen_*.py          config field table → cfgnames.h, cfgfields.json, endpoints.json
   pfstrings.py                    PinFinder message compression (build step)
+ros/                              SocketCAN bridge for the ODrive ROS 2 driver, ros2_control example
 extraFiles/                       pictures
 ```
 
@@ -282,8 +287,10 @@ No. Build one image per MCU; PinFinder detects the pins and stores them in flash
 Yes, with two measured phase currents (internal op-amps on the MM32SPIN05PFOP, external amplifiers on other
 boards). Block and sine work without phase current sensing.
 
-**Can I use it with ODrive tools or code?**
-The messages, units and parameter names follow ODrive's CANSimple, carried over UART instead of CAN.
+**Can I use it with ODrive tools, ROS or ROS 2?**
+Yes. The messages, units and parameter names follow ODrive's CANSimple, carried over UART instead of CAN.
+`ros/uart_can_bridge.py` puts the boards on a SocketCAN interface as ODrives, so the official ODrive ROS 2
+driver (`odrive_node`, `odrive_ros2_control`) and other CANSimple tools work unchanged.
 `tools/cansimple_uart.py` is a Python host library.
 
 **Can I control it from an ESP32 or Arduino?**
@@ -305,4 +312,4 @@ Binaries are not stored in git. Run `make release` or download them from the pro
 
 Keywords: hoverboard firmware, hoverboard hack, MM32SPIN05, MM32SPIN06, MM32SPIN25, MM32F031, MindMotion,
 BLDC motor controller, FOC, field oriented control, sine commutation, hub motor, robot wheel, ODrive
-CANSimple, UART, open source, GCC, pyOCD, PinFinder.
+CANSimple, ROS 2, ros2_control, SocketCAN, UART, open source, GCC, pyOCD, PinFinder.

@@ -1,0 +1,14 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz; every cycle sends the set point, which also feeds the board's command watchdog
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    wheel_velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+wheel_velocity_controller:
+  ros__parameters:
+    joints:
+      - wheel_joint
