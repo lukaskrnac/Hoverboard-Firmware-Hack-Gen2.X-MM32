@@ -9,7 +9,7 @@ microcontroller (MM32SPIN05PF, MM32SPIN06PF, MM32SPIN25PF, MM32F031). It turns a
 - **Protocols:** **ODrive CANSimple over UART** (ODrive names and units: turns, turns/s, Nm, A) and the
   original Gen2.x **RemoteUartBus** v1 protocol; several boards on one bus.
 - **ROS 2:** works with ODrive's official ROS 2 driver (`ros_odrive`: `odrive_node`, `odrive_ros2_control`)
-  through the SocketCAN bridge in [`ros/`](ros/README.md).
+  through the SocketCAN bridge [hoverboard-odrive-adapter-ros](https://gitlab.com/ailife8881/hoverboard-odrive-adapter-ros).
 - **Any board, no recompile:** the **PinFinder** firmware auto-detects hall sensors, phase / bus current pins,
   battery divider, buttons, power latch, LEDs, buzzer, charger, foot sensors and an I2C IMU, and stores the
   configuration in flash.
@@ -170,8 +170,9 @@ power feedback, heartbeat with ODrive error bits, Estop / Clear_Errors, and ever
 parameter (RxSdo/TxSdo, ids in `tools/endpoints.json`). Arming as in ODrive: `Set_Axis_State` 8
 (CLOSED_LOOP_CONTROL) arms, 1 (IDLE) switches the gates off; a disarming error leaves the axis IDLE until
 Clear_Errors. Host libraries: `tools/cansimple_uart.py` (Python), the web console's `protocol.js`.
-**ROS 2 / ODrive tools on SocketCAN:** `ros/uart_can_bridge.py` makes the boards appear as ODrives on a
-(virtual) CAN interface, see [ros/README.md](ros/README.md).
+**ROS 2 / ODrive tools on SocketCAN:** [hoverboard-odrive-adapter-ros](https://gitlab.com/ailife8881/hoverboard-odrive-adapter-ros) makes the boards appear as
+ODrives on a (virtual) CAN interface, so ODrive's ROS 2 driver (`odrive_node`, `odrive_ros2_control`) works
+unchanged.
 
 **RemoteUartBus v1** (frames start with `/`) — the original Gen2.x protocol, unchanged
 ([PROTOCOL.md](https://gitlab.com/ailife8881/remoteuartbus-online/-/blob/main/PROTOCOL.md)). State bit 64
@@ -269,7 +270,6 @@ tools/
   cansimple_uart.py               CANSimple over UART host library
   cfgfields.py, gen_*.py          config field table → cfgnames.h, cfgfields.json, endpoints.json
   pfstrings.py                    PinFinder message compression (build step)
-ros/                              SocketCAN bridge for the ODrive ROS 2 driver, ros2_control example
 extraFiles/                       pictures
 ```
 
@@ -289,7 +289,7 @@ boards). Block and sine work without phase current sensing.
 
 **Can I use it with ODrive tools, ROS or ROS 2?**
 Yes. The messages, units and parameter names follow ODrive's CANSimple, carried over UART instead of CAN.
-`ros/uart_can_bridge.py` puts the boards on a SocketCAN interface as ODrives, so the official ODrive ROS 2
+The [ROS driver adapter](https://gitlab.com/ailife8881/hoverboard-odrive-adapter-ros) puts the boards on a SocketCAN interface as ODrives, so the official ODrive ROS 2
 driver (`odrive_node`, `odrive_ros2_control`) and other CANSimple tools work unchanged.
 `tools/cansimple_uart.py` is a Python host library.
 
@@ -301,6 +301,12 @@ Any SWD probe supported by pyOCD: ST-Link V2 clone, DAPLink, J-Link.
 
 **Is there a precompiled binary?**
 Binaries are not stored in git. Run `make release` or download them from the project's releases.
+
+## Related repositories
+
+- [hoverboard-odrive-adapter-ros](https://gitlab.com/ailife8881/hoverboard-odrive-adapter-ros): ROS 2 driver adapter, the boards as ODrives for `ros_odrive`
+- [remoteuartbus-online](https://gitlab.com/ailife8881/remoteuartbus-online): web console, PinFinder wizard,
+  image builder
 
 ## Support and contributing
 
