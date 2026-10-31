@@ -1,10 +1,15 @@
 # GCC build for the MindMotion hoverboard firmware.
-#   make                  build build/hoverboard.{elf,bin,hex} for the MM32SPIN05
+#   make                  main firmware build/spin05/hoverboard.{elf,bin,hex} for the MM32SPIN05
 #   make MCU=F031         another MCU: SPIN05 (default), SPIN06, SPIN25, F031; output in build/<mcu>/
-#   make targets          main firmware and PinFinder for every MCU (a compile check of all of them)
+#   make pinfinder        PinFinder build/<mcu>/pinfinder.{elf,bin,hex}
+#   make both             main firmware and PinFinder for MCU
+#   make targets          main firmware and PinFinder for every MCU
+#   make release          targets, then the images copied to ../release/<mcu>/
 #   make CROSS=/path/to/arm-none-eabi-    use a toolchain that is not on PATH
 #   make flash            flash over SWD with pyOCD (../tools/mm32flash.py, keeps the board config)
-#   make clean
+#   make flash-pinfinder
+#   make clean            this MCU's build;  make clean-all: every MCU and ../release
+#   make help
 
 CROSS   ?= arm-none-eabi-
 CC      := $(CROSS)gcc
@@ -21,7 +26,8 @@ MCU     ?= SPIN05
 ifeq ($(filter $(MCU),$(MCUS)),)
 $(error MCU=$(MCU): one of $(MCUS))
 endif
-BUILD   := $(if $(filter SPIN05,$(MCU)),build,build/$(shell echo $(MCU) | tr A-Z a-z))
+mcu_dir  = $(shell echo $(1) | tr A-Z a-z)
+BUILD   := build/$(call mcu_dir,$(MCU))
 TARGET  := $(BUILD)/hoverboard
 LDSCRIPT := Device/MM32SPIN0x/Source/mm32spin05.ld
 
@@ -104,7 +110,9 @@ $(PFZ_SRC): $(PFZ)/stamp ;
 $(PFZ)/%.o: $(PFZ)/%.c Makefile $(FLAGS_STAMP)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
-pinfinder: $(PF).bin
+pinfinder: $(PF).bin $(PF).hex
+
+both: all pinfinder
 
 $(PF).elf: $(PF_OBJ) $(LDSCRIPT) Makefile $(FLAGS_STAMP)
 	$(CC) $(subst $(TARGET).map,$(PF).map,$(LDFLAGS)) $(PF_OBJ) -o $@
@@ -113,15 +121,31 @@ $(PF).elf: $(PF_OBJ) $(LDSCRIPT) Makefile $(FLAGS_STAMP)
 $(PF).bin: $(PF).elf
 	$(OBJCOPY) -O binary $< $@
 
+$(PF).hex: $(PF).elf
+	$(OBJCOPY) -O ihex $< $@
+
 flash-pinfinder: $(PF).bin
 	$(PYTHON) ../tools/mm32flash.py $<
 
 clean:
 	rm -rf $(BUILD)
 
-targets:
-	@set -e; for m in $(MCUS); do echo "== $$m"; $(MAKE) --no-print-directory MCU=$$m all pinfinder; done
+clean-all:
+	rm -rf build ../release
 
-.PHONY: all clean flash pinfinder flash-pinfinder targets
+targets:
+	@set -e; for m in $(MCUS); do echo "== $$m"; $(MAKE) --no-print-directory MCU=$$m both; done
+
+RELEASE := ../release
+release: targets
+	@set -e; for m in $(MCUS); do d=$(RELEASE)/$$(echo $$m | tr A-Z a-z); mkdir -p $$d; \
+	  cp build/$$(echo $$m | tr A-Z a-z)/hoverboard.bin build/$$(echo $$m | tr A-Z a-z)/hoverboard.hex \
+	     build/$$(echo $$m | tr A-Z a-z)/pinfinder.bin build/$$(echo $$m | tr A-Z a-z)/pinfinder.hex $$d/; done
+	@ls -l $(RELEASE)/*
+
+help:
+	@sed -n '2,/^$$/{s/^# \{0,1\}//;p}' Makefile
+
+.PHONY: all both clean clean-all flash pinfinder flash-pinfinder targets release help
 -include $(PF_OBJ:.o=.d)
 -include $(DEP)

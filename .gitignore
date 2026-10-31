@@ -1,7 +1,21 @@
-HoverBoardGigaDevice/Objects/*
-HoverBoardGigaDevice/BinariesToFlash/hoverboard*
-/HoverBoardMindMotion/Objects
-/HoverBoardMindMotion/build
+# build output
+/HoverBoardMindMotion/build/
+/HoverBoardMindMotion/Objects/
+/HoverBoardMindMotion/Listings/
+/release/
+*.elf
+*.map
+*.lst
+
+# precompiled images and flash dumps (publish binaries as release assets, not in git)
+*.bin
+*.hex
+backups/
+
+# local notes / progress tracking
+TODO.md
+
+# python
 __pycache__/
 *.pyc
-backups/
+.venv/

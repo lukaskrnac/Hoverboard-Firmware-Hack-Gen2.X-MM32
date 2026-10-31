@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Flash MM32SPIN05/06 firmware over SWD with pyOCD (any probe pyOCD supports; no vendor tools).
 
-    python3 tools/mm32flash.py HoverBoardMindMotion/build/hoverboard.bin
+    python3 tools/mm32flash.py HoverBoardMindMotion/build/spin05/hoverboard.bin
     python3 tools/mm32flash.py image.bin --backup before.bin       # dump all 32 KB first
     python3 tools/mm32flash.py image.bin --erase-config            # also wipe the board config
     python3 tools/mm32flash.py image.bin --start reset             # system reset instead of soft start
