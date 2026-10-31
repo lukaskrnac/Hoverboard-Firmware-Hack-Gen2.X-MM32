@@ -45,18 +45,14 @@ void HALLModuleInit(HALLType *u)
 	u->Time100msCNT = 0;
 	u->HallTimeSum = 60000;
 
-	u->CWAngleTab[5] = 32767;
-	u->CWAngleTab[1] = 43688;
-	u->CWAngleTab[3] = 54610;
-	u->CWAngleTab[2] = 0;
-	u->CWAngleTab[6] = 10922;
-	u->CWAngleTab[4] = 21844;
+	//sector centres of states 1-6 (CWAngleTab[1..6])
+	static const uint16_t centre[6] = { 43688, 0, 54610, 21844, 32767, 10922 };
 	//calibrated edges (PinFinder calibrate hall, all six set): the state from its edge to the next state's
 	//edge, the centre in the middle. Unset: +-30 deg around the table above (the bench motor, within 1.5 deg)
 	uint8_t cal = 1;
 	for(i=1;i<=6;i++) if(HALL_ANG(i)==0||HALL_ANG(i)==0xFFFF) cal = 0;
 	for(i=1;i<=6;i++){
-		uint16_t lo = (uint16_t)(u->CWAngleTab[i]-5461), width = 10922;
+		uint16_t c = centre[i-1], lo = (uint16_t)(c-5461), width = 10922;
 		if(cal){
 			lo = HALL_ANG(i);
 			width = 0xFFFF;
@@ -64,8 +60,9 @@ void HALLModuleInit(HALLType *u)
 				uint16_t d = (uint16_t)(HALL_ANG(j)-lo);
 				if(j!=i&&d&&d<width) width = d;
 			}
-			u->CWAngleTab[i] = (uint16_t)(lo+width/2);
+			c = (uint16_t)(lo+width/2);
 		}
+		u->CWAngleTab[i] = c;
 		bndLo[i] = lo;
 		bndHi[i] = (uint16_t)(lo+width);
 	}
@@ -268,7 +265,7 @@ void HALLModuleCalc(HALLType *u){
 	}
 	//block commutation: evaluated every time, so a direction change or a mode switch takes effect at
 	//once instead of at the next hall edge
-	if(com&&!blockbrake&&hall_to_pos[u->RunHallValue]!=step){
+	if(com&&!blockbrake&&!regenShort&&hall_to_pos[u->RunHallValue]!=step){
 		step=hall_to_pos[u->RunHallValue];
 		commutate();
 	}

@@ -244,20 +244,21 @@ uint8_t UART_GPIO_Init(void){
 }
 
 uint32_t adcRest;
-void adc_Init(void){
-	ADC_InitTypeDef  ADC_InitStructure;
+//Register writes, the values of the vendor HAL calls this replaced (ADC_Init, ADC_ExternalTrigConvCmd,
+//ADC_RegularChannelConfig, ADC_VrefintCmd, ADC_Cmd, ADC_ITConfig), in their order (60 B less, out of line)
+__attribute__((noinline)) void adc_Init(void){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-	ADC_InitStructure.ADC_PRESCALE = ADC_PCLK2_PRESCALE_6;							//for 72MHz
-	ADC_InitStructure.ADC_Mode = ADC_Mode_Single_Period;
-	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC1_ExternalTrigConv_T1_TRIG;    //TIM1 TRGO: every pwmDiv-th update (main.c)
-	ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-	ADC_Init(ADC1, &ADC_InitStructure);
-	ADC_ExternalTrigConvCmd(ADC1,ENABLE);
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_VoltReference, 0, ADC_SampleTime_7_5Cycles);
-	ADC_VrefintCmd(ENABLE);
-	ADC1->ADCHS |= ADC_CHSR_CHT;    //the internal temperature sensor (channel 14, after the pins in the scan: busLead unchanged)
-	ADC_Cmd(ADC1, ENABLE);
+	//adc clock pclk / 6 (72 MHz), 12 bit; right aligned, scan, TIM1 TRGO (every pwmDiv-th update, main.c), triggered
+	ADC1->ADCFG = (ADC1->ADCFG&~(ADC_CFGR_PRE|ADC_CFGR_RSLTCTL))|ADC_CFGR_PRE_6|ADC_CFGR_RSLTCTL_12;
+	ADC1->ADCR = (ADC1->ADCR&~(ADC_CR_ALIGN|ADC_CR_MODE|ADC_CR_TRGSEL))|ADC_CR_RIGHT|ADC_CR_T1_TRIG|ADC_CR_SCAN;
+	ADC1->ADCR |= ADC_CR_TRGEN;
+	//7.5 cycles sampling for every channel; the internal reference (channel 15) and the temperature sensor
+	//(channel 14, after the pins in the scan: busLead unchanged) on
+	ADC1->ADCFG = (ADC1->ADCFG&~ADC_CFGR_SAMCTL)|ADC_CFGR_SAMCTL_7_5;
+	ADC1->ADCHS |= ADC_CHSR_CHV;
+	ADC1->ADCFG |= ADC_CFGR_TEN|ADC_CFGR_VEN;
+	ADC1->ADCHS |= ADC_CHSR_CHT;
+	ADC1->ADCFG |= ADC_CFGR_ADEN;
 	//the battery, bus shunt and (both) phase current pins that have an adc channel: analog, in the scan
 	//adcRest: the channels before the last phase pin that are not phase pins (adcs[] in channel order), left
 	//out of the control sample in sine / FOC (interrupt.c)
@@ -269,7 +270,7 @@ void adc_Init(void){
 		else if(io==VBATPIN||io==ITOTALPIN) seen |= 1u<<adcs[i].channel;
 		else continue;
 		pinMode(io, INPUT_ADC);
-		ADC_RegularChannelConfig(ADC1, adcs[i].channel, 0, ADC_SampleTime_7_5Cycles);
+		ADC1->ADCHS |= 1u<<adcs[i].channel;    //(the sample time is set above)
 	}
 #ifdef MCU_OPAMPS
 	//SPIN25: op-amp n drives its output pin (OP1 PA6, OP2 PB2, OP3 PB10; OP4's PA9 is a PWM pin); enabled
@@ -286,7 +287,7 @@ void adc_Init(void){
 	}
 #endif
 
-	ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
+	ADC1->ADCR |= ADC_CR_ADIE;    //end of conversion interrupt
 }
 
 //Waits are bounded: a pending prescaler/reload write only completes in the watchdog's LSI domain. On

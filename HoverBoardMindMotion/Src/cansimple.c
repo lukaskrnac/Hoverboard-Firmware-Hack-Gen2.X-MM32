@@ -81,13 +81,13 @@ static float rdF(const uint8_t* p){ float f; memcpy(&f, p, 4); return f; }
 static uint32_t rdU32(const uint8_t* p){ return p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24; }
 static void wrF(uint8_t* p, float f){ memcpy(p, &f, 4); }
 static void wrU32(uint8_t* p, uint32_t v){ p[0] = (uint8_t)v; p[1] = (uint8_t)(v>>8); p[2] = (uint8_t)(v>>16); p[3] = (uint8_t)(v>>24); }
-static int32_t clampF(float f, int32_t lim){ return f>lim ? lim : (f<-lim ? -lim : (int32_t)(f<0 ? f-0.5f : f+0.5f)); }
+static int32_t clampF(float f, int32_t lim){ return f>lim ? lim : (f<-lim ? -lim : roundF(f)); }
 
 //a config word from a float: 0..65534, rounded. Negative and NaN give 0: the cast wrapped them (-2.5 V
 //written as the undervoltage level became 63.0 V, a low battery cut-off above the bus voltage)
 static uint16_t toWord(float f){ return !(f>0) ? 0 : (uint16_t)clampF(f, 65534); }
 
-int32_t StepsPerTurn(void){ return 3*(int32_t)WINDINGS; }    //hall edges per turn: 6 per pole pair
+__attribute__((noinline)) int32_t StepsPerTurn(void){ return 3*(int32_t)WINDINGS; }    //hall edges per turn: 6 per pole pair (one copy: LTO inlined it 7 times)
 float TorqueConstant(void){    //Nm per A (amplitude of the phase current)
 	int32_t kt = cfgDef(TORQUE_CONST, 0);
 	if(!kt){    //from the sine kv (0.1 rpm/V at 100 % modulation): 8.27 / kv, as ODrive's estimate
@@ -138,10 +138,14 @@ static uint8_t setAxisState(uint32_t st){
 	return 0;
 }
 
-//Set_Input_Vel / _Torque / _Voltage: the command x (rpm, 0.01 A, permille) taken in its control mode only
-static __attribute__((noinline)) uint8_t inputCmd(uint8_t ctl, float x, int32_t lim){
-	if(CONTROL(DRIVEMODE)!=ctl) return 0;
-	speed = clampF(x, lim);
+//Set_Input_Vel / _Torque / _Voltage (k 0, 1, 2; messages and endpoints): turns/s, Nm, fraction -> the command
+//(rpm, 0.01 A, permille), taken in its control mode only; returns 1 if taken
+static const uint8_t inCtl[3] = { CTRL_SPEED, CTRL_TORQUE, CTRL_PWM };
+static __attribute__((noinline)) uint8_t inputCmd(uint8_t k, float f){
+	static const uint16_t lim[3] = { 1000, 30000, 1000 };
+	float x = k==0 ? f*60.0f : (k==1 ? f/TorqueConstant()*100.0f : f*1000.0f);
+	if(CONTROL(DRIVEMODE)!=inCtl[k]) return 0;
+	speed = clampF(x, lim[k]);
 	return 1;
 }
 
@@ -240,21 +244,9 @@ static void handle(uint8_t node, uint8_t cmdByte, const uint8_t* d, uint8_t len)
 				inputArrived();
 			}
 			break;
-		case CMD_SET_INPUT_VEL:
+		case CMD_SET_INPUT_VEL: case CMD_SET_INPUT_TORQUE: case CMD_SET_INPUT_VOLTAGE:
 			if(len>=4){
-				inputCmd(CTRL_SPEED, rdF(d)*60.0f, 1000);    //rpm
-				inputArrived();
-			}
-			break;
-		case CMD_SET_INPUT_TORQUE:
-			if(len>=4){
-				inputCmd(CTRL_TORQUE, rdF(d)/TorqueConstant()*100.0f, 30000);    //0.01 A
-				inputArrived();
-			}
-			break;
-		case CMD_SET_INPUT_VOLTAGE:
-			if(len>=4){
-				inputCmd(CTRL_PWM, rdF(d)*1000.0f, 1000);    //permille
+				inputCmd(cmd==CMD_SET_INPUT_VEL ? 0 : (cmd==CMD_SET_INPUT_TORQUE ? 1 : 2), rdF(d));
 				inputArrived();
 			}
 			break;
@@ -407,7 +399,6 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 	uint16_t ep = (uint16_t)(d[1]|d[2]<<8);
 	uint32_t v = len>=8 ? rdU32(d+4) : 0;
 	float f = len>=8 ? rdF(d+4) : 0.0f;
-	uint8_t frame[8];
 	uint32_t r = 0;
 	if(write&&len<8&&ep<EP_SAVE_CONFIGURATION) return 0;
 	float pv;
@@ -449,15 +440,13 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 			case EP_INPUT_POS:
 				if(write){ setInputPos(f); inputArrived(); }
 				wrF((uint8_t*)&r, (float)(posCmd-posOffset*POS_FINE)/((float)StepsPerTurn()*POS_FINE)); break;
-			case EP_INPUT_VEL:
-				if(write&&inputCmd(CTRL_SPEED, f*60.0f, 1000)) inputArrived();
-				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_SPEED ? (float)speed/60.0f : 0.0f); break;
-			case EP_INPUT_TORQUE:
-				if(write&&inputCmd(CTRL_TORQUE, f/kt*100.0f, 30000)) inputArrived();
-				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_TORQUE ? (float)speed/100.0f*kt : 0.0f); break;
-			case EP_INPUT_VOLTAGE:
-				if(write&&inputCmd(CTRL_PWM, f*1000.0f, 1000)) inputArrived();
-				wrF((uint8_t*)&r, CONTROL(DRIVEMODE)==CTRL_PWM ? (float)speed/1000.0f : 0.0f); break;
+			case EP_INPUT_VEL: case EP_INPUT_TORQUE: case EP_INPUT_VOLTAGE:{
+				uint8_t k = (uint8_t)(ep-EP_INPUT_VEL);
+				if(write&&inputCmd(k, f)) inputArrived();
+				float x = 0.0f, s = (float)speed;
+				if(CONTROL(DRIVEMODE)==inCtl[k]) x = k==1 ? s/100.0f*kt : s/(k ? 1000.0f : 60.0f);
+				wrF((uint8_t*)&r, x); break;
+			}
 			case EP_TORQUE_CONSTANT: wrF((uint8_t*)&r, kt); break;
 			case EP_ID_SETPOINT: if(write) focIdRef = (int32_t)v; r = (uint32_t)focIdRef; break;
 			case EP_FAST_SPEED: r = (uint32_t)fastspeed; break;
@@ -472,9 +461,8 @@ uint8_t SdoAccess(const uint8_t* d, uint8_t len, uint8_t* out){
 				wrF((uint8_t*)&r, ImuValue((uint8_t)(ep-EP_IMU_ACCEL_X)));
 		}
 	}
-	frame[0] = 0; frame[1] = (uint8_t)ep; frame[2] = (uint8_t)(ep>>8); frame[3] = 0;
-	if(write){ memcpy(out, frame, 4); return 4; }
-	wrU32(frame+4, r);
-	memcpy(out, frame, 8);
+	out[0] = 0; out[1] = (uint8_t)ep; out[2] = (uint8_t)(ep>>8); out[3] = 0;
+	if(write) return 4;
+	wrU32(out+4, r);
 	return 8;
 }

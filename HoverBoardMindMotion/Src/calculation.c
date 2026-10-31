@@ -83,7 +83,7 @@ void SpeedCtrlReset(void){
 	spdT = millis;
 }
 
-static int32_t FeedForward(int32_t rpm, const SpeedPlant* p, int32_t v){    //permille<<8, |rpm| <= 1000
+static __attribute__((noinline)) int32_t FeedForward(int32_t rpm, const SpeedPlant* p, int32_t v){    //permille<<8, |rpm| <= 1000 (one copy: LTO inlined it twice)
 	if(rpm==0) return 0;    //no dead band push at a 0 rpm set point (braking to standstill)
 	int32_t a = rpm < 0 ? -rpm : rpm;
 	int32_t ff = (p->d0<<8) + a*256000/(p->kv*v/1000);     //1000/(kv/10 * v/100) per rpm

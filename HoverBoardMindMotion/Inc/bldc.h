@@ -10,6 +10,8 @@ void SetDriveMode(uint8_t mode);    //safe while running, see bldc.c
 void gatesOutput(uint8_t on);
 void BlockBrake(uint8_t on);    //block commutation short brake (speedupdate)
 extern volatile uint8_t blockbrake;
+extern volatile uint8_t regenShort;    //RegenShort() drives the outputs (sine / block)
+uint8_t RegenShort(uint8_t over);    //adc isr: bus above BAT_FULL + 0.5 V while turning (sine / block)
 
 extern volatile uint8_t gatesoff;    //1: gates must stay off (disarmed by the remote, low battery), applied by the adc isr
 extern volatile uint8_t coastreq;    //1: gates off for now, the drive mode's behaviour at command 0 (coast)

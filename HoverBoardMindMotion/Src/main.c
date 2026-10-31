@@ -49,6 +49,8 @@ uint8_t pwmDiv=1;    //pwm periods per control period (pinout.h)
 uint16_t pinstorage[128];    //zero: a valid record replaces words 0-63 (else no boot); 64-127 set in main()
 
 
+static __attribute__((noinline)) void WatchdogFeed(void){ IWDG_ReloadCounter(); }    //(one copy of the key write)
+
 //every wait after the watchdog started: in steps well below its timeout (a 2 x 150 ms melody note
 //between two feeds was enough for a watchdog reset; with the button still held that rebooted the board
 //instead of switching it off)
@@ -56,7 +58,7 @@ static void DelayFed(uint32_t ms){
 	while(ms){
 		uint32_t chunk = ms > 50 ? 50 : ms;
 		DELAY_Ms(chunk);
-		IWDG_ReloadCounter();
+		WatchdogFeed();
 		ms -= chunk;
 	}
 }
@@ -145,7 +147,7 @@ s32 main(void){
 		digitalWrite(LATCHPIN, 1);
 		while(digitalRead(BUTTONPIN)&&BUTTONPIN<PINCOUNT){    //wait while release button
 			Melody(1, 2);    //beeps (with a buzzer)
-			IWDG_ReloadCounter();
+			WatchdogFeed();
 		}
 	}
 	Melody(5, 50);    //power on melody
@@ -223,14 +225,14 @@ s32 main(void){
 				Melody(3, 150);    //power off melody
 				while(digitalRead(BUTTONPIN)) {    //wait for release
 					__NOP();
-					IWDG_ReloadCounter();
+					WatchdogFeed();
 				}
 				digitalWrite(LATCHPIN, 0);    //last line to ever be executed
 				while(1){    //still powered (latch failed, debugger supply): stay off. A watchdog reset
-					IWDG_ReloadCounter();    //would boot and set the latch again
+					WatchdogFeed();    //would boot and set the latch again
 				}
 			}
 		}
-		IWDG_ReloadCounter();    //feed the watchdog
+		WatchdogFeed();    //feed the watchdog
   }//main loop
 }

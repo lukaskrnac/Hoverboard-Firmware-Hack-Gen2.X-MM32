@@ -97,7 +97,7 @@ uint32_t iTimeLastRx = 0;
 static void AnswerMaster(void);
 //a v1 command in the drive mode's range (as the CANSimple inputs): pwm permille and rpm +-1000; torque
 //(0.01 A) and position (hall steps) as sent. Beyond 1000 permille the voltage ramp ran past full scale.
-static int32_t v1Speed(int16_t v){
+static __attribute__((noinline)) int32_t v1Speed(int16_t v){    //(out of line: 24 B less than LTO inlined)
 	if(CONTROL(DRIVEMODE)>=CTRL_TORQUE) return v;
 	return v>1000 ? 1000 : (v<-1000 ? -1000 : v);
 }
@@ -203,14 +203,10 @@ static void feedV1(uint8_t cRead){
 
 	if (iReceivePos == 2)	// iDataType read
 	{
+		static const uint8_t size[3] = { sizeof(SerialServer2Hover), sizeof(SerialServer2HoverMaster), sizeof(SerialServer2HoverConfig) };
 		iRxDataType = aReceiveBuffer[1];
-		switch (iRxDataType)
-		{
-			case 0: iRxDataSize = sizeof(SerialServer2Hover);	break;
-			case 1: iRxDataSize = sizeof(SerialServer2HoverMaster);	break;
-			case 2: iRxDataSize = sizeof(SerialServer2HoverConfig);	break;
-			default: iReceivePos = -1;	break;    //unknown type: look for the next '/'
-		}
+		if(iRxDataType<3) iRxDataSize = size[iRxDataType];
+		else iReceivePos = -1;    //unknown type: look for the next '/'
 		return;
 	}
 

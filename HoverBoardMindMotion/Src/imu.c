@@ -59,9 +59,8 @@ void ImuInit(void){
 //pulled to the accelerometer's angle with a ~0.5 s time constant: 2 % per 10 ms). ROS axes and signs:
 //pitch about Y (left), positive with the front down; roll about X, positive with the right side down.
 static void update(void){
-	int16_t g[3] = { imuRaw[4], imuRaw[5], imuRaw[6] };
 	ImuToBoard(ax, (const int16_t*)imuRaw, acc);
-	ImuToBoard(ax, g, rate);
+	ImuToBoard(ax, (const int16_t*)imuRaw+4, rate);
 	//gyro bias: the mean of the first 0.5 s that stands still (all rates below 5 deg/s)
 	if(nBias<50){
 		uint8_t still = 1;

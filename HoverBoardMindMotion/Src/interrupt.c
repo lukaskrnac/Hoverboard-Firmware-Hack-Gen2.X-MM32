@@ -156,10 +156,6 @@ void ADC1_COMP_IRQHandler(void){
 				int32_t vb = (int32_t)(vg&&vg!=0xFFFF ? vg*a/25u*3u/vrefint : vd*a*120u/vrefint);
 				//and the bus voltage channel's own glitches (bus traffic couples into the adc): a reading 1/12 off
 				//the last is held for up to 3 periods (a real change, regeneration, takes far longer)
-				//block brake above BAT_FULL + 0.5 V: the full short at once, on the raw reading (bldc.c). Braking current
-				//into a bus that cannot take it (a full battery, a bench supply) raises it ~20 V/ms; the main loop's
-				//2 ms on the filtered value let a bench supply reach its 41 V OVP (F031, braking from 5 turns/s)
-				if(blockbrake&&BAT_SET(BAT_FULL)&&vb*10>(int32_t)BAT_FULL+500) TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD+1;
 				static uint8_t vbHeld;
 				if(vbat>0&&(vb>vbat+vbat/12||vb<vbat-vbat/12)&&vbHeld<3) vbHeld++;
 				else{ vbat = vb; vbHeld = 0; }
@@ -196,7 +192,9 @@ void ADC1_COMP_IRQHandler(void){
 			gatesOutput(!(gatesoff||coastreq||overcurrent||hwOcHold||(foc ? FocHoldOff() : sine&&focTrip)));
 			HALL1.CMDDIR = -dir;
 			HALLModuleCalc(&HALL1);    //also with the gates off: speed and odometry keep tracking a coasting wheel
-			if(COMMUTATION(DRIVEMODE)==COMMUT_SINE){
+			//regeneration with nowhere to go: shorted in the motor, ramped (bldc.c RegenShort)
+			uint8_t rs = !foc&&RegenShort(realspeed&&BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL+500);
+			if(sine&&!rs){
 				//torque direction from the sign (the angle follows the rotor, not the command);
 				//negated so a positive command gives positive speed. +-32000: linear svpwm range
 				int32_t q = -pwm, adv = 0;
@@ -215,12 +213,6 @@ void ADC1_COMP_IRQHandler(void){
 				pwm_gen.Beta  = ipark1.Beta;
 				PWM_GEN_calc(&pwm_gen);
 				Update_PWM(&pwm_gen);
-				//bus above BAT_FULL + 0.5 V (regenerating into a full battery / a bench supply): the three low sides
-				//on, no switching (PWM2, CCR above ARR), the motor shorted, nothing into the bus (as the block brake).
-				//Sine has no current based regen limit: braking from 5 turns/s lifted the SPIN05 bench bus to 30.7 V
-				//and once tripped the supply's OVP. (The zero vector still switched: the short circuit current went
-				//through the diodes into the bus in every dead time.)
-				if(BAT_SET(BAT_FULL)&&vbat*10>(int32_t)BAT_FULL+500) TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = PWM_PERIOD+1;
 				FocObserve();
 			}else if(foc){
 				FocControl();

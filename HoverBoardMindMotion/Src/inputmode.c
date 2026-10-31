@@ -26,7 +26,7 @@ static uint8_t planned;
 static float Xi, Xf, Vi, Ar, Dr, Vr, Ta, Tv, Td, Tf, yAcc, t;    //the trapezoid, as ODrive names it
 
 static float centi(uint16_t w, int32_t def){ return (float)cfgDef(w, def)/100.0f; }
-static int32_t roundF(float f){ return (int32_t)(f<0 ? f-0.5f : f+0.5f); }
+__attribute__((noinline)) int32_t roundF(float f){ return (int32_t)(f<0 ? f-0.5f : f+0.5f); }    //(one copy: LTO inlined it five times)
 
 static float sqrtF(float x){    //Newton from the exponent halved (soft float: no sqrtf from libm)
 	if(x<=0) return 0;
@@ -94,7 +94,7 @@ int32_t InputVel(int32_t rpm, int32_t dtms, uint8_t holdDown, int32_t meas){
 	return roundF(rampRpm);
 }
 
-static void plan(float spt){    //ODrive TrapezoidalTrajectory::planTrapezoidal, from rel to 0
+static __attribute__((noinline)) void plan(float spt){    //ODrive TrapezoidalTrajectory::planTrapezoidal, from rel to 0 (plan, eval out of line: 24 B less)
 	float vmax = centi(TRAJ_VEL, 200)*spt, amax = centi(TRAJ_ACCEL, 50)*spt, dmax = centi(TRAJ_DECEL, 50)*spt;
 	float xi = rel, vi = inVelSp, xf = 0;
 	float dx = xf-xi;
@@ -120,7 +120,7 @@ static void plan(float spt){    //ODrive TrapezoidalTrajectory::planTrapezoidal,
 	t = 0;
 }
 
-static void eval(void){    //ODrive TrapezoidalTrajectory::eval
+static __attribute__((noinline)) void eval(void){    //ODrive TrapezoidalTrajectory::eval
 	if(t<Ta){
 		rel = Xi+Vi*t+0.5f*Ar*t*t; inVelSp = Vi+Ar*t; accSp = Ar;
 	}else if(t<Ta+Tv){

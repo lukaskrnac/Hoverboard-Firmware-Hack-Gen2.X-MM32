@@ -315,8 +315,10 @@ void FocMeasure(void){
 	//sine above that: the low side time is too short for a valid sample. (It was MOD_MAX: at the sine's
 	//top speed (95 %) the bus current and I_d / I_q read the value from the acceleration, 2.5 A / 3.5 A
 	//instead of 0.4 / 0.7.) itotal stays the shunt's, sampled in the active vectors (interrupt.c busv; it
-	//was itotalPhase, frozen at its last valid value from ~10 turns/s with field advance up)
-	if(sine&&(pwm>SAMPLE_MAX||pwm<-SAMPLE_MAX)){
+	//was itotalPhase, frozen at its last valid value from ~10 turns/s with field advance up). Nor in a regen
+	//short (bldc.c RegenShort): the low sides conduct for its duty only, at 4 % for ~1 us around the counter's
+	//zero, the samples read the saturated amplifiers (F031: CURRENT_LIMIT_VIOLATION in every sine braking)
+	if(sine&&(regenShort||pwm>SAMPLE_MAX||pwm<-SAMPLE_MAX)){
 		dqOk = 0;
 		return;
 	}
@@ -641,7 +643,7 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 	//of error: half a turn overshot 4-5 steps; 3.3x: 0-3, 0.21-0.34 s; 5 steps 0.05 s instead of 0.14-
 	//0.18), and the hold takes over before the stop. At cruise speed 3.3x was unstable (+-10 A every
 	//sample at 470 rpm, the bus pumped to 38 V, a trip).
-	int32_t kp = cfg(FOC_SPD_KP, 30), ki = cfg(FOC_SPD_KI, 100);
+	int32_t kp = cfgDef(FOC_SPD_KP, 30), ki = cfgDef(FOC_SPD_KI, 100);
 	if(!filt){
 		int32_t am = meas<0 ? -meas : meas, g = am<=60 ? 100 : (am>=200 ? 30 : 100-(am-60)/2);    //percent*3
 		kp = kp*g/30; ki = ki*g/30;
@@ -660,7 +662,7 @@ int32_t FocSpeedCtrl(int32_t sp, int32_t meas, uint8_t filt){
 		if(spI>imax) spI = imax; else if(spI<-imax) spI = -imax;
 	}
 	u = kp*e*256+spI;
-	int32_t kd = cfg(FOC_SPD_KD, 0);
+	int32_t kd = cfgDef(FOC_SPD_KD, 0);
 	if(kd){    //D on the measured speed: 0.01 mA per rpm/s
 		int32_t dd = kd*SpeedDerivStep(&spD, meas, dt)/100, im = imax>>8;
 		if(dd>im) dd = im; else if(dd<-im) dd = -im;

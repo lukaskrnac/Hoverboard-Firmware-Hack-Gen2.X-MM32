@@ -29,7 +29,7 @@ static uint8_t sdaIo = 0xFF, sclIo = 0xFF, busy, nRead;
 static uint16_t cmd[16];
 static uint32_t startT;
 
-static int8_t entry(uint8_t io, uint8_t scl){
+static __attribute__((noinline)) int8_t entry(uint8_t io, uint8_t scl){    //(one copy: LTO inlined it twice)
 	for(uint8_t i=0;i<I2CCOUNT;i++) if(i2cs[i].io==io&&i2cs[i].scl==scl) return (int8_t)i;
 	return -1;
 }

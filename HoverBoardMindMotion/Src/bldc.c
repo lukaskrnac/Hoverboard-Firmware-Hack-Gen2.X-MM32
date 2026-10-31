@@ -21,6 +21,7 @@ volatile uint32_t lastcommutate;
 volatile uint8_t gatesoff=0;
 volatile uint8_t coastreq=0;
 volatile uint8_t blockbrake=0;    //block commutation: low side short brake active, the hall isr does not commutate
+static volatile uint16_t regenMax = 1001;    //RegenShort(): the duty limit for the current limit (speedupdate)
 static uint16_t brakeduty;        //permille of the period the low sides are on while braking
 static int32_t posHold;           //position mode: target kept while the remote is silent
 volatile int32_t posCmd;          //position target from the CANSimple protocol, hall steps (int32)
@@ -355,6 +356,10 @@ void speedupdate(void){
 			pwm = speed;
 		}else{
 			uint8_t blk = COMMUTATION(DRIVEMODE)==COMMUT_BLOCK;
+			//while RegenShort() holds the outputs the speed loop does not wind up: after it, it starts again from
+			//the wheel's speed (a reverse command built up meanwhile hit the turning motor at once: sine has no
+			//current loop, a CURRENT_LIMIT_VIOLATION in a 3 turns/s reversal on the F031)
+			if(regenShort){ SpeedCtrlReset(); TorqueCtrlReset(); }
 			switch(CONTROL(DRIVEMODE)){
 				case CTRL_PWM:    //command 0 coasts (after the ramp)
 					coast = vRamp==0;
@@ -436,7 +441,16 @@ void speedupdate(void){
 		dir=-1;
 		}
 		abspwm=(pwm<0 ? -pwm : pwm)*derate>>10;    //block duty; temperature derating (sine: interrupt.c, FOC: CurrentImax())
-		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK){
+		{    //RegenShort's duty limit: the steady short circuit current |E| / |Z| (E from the sine kv, Z = R + j w L,
+			//|Z| ~ max + min/2, within 12 %) at most the current limit on average (~ duty x short circuit current):
+			//F031, 6 turns/s, ~21 A
+			int32_t a = realspeed<0 ? -realspeed : realspeed, r = cfgDef(MOTOR_R, 300);
+			int32_t wl = a*cfgDef(WINDINGS, 30)*53/1000*cfgDef(PHASE_L, 460)/1000;    //mOhm (w = rpm x poles x pi/60)
+			int32_t z = r>wl ? r+wl/2 : wl+r/2;
+			int32_t isc = a*5774/cfgDef(SINE_KV, 242)*1000/z, im = CurrentImax();    //mA
+			regenMax = (uint16_t)(isc>im ? im*1000/isc : 1001);
+		}
+		if(COMMUTATION(DRIVEMODE)==COMMUT_BLOCK&&!regenShort){
 			//block brake: the ramped duty regenerates into the bus (the off time: the motor current through the
 			//high side diodes); above BAT_FULL + 0.5 V the adc isr shorts the motor fully (interrupt.c). Full = CCR
 			//above ARR (the ramp ends at 1001): at CCR = ARR the low sides went off for a tick at the counter's top
@@ -477,6 +491,47 @@ void BlockBrake(uint8_t on){
 	if(brakeduty>1001) brakeduty = 1001;
 }
 
+//Regeneration with nowhere to go (sine and block; FOC dumps it as d current): with the bus above BAT_FULL
+//+ 0.5 V and the wheel turning, the braking energy is shorted in the motor: the three low sides switched
+//together (as the block brake), the short duty ramping up 4 % per control period (~6 ms to full) and down
+//again once the bus is below, then the normal outputs back. The duty is limited so the short circuit current
+//(|E| / |Z|, up to ~21 A at 6 turns/s on the F031) stays within the current limit on average (regenMax):
+//the off time regenerates the rest into the bus. A full short at once spiked the current (up to
+//~45 A at 6 turns/s on the F031, the bus sagged to 17.6 V and the board reset); a coast loses the braking
+//(a position move overshoots). The block brake ramps faster instead. Called by the adc isr every control
+//period; returns 1 while it drives the outputs.
+static void TIMOCInit(void);
+volatile uint8_t regenShort;
+static uint16_t regenDuty;
+#define REGEN_STEP 40
+uint8_t RegenShort(uint8_t over){
+	if(blockbrake){
+		regenShort = 0; regenDuty = 0;
+		if(over&&brakeduty<regenMax){
+			brakeduty += REGEN_STEP;
+			if(brakeduty>regenMax) brakeduty = regenMax;
+			TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = (uint16_t)((uint32_t)PWM_PERIOD*brakeduty/1000);
+		}
+		return 0;
+	}
+	if(over){
+		if(!regenShort){ regenShort = 1; tim1Outputs(TIM_OCMode_PWM1, TIM_CCER_CC1NEN|TIM_CCER_CC2NEN|TIM_CCER_CC3NEN); }
+		regenDuty += REGEN_STEP;
+		if(regenDuty>regenMax) regenDuty = regenMax;
+	}else if(regenShort){
+		if(regenDuty>REGEN_STEP) regenDuty -= REGEN_STEP;
+		else{
+			regenShort = 0; regenDuty = 0;
+			step = 0;    //block: commutates at once (the hall isr at its next run)
+			TIMOCInit();
+			return 0;
+		}
+	}
+	if(!regenShort) return 0;
+	TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = (uint16_t)((uint32_t)PWM_PERIOD*regenDuty/1000);    //(1001: above ARR)
+	return 1;
+}
+
 //TIM1 main output enable for all six gates. AOEN goes with MOEN: with automatic output enable set,
 //the timer sets MOEN again at the next update event and a software "off" lasts only one pwm period.
 __attribute__((noinline)) void gatesOutput(uint8_t on){
@@ -492,9 +547,8 @@ __attribute__((noinline)) void gatesOutput(uint8_t on){
 //counts / Q15 modulation: a sine value left in CCR1-3 is full duty in block mode). So the gates go
 //off and the isr is masked (a few us) while the mode, the outputs and the controllers are replaced;
 //the isr arms the gates again and the speed controllers restart from the measured speed.
-static void TIMOCInit(void);
 
-uint8_t DriveModeSupported(uint8_t mode){
+__attribute__((noinline)) uint8_t DriveModeSupported(uint8_t mode){    //(one copy: LTO inlined it into four callers)
 	if(COMMUTATION(mode)==COMMUT_FOC){
 		return mode<=FOC_POSITION&&FocAvailable();
 	}
@@ -514,6 +568,7 @@ void SetDriveMode(uint8_t mode){
 	TIM1->CCR3 = 0;
 	DRIVEMODE = mode;
 	blockbrake = 0;    //TIMOCInit() sets the outputs up from scratch
+	regenShort = 0;
 	SpeedCtrlReset();
 	FocInit();
 	TIMOCInit();
