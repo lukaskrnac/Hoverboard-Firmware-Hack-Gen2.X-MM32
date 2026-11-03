@@ -90,7 +90,7 @@ flash: $(TARGET).bin
 # PinFinder: a separate image (the main firmware has no room for it) built from PinFinder/ and the shared
 # hardware, config, uart and startup code. make pinfinder / make flash-pinfinder
 PF       := $(BUILD)/pinfinder
-PF_SRC   := Src/hardware.c Src/initialize.c Src/sim_eeprom.c Src/uart.c Src/softfloat.c Src/i2c.c Src/imumath.c \
+PF_SRC   := Src/hardware.c Src/initialize.c Src/sim_eeprom.c Src/uart.c Src/i2c.c Src/imumath.c \
             $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
             Device/MM32SPIN0x/Source/system_mm32spin05.c Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
 # PinFinder's own sources are compiled from copies with the messages compressed (../tools/pfstrings.py,
@@ -114,8 +114,9 @@ pinfinder: $(PF).bin $(PF).hex
 
 both: all pinfinder
 
+# -flto-partition=none: one LTO unit, 176 B less (PinFinder is at the flash limit)
 $(PF).elf: $(PF_OBJ) $(LDSCRIPT) Makefile $(FLAGS_STAMP)
-	$(CC) $(subst $(TARGET).map,$(PF).map,$(LDFLAGS)) $(PF_OBJ) -o $@
+	$(CC) $(subst $(TARGET).map,$(PF).map,$(LDFLAGS)) -flto-partition=none $(PF_OBJ) -o $@
 	$(SIZE) $@
 
 $(PF).bin: $(PF).elf

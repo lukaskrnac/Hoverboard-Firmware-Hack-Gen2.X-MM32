@@ -24,6 +24,7 @@ void outc(char c);
 void out(const char* s);
 uint8_t eq(const char* in, const char* name);    //1: input equals a (compressed) name literal or config name
 uint8_t zlen(const char* s);            //printed length of a compressed string
+void zcpy(char* d, const char* s);      //expands a compressed string into d (a command to run)
 void outi(int32_t v);
 void outfix(int32_t v, uint8_t dec);    //v / 10^dec with dec decimals
 void outpin(uint16_t pin);              //PA7, "none" when not set
@@ -65,6 +66,8 @@ void FieldVector(uint8_t k, int32_t mv);
 void FieldAngle(uint16_t th, int32_t mv);    //field at th (65536 per electrical turn, the main firmware's angle)
 int32_t Sin16(uint16_t a);                   //Q15    //k = 0..11: field at k x 30 deg el (even k: step k/2+1), complementary
 uint16_t DutyForMv(int32_t mv);         //duty for this average phase voltage at the measured (or assumed 42 V) battery
+int32_t Div64(int64_t n, int32_t d);   //n / d, truncated (no floats in PinFinder)
+int32_t MulDiv(int32_t a, int32_t b, int32_t c);    //a * b / c with a 64 bit product
 uint8_t PinFree(uint16_t pin);          //not SWD, not configured for anything (pins in words 0-17, 23, 24)
 uint8_t HallState(void);                //C*4 + B*2 + A, 7 - that with hallinvert (the main firmware's hallpos(1))
 const char* PinName(uint16_t pin);
@@ -84,8 +87,9 @@ void CfgDefaults(void);
 
 //pf_detect.c: the detections; each prints results and ends with ok() / err()
 void DetectHall(int32_t mv);
-void HwCheck(void);                     //warnings: detected pins the main firmware's peripherals cannot use
+void HwCheck(void);                     //warnings: IMU / passive buzzer pins the main firmware's peripherals cannot use
 void DetectVbat(int32_t expect_mv);
+extern int32_t vbLevelMv;              //DetectVbat: first level stored (mV), 0 none
 void DetectCurrent(int32_t mv, int32_t shunt_uohm);
 void ScanWindow(uint8_t k, int32_t mv, uint16_t pin);        //phase current pins, then the bus current pin and its calibration
 void ShowAdc(void);

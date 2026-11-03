@@ -155,7 +155,13 @@ void DetectHall(int32_t mv){
 	HALL_INVERT = inv ? 2 : 1;
 	kvi("hallinvert", HALL_INVERT);
 	kvi("lead90", best);    //directions at the ideal 90 deg lead (of up to 6 off the hall edges)
-	HwCheck();
+	uint8_t e[3];
+	int8_t t = HallTimEntries(e);    //the main firmware measures the speed with this timer's capture
+	kv(agent ? "halltimer" : "hall speed timer");    //agent: 2 / 3, 0 none
+	if(!agent) out("TIM");
+	outi(t<0 ? 0 : 3-t);
+	nl();
+	if(t<0) warn("halls not on CH1-3 of TIM2/3: the main firmware cannot measure the speed");
 	ok();
 }
 
@@ -169,12 +175,6 @@ static uint8_t onI2c(uint16_t p, uint8_t scl){
 }
 
 void HwCheck(void){
-	uint8_t e[3];
-	if(HALLAPIN<PINCOUNT&&HALLBPIN<PINCOUNT&&HALLCPIN<PINCOUNT){
-		int8_t t = HallTimEntries(e);
-		kvi("halltimer", t<0 ? 0 : 3-t);    //2 / 3, 0 none
-		if(t<0) warn("halls not on CH1-3 of TIM2/3: no speed");
-	}
 	if(IMU_SDA<PINCOUNT&&!(onI2c(IMU_SDA, 0)&&onI2c(IMU_SCL, 1))) warn("imu pins not I2C1 SDA/SCL: no imu");
 	if(BUZZERPIN<PINCOUNT&&BUZZER_PASSIVE==2&&BuzzerEntry()<0) warn("passive buzzer pin: no timer, silent");
 }
@@ -202,14 +202,15 @@ void ShowAdc(void){
 //behind the power switch reads like a battery too). "detect vbat <V>" stores every adc pin at that voltage;
 //after the voltage changed (bench supply, charger plugged in) "detect vbat <new V>" takes the pin whose
 //reading changed in proportion (within 3 %) and calibrates its divider.
-static int32_t vbLevelMv, vbLevel[ADCCOUNT];
+int32_t vbLevelMv;    //the first level's voltage, 0: none stored (the TUI asks for the second)
+static int32_t vbLevel[ADCCOUNT];
 void DetectVbat(int32_t mv){
 	if(mv<=0){ err("give the voltage you measure: detect vbat 36.5"); return; }
 	if(!vbLevelMv||(mv-vbLevelMv<300&&vbLevelMv-mv<300)){    //first level (or the same voltage again)
 		for(uint8_t i=0;i<ADCCOUNT;i++) vbLevel[i] = PinMv(adcs[i].io);
 		vbLevelMv = mv;
 		kvmv("level1", mv);
-		note("change the voltage (bench supply, or plug in the charger), measure it, then detect vbat <new V>");
+		note("change the voltage (bench supply, or plug in the charger) and measure it again");
 		ok();
 		return;
 	}
@@ -592,21 +593,33 @@ static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint16_t n){    
 	}
 }
 
-//least squares of the bus pin's readings (counts) over the reference current xs (A), the points above the
-//adc's zero (a shunt's zero can be below it), rising steadily
-static uint8_t busFit(uint16_t (*avg)[16], uint8_t c, const float* xs, float* a, float* z){
-	float sx = 0, sy = 0, sxx = 0, sxy = 0;
-	uint8_t np = 0;
+//least squares of the bus pin's readings (counts x 8) over the reference current xs (mA x 6), the points
+//above the adc's zero (a shunt's zero can be below it), rising steadily. Integer (PinFinder has no floats):
+//centred (u = np x - sum x, v = np y - sum y), slope = suv / suu, both halved until suu fits 31 bits.
+//a: counts per A x 1000, z: the reading at 0 A, counts x 100
+static uint8_t busFit(uint16_t (*avg)[16], uint8_t c, const int32_t* xs, int32_t* a, int32_t* z){
+	int32_t sx = 0, sy = 0;
+	uint8_t np = 0, use = 0;
 	for(uint8_t s=0;s<8;s++){
-		float y = (float)avg[s][c]/8.0f;
 		if(s&&avg[s][c]+4<avg[s-1][c]) return 0;    //falls by more than half a count
-		if(y<3.0f) continue;
-		sx += xs[s]; sy += y; sxx += xs[s]*xs[s]; sxy += xs[s]*y; np++;
+		if(avg[s][c]<24) continue;    //below 3 counts
+		use |= (uint8_t)(1<<s);
+		np++;
+		sx += xs[s];
+		sy += avg[s][c];
 	}
-	float den = (float)np*sxx-sx*sx;
-	if(np<3||den<0.01f) return 0;
-	*a = ((float)np*sxy-sx*sy)/den;
-	*z = (sy-*a*sx)/(float)np;
+	if(np<3) return 0;
+	int64_t suu = 0, suv = 0;
+	for(uint8_t s=0;s<8;s++){
+		if(!(use>>s&1)) continue;
+		int32_t u = np*xs[s]-sx;
+		suu += (int64_t)u*u;
+		suv += (int64_t)u*(np*avg[s][c]-sy);
+	}
+	if(suu<3600*100*np) return 0;    //the currents spread less than 0.1 A (rms)
+	while(suu>0x7FFFFFFF){ suu >>= 1; suv >>= 1; }
+	*a = Div64(suv*750000, (int32_t)suu);    //(counts x 8 per mA x 6) x 6000 / 8 x 1000
+	*z = (sy*100-Div64(suv*sx*100, (int32_t)suu))/(8*np);
 	return 1;
 }
 
@@ -684,7 +697,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	//per conversion (a scan converts its channels ~1.7 us apart, the window is ~+-7 us). The bus pin is the
 	//one that rises steadily with the current (op-amp inputs read high-impedance noise there: flat or jumpy)
 	static uint16_t avg[8][16];    //counts x 8, summed over the passes
-	float xs[8], fr[8];
+	int32_t xs[8], dd[8];    //phase x's current, mA x 6 (3 passes, before and after); duty x - duty others
 	for(uint8_t s=0;s<8;s++){ xs[s] = 0; for(uint8_t c=0;c<16;c++) avg[s][c] = 0; }
 	FieldVector(kx, mv*5/2);    //the rotor aligns first: a swinging rotor changed the current between the samples
 	Wait(500);
@@ -694,7 +707,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 			FieldVector(kx, mv*(s+3)/4);
 			Wait(150);
 			uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
-			fr[s] = (float)(fieldCcr[(x+1)%3]-fieldCcr[x])/(float)PWM_PERIOD;    //duty x - duty others
+			dd[s] = fieldCcr[(x+1)%3]-fieldCcr[x];
 			sampleAvg(mask, 1, v, 16);
 			int32_t before = PHASE_X_MA();
 			for(uint8_t c=0;c<16;c++){
@@ -704,25 +717,25 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 				avg[s][c] = (uint16_t)(avg[s][c]+one[c]/72);
 			}
 			sampleAvg(mask, 1, v, 16);
-			xs[s] += (float)(before+PHASE_X_MA())/6000.0f;    //A, before and after the bus samples
+			xs[s] += before+PHASE_X_MA();    //before and after the bus samples
 			progress(pass*8+s+1, 24);
 		}
 	}
 	FieldVector(0, 0);
 	GatesOff();
 	progressEnd();
-	kvi("bus_test_current_ma", (int32_t)(xs[7]*1000.0f));
+	kvi("bus_test_current_ma", xs[7]/6);
 	uint16_t best = PIN_NONE;
-	float slope = 0, z = 0;
+	int32_t slope = 0, z = 0;    //counts per A x 1000, zero counts x 100
 	for(uint8_t i=0;i<ADCCOUNT;i++){
 		uint8_t c = (uint8_t)adcs[i].channel;
 		uint16_t p = adcs[i].io;
 		if(!(mask>>c&1)||p==IPHASEAPIN||p==IPHASEBPIN) continue;
-		float a, zz;
+		int32_t a, zz;
 		if(!busFit(avg, c, xs, &a, &zz)) continue;
 		//(a filtered pin, below, rises only by its average: ~0.5 counts per A here) the configured pin first, else the steepest (best==PIN_NONE first: with no pin configured ITOTALPIN is
 		//PIN_NONE too, and "best!=ITOTALPIN" alone never let a pin in)
-		if(a>0.2f&&(best==PIN_NONE||(best!=ITOTALPIN&&(a>slope||p==ITOTALPIN)))){ slope = a; z = zz; best = p; }
+		if(a>200&&(best==PIN_NONE||(best!=ITOTALPIN&&(a>slope||p==ITOTALPIN)))){ slope = a; z = zz; best = p; }
 	}
 	if(best==PIN_NONE){
 		//a zero below adc 0 hides small currents (F031: a filtered pin reads 0 up to ~0.75 A average)
@@ -746,26 +759,27 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		uint8_t filtered = zv*2>av;
 		kvi("itotal_filtered", filtered);
 		if(filtered){
-			for(uint8_t s=0;s<8;s++) xs[s] *= fr[s];
+			for(uint8_t s=0;s<8;s++) xs[s] = xs[s]*dd[s]/PWM_PERIOD;
 			if(!busFit(avg, c, xs, &slope, &z)){ err("bus current pin: no fit"); return; }
 		}
 	}
 	ITOTALPIN = best;
 	kvp("itotal", best);
-	int32_t div = (int32_t)(4096000.0f/(slope*(float)VddMv()));    //divider = A / V = 1 / (counts per A x VDD / 4096)
-	kvi("counts_per_a_x100", (int32_t)(slope*100.0f));
-	kvi("zero_counts_x100", (int32_t)(z*100.0f));
+	int32_t vdd = VddMv();
+	int32_t div = (int32_t)(4096000000u/(uint32_t)(slope*vdd));    //divider = A / V = 1 / (counts per A x VDD / 4096)
+	kvi("counts_per_a_x100", slope/10);
+	kvi("zero_counts_x100", z);
 	if(nophase) div = 0;    //the reference was a model: no divider from it
 	if(shunt_uohm>0){
 		//the shunt value is the reference: counts per A = R x 4096 / VDD; the phase currents read the measured
 		//slope / that too high, so the phase gain scales by it
-		float cTrue = (float)shunt_uohm*4.096f/(float)VddMv();    //uOhm * 4096 / mV / 1000
-		int32_t g = (int32_t)((float)gain*slope/cTrue);    //(the zero is in counts: unchanged)
-		div = (int32_t)(1000000.0f/(float)shunt_uohm);
+		//true counts per A = uOhm x 4.096 / VDD mV
+		int32_t g = MulDiv(gain*slope, vdd, shunt_uohm*4096);    //(the zero is in counts: unchanged)
+		div = 1000000/shunt_uohm;
 		if(!nophase&&g>50&&g<5000){ IPHASE_GAIN = (uint16_t)g; kvi("iphasegain", g); }
 	}else if(nophase) note("no phase current pins: give the shunt value for the divider (detect current <mV> <mOhm>)");
 	if(div>0&&div<65535){ ITOTAL_DIVIDER = (uint16_t)div; kvi("itotaldivider", div); }
-	ITOTAL_ZERO = (uint16_t)(z<0.0f ? (int32_t)(-z*100.0f) : 0);
+	ITOTAL_ZERO = (uint16_t)(z<0 ? -z : 0);
 	kvi("itotalzero", ITOTAL_ZERO);
 	ok();
 }

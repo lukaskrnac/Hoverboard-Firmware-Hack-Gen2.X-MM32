@@ -25,15 +25,6 @@ static int32_t isqrt(uint32_t v){
 	return (int32_t)r;
 }
 
-//least squares y = a x + b
-static void fit(const float* x, const float* y, uint8_t n, float* a, float* b){
-	float sx = 0, sy = 0, sxx = 0, sxy = 0;
-	for(uint8_t i=0;i<n;i++){ sx += x[i]; sy += y[i]; sxx += x[i]*x[i]; sxy += x[i]*y[i]; }
-	float d = (float)n*sxx-sx*sx;
-	*a = d!=0.0f ? ((float)n*sxy-sx*sy)/d : 0.0f;
-	*b = (sy-*a*sx)/(float)n;
-}
-
 //hall edges with direction (forward = the order of rising steps) between calls
 static int32_t edgeCount;
 static uint8_t edgePrev;
@@ -262,33 +253,38 @@ void CalKv(const char* which, int32_t top){
 	int32_t vb = VbatMv();
 	if(vb<10000){ err("no battery pin: detect vbat first"); return; }
 	note("wheel spins at 3 speeds (unloaded)");
-	float x[3], y[3];
+	int32_t x[3], y[3];
 	if(sine) centres();
 	RotateStop();
 	for(uint8_t s=0;s<3;s++){
 		int32_t lvl = top*(s+3)/5;    //60, 80, 100 %
 		int32_t rpm = speedRun(sine ? driveField : driveBlock, lvl, 1500);
 		if(rpm==-999999){ RotateStop(); GatesOff(); err("stopped"); return; }
-		x[s] = sine ? (float)lvl*0.955f : (float)lvl/1000.0f;
-		y[s] = (float)rpm;
+		x[s] = sine ? lvl*955/1000 : lvl;    //sine: q voltage mV (0.955 of the level), block: permille
+		y[s] = rpm;
 		kv("rpm"); outi(rpm); out(sine ? (agent ? " mv " : " rpm at mV ") : (agent ? " permille " : " rpm at permille ")); outi(lvl); nl();
 		progress(s+1, 3);
 	}
 	RotateStop();
 	GatesOff();
 	progressEnd();
-	float a, b;
-	fit(x, y, 3, &a, &b);
-	if(a<=0.0f||y[0]<5.0f){ err("wheel stalled at a level (calibrate kv block|sine <max>)"); return; }
-	int32_t d0 = (int32_t)(-b/a*(sine ? 1.0f : 1000.0f));    //sine: mV, block: permille
+	//least squares rpm = a x + b on the centred points (u = 3x - sum x, v = 3y - sum y): a = suv / suu
+	int32_t sx = x[0]+x[1]+x[2], sy = y[0]+y[1]+y[2], suu = 0, suv = 0;
+	for(uint8_t s=0;s<3;s++){
+		int32_t u = 3*x[s]-sx;
+		suu += u*u;
+		suv += u*(3*y[s]-sy);
+	}
+	if(suv<=0||suu<=0||y[0]<5){ err("wheel stalled at a level (calibrate kv block|sine <max>)"); return; }
+	int32_t d0 = (sx-MulDiv(sy, suu, suv))/3;    //where the line crosses 0 rpm, -b / a: sine mV, block permille
 	if(sine){
-		int32_t kvs = (int32_t)(5774.0f*a);    //a = rpm per mV of q voltage
+		int32_t kvs = MulDiv(5774, suv, suu);    //a = rpm per mV of q voltage
 		int32_t d0p = d0*1732/vb;              //permille of the phase voltage at 100 %: vbat / sqrt(3)
 		SINE_KV = (uint16_t)kvs;
 		kvi("sinekv", kvs);
 		if(d0p>0&&d0p<500){ SINE_D0 = (uint16_t)d0p; kvi("sined0", d0p); }
 	}else{
-		int32_t kvb = (int32_t)(a*10000.0f/(float)vb);    //0.1 rpm per V at 100 %
+		int32_t kvb = MulDiv(MulDiv(suv, 10000, suu), 1000, vb);    //0.1 rpm per V at 100 % (a: rpm per permille)
 		SPEED_KV = (uint16_t)kvb;
 		kvi("speedkv", kvb);
 		if(d0>0&&d0<900){ SPEED_D0 = (uint16_t)d0; kvi("speedd0", d0); }

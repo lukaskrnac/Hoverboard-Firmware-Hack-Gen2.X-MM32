@@ -101,7 +101,7 @@ The top-level `Makefile` forwards to `HoverBoardMindMotion/Makefile`; both work 
 | `make help` | this list |
 
 A change of flags (`TRACE`, `CROSS`) rebuilds everything. Integer division uses the chip's hardware divider
-(`Src/hwdiv.S`), floats a compact soft float (`Src/softfloat.c`); `-flto -Os`. The flash is nearly full
+(`Src/hwdiv.S`), floats a compact soft float (`Src/softfloat.c`; PinFinder uses integers only); `-flto -Os`. The flash is nearly full
 (~31.6 of 31 KB used on every MCU), so new features need equal savings.
 
 Precompiled images are not kept in git; build them with `make release` or take them from the project's
@@ -128,7 +128,11 @@ writes the configuration the main firmware boots from. It talks 115200 8N1. On a
 configuration it first searches the UART pins: short the board's TX and RX (loop-back) until it finds them,
 then connect your USB-UART adapter. It prints `PinFinder 2.0: Enter = menu, @<command> = agent mode`.
 
-- **TUI** (press Enter): pin map, voltages, menu for each detection, test motor, save.
+- **TUI** (press Enter): pin map, voltages and a menu (`press a key:`): detections (hall, LEDs/buzzer,
+  battery, button, charger, latch, IMU, foot sensors, current, all), calibrations, test run, save. The
+  battery asks for the measured voltage twice (change it in between). `w` lists every config word with its
+  number and opens the command line (`command>`): `get <name|number>`, `set <name|number> <value|pin|none>`,
+  any agent command; Enter on an empty line or Esc goes back to the menu.
 - **Agent mode** (lines starting with `@`): one command per line, `key=value` output, ends with `ok` or
   `err <text>`. Wrapped by `tools/pinfinder.py` (`--json`, exit status 1 on error).
 - **Browser:** `pinfinder.html` in the [web console](https://gitlab.com/ailife8881/remoteuartbus-online)

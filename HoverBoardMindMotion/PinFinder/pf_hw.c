@@ -225,3 +225,21 @@ uint16_t PinByName(const char* s){
 	}
 	return PIN_NONE;
 }
+
+//n / d with a 64 bit dividend, truncated towards zero (the quotient must fit in 32 bits). Shift and subtract:
+//PinFinder has no floats (the soft float library was ~0.8 KB of its 31 KB) and libgcc's 64 bit division is large
+int32_t Div64(int64_t n, int32_t d){
+	uint8_t neg = (n<0)!=(d<0);
+	uint64_t u = n<0 ? 0u-(uint64_t)n : (uint64_t)n, r = 0, q = 0;
+	uint32_t v = d<0 ? 0u-(uint32_t)d : (uint32_t)d;
+	if(!v) return 0;
+	for(uint8_t i=0;i<64;i++){
+		r = r<<1|u>>63;
+		u <<= 1;
+		q <<= 1;
+		if(r>=v){ r -= v; q |= 1; }
+	}
+	return neg ? -(int32_t)q : (int32_t)q;
+}
+
+int32_t MulDiv(int32_t a, int32_t b, int32_t c){ return Div64((int64_t)a*b, c); }

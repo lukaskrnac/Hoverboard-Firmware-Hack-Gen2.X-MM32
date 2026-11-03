@@ -34,6 +34,20 @@ void out(const char* s){
 	while(*s) outz((uint8_t)*s++);
 }
 
+static char* zdst;
+static void zput(uint8_t c){
+	while(c>=0x80){
+		zput(pfPairs[c-0x80][0]);
+		c = pfPairs[c-0x80][1];
+	}
+	*zdst++ = (char)c;
+}
+void zcpy(char* d, const char* s){
+	zdst = d;
+	while(*s) zput((uint8_t)*s++);
+	*zdst = 0;
+}
+
 static const char* zin;
 static uint8_t zeq(uint8_t c){    //expands c against the input at zin
 	if(c>=0x80) return zeq(pfPairs[c-0x80][0])&&zeq(pfPairs[c-0x80][1]);
@@ -107,7 +121,14 @@ uint8_t aborted(void){
 	return 1;
 }
 
+static uint8_t dots;    //TUI: progress dots on the current line (a result starts a new one)
+static void endDots(void){
+	if(dots) nl();
+	dots = 0;
+}
+
 void kv(const char* key){
+	endDots();
 	if(agent){
 		out(key);
 		outc('=');
@@ -136,6 +157,7 @@ void kvmv(const char* key, int32_t mv){
 }
 
 void note(const char* s){
+	endDots();
 	if(agent) out("# ");
 	else color(36);
 	out(s);
@@ -144,6 +166,7 @@ void note(const char* s){
 }
 
 void warn(const char* s){
+	endDots();
 	if(agent){
 		out("warn ");
 	}else{
@@ -164,11 +187,12 @@ void progress(int32_t n, int32_t total){
 		nl();
 	}else{
 		outc('.');
+		dots = 1;
 	}
 }
 
 void progressEnd(void){
-	if(!agent) nl();
+	endDots();
 }
 
 void ok(void){
@@ -180,6 +204,7 @@ void ok(void){
 
 void err(const char* s){
 	failed = 1;
+	endDots();
 	if(agent){
 		out("err ");
 	}else{
