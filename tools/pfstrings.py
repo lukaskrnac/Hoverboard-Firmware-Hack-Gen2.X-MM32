@@ -2,8 +2,9 @@
 """PinFinder message compression (build step, see the Makefile).
 
 PinFinder's messages are ~6 KB of its 30 KB. This copies PinFinder/*.c to an output directory with the
-printed string literals byte-pair encoded: bytes 0x80-0xFF stand for a pair of bytes (each again plain
-ASCII or a pair), out() in pf_io.c expands them. The table is written as pfdict.c (2 bytes per pair).
+printed string literals byte-pair encoded: code bytes stand for a pair of bytes (each again plain ASCII
+or a pair), out() in pf_io.c expands them. Codes: 0x80-0xFF, then the control characters 0x0E-0x1A and
+0x01-0x06 that no message contains (checked; pf_io.c pairOf() maps them back). The table is written as pfdict.c (2 bytes per pair).
 
 Encoded are only literals that are printed or compared by eq() and nothing else: arguments of the output
 functions and eq() (ENCODED), literals wrapped in T(...) (tables of messages, see pf.h) and the config
@@ -17,8 +18,9 @@ import re
 import sys
 
 ENCODED = {"out", "note", "warn", "err", "kv", "kvi", "kvp", "kvs", "kvmv", "heading", "T", "eq"}
-BASE = 0x80
-MAXPAIRS = 128
+CODES = list(range(0x80, 0x100)) + list(range(0x0E, 0x1B)) + list(range(0x01, 0x07))    # pair k = CODES[k]
+MAXPAIRS = len(CODES)
+INDEX = {c: k for k, c in enumerate(CODES)}
 
 ESC = {"n": 10, "r": 13, "t": 9, "a": 7, "b": 8, "f": 12, "v": 11, "\\": 92, "'": 39, '"': 34, "?": 63}
 
@@ -95,8 +97,8 @@ def scan(src, header=False):
                 stack.pop()
         elif k == "str" and stack and stack[-1] in ENCODED:
             data = unescape(m.group(0)[1:-1])
-            if any(b >= 0x80 for b in data):
-                raise SystemExit("pfstrings: non-ASCII message " + m.group(0))
+            if any(b >= 0x80 or b in INDEX for b in data):
+                raise SystemExit("pfstrings: non-ASCII or code byte (0x01-0x06, 0x0E-0x1A) in message " + m.group(0))
             yield m.start(), m.end(), data
         if k != "other" or not m.group(0).isspace():
             last_id = None
@@ -122,7 +124,7 @@ def bpe(strings):
         p, n = max(sorted(count.items()), key=lambda kv: kv[1])
         if n < 3:    # saves n bytes, costs 2 in the table
             break
-        sym = BASE + len(pairs)
+        sym = CODES[len(pairs)]
         pairs.append(p)
         for s in seqs:
             i = 0
@@ -139,7 +141,7 @@ def encode(data, pairs):
         i = 0
         while i < len(s) - 1:
             if (s[i], s[i + 1]) == p:
-                s[i:i + 2] = [BASE + k]
+                s[i:i + 2] = [CODES[k]]
             i += 1
     return s
 
@@ -150,8 +152,8 @@ def decode(s, pairs):
         stack = [b]
         while stack:
             c = stack.pop()
-            if c >= BASE:
-                stack += reversed(pairs[c - BASE])
+            if c in INDEX:
+                stack += reversed(pairs[INDEX[c]])
             else:
                 out.append(c)
     return out

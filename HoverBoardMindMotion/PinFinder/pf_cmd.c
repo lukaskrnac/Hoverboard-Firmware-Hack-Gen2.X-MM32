@@ -128,6 +128,7 @@ void Command(char* line){
 		if(*s) *s++ = 0;
 	}
 	if(!argc) return;
+	abortKey = 0;    //aborted() sets it: a stop by a key, not a timeout
 	for(char* s=argv[0];*s;s++) if(*s>='A'&&*s<='Z') *s += 32;
 	const char* c = argv[0];
 	const char* a1 = argc>1 ? argv[1] : 0;
@@ -142,7 +143,7 @@ void Command(char* line){
 		if(idx<0) err("unknown name"); else{ CfgPrint((uint8_t)idx); ok(); }
 	}
 	else if(eq(c, "set")) setWord(a1, a2);
-	else if(eq(c, "save")){ HwCheck(); CfgSave(); note("saved"); ok(); }
+	else if(eq(c, "save")){ HwCheck(); CfgSave(); note("saved to flash: the main firmware boots with it"); ok(); }
 	else if(eq(c, "revert")){ if(ConfigLoad()) ConfigMigrate(); else CfgDefaults(); CfgMarkSaved(); ok(); }
 	else if(eq(c, "defaults")){ CfgDefaults(); note("defaults in RAM (save keeps them)"); ok(); }
 	else if(eq(c, "detect")||eq(c, "calibrate")){

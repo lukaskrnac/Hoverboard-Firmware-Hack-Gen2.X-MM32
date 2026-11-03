@@ -174,7 +174,7 @@ void CalImu(void){
 		done = good&&m<n0/800&&h>n0/15;
 	}
 	I2cRelease();
-	if(!done){ err(!good ? "the IMU does not answer" : "no steady forward tilt"); return; }
+	if(!done){ err(!good ? "the IMU does not answer" : abortKey ? "stopped" : "no steady forward tilt"); return; }
 	int8_t fwd = dominant(d), ax[3];
 	ImuAxes((uint16_t)(1+up*6+fwd), ax);
 	IMU_MOUNT = (uint16_t)(1+up*6+fwd);

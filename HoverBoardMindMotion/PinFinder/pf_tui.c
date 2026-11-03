@@ -222,7 +222,7 @@ static void rotateKey(int c){
 //passed, failed or was skipped at the end (a failed step used to scroll past), then the LED screen.
 static void detectAll(void){
 	static const char* const names[6] = { T("hall sensors"), T("current sensing"), T("battery voltage"),
-		T("power button"), T("charger (any key skips)"), T("IMU") };
+		T("power button"), T("charger"), T("IMU") };
 	uint8_t run = 0, good = 0, skip = 0, esc = 0;
 	for(uint8_t k=0;k<6&&!esc;k++){
 		if((k==3&&!master)||k==2) continue;    //battery: two voltage levels the user sets (menu 3)
@@ -270,6 +270,8 @@ void TuiStart(void){
 static const char runKeys[] = "145678hpmgsri?";
 static const char runCmds[] = T("detect hall\0detect button\0detect charger\0detect latch\0detect imu\0detect ir\0"
 	"calibrate hall\0calibrate poles\0calibrate rl\0calibrate imu\0save\0revert\0info\0help");
+static const char runTitles[] = T("hall sensors\0power button\0charger\0power latch\0IMU\0foot sensors\0"
+	"hall edge angles\0pole count\0phase resistance and inductance\0IMU mounting\0save\0revert\0info\0commands");
 
 static void lineKey(int c){
 	if(c=='\r'||c=='\n'){
@@ -307,14 +309,13 @@ void TuiKey(int c){
 	nl();
 	const char* k = c ? strchr(runKeys, c) : 0;
 	if(k){
-		const char* s = runCmds;
-		for(uint8_t i=0;i<k-runKeys;i++) s += strlen(s)+1;
+		const char *s = runCmds, *t = runTitles;
+		for(uint8_t i=0;i<k-runKeys;i++){ s += strlen(s)+1; t += strlen(t)+1; }
 		zcpy(line, s);
-		heading(s);
+		heading(t);
 		failed = 0;
 		Command(line);
 		if(c=='r'){ draw(); return; }
-		if(c=='s'&&!failed) note("saved to flash: the main firmware boots with it");
 		after();
 		return;
 	}

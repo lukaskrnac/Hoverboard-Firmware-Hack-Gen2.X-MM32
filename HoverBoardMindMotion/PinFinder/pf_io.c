@@ -14,43 +14,52 @@ void IoInit(uint8_t uart){
 	U = uart==2 ? UART2 : UART1;
 }
 
+static uint8_t mute;    //TUI: a debug line (kvd) is not printed, up to its nl()
+
 void outc(char c){
+	if(mute) return;
 	uint32_t t = millis;
 	while((U->CSR&UART_CSR_TXFULL)&&millis-t<5);
 	U->TDR = (uint8_t)c;
 }
 
-//messages are byte pair encoded at build time (tools/pfstrings.py): 0x80 + k stands for pfPairs[k]
+//messages are byte pair encoded at build time (tools/pfstrings.py): a code byte stands for a pair of codes
+//or characters. Codes: 0x80-0xFF (pairs 0-127), 0x0E-0x1A (128-140), 0x01-0x06 (141-146): control
+//characters no message uses (plain strings, e.g. pin names and the echoed input, never contain them)
 extern const uint8_t pfPairs[][2];
+static const uint8_t* pairOf(uint8_t c){    //0: a plain character
+	if(c>=0x80) return pfPairs[c-0x80];
+	if(c>=14&&c<27) return pfPairs[c+114];    //0x0E-0x1A: 128-140
+	if(c&&c<7) return pfPairs[c+140];
+	return 0;
+}
+
+static char* zdst;    //zcpy: expand into memory instead of the uart
 static void outz(uint8_t c){
-	while(c>=0x80){
-		outz(pfPairs[c-0x80][0]);
-		c = pfPairs[c-0x80][1];
+	const uint8_t* p;
+	while((p = pairOf(c))){
+		outz(p[0]);
+		c = p[1];
 	}
-	outc((char)c);
+	if(zdst) *zdst++ = (char)c;
+	else outc((char)c);
 }
 
 void out(const char* s){
 	while(*s) outz((uint8_t)*s++);
 }
 
-static char* zdst;
-static void zput(uint8_t c){
-	while(c>=0x80){
-		zput(pfPairs[c-0x80][0]);
-		c = pfPairs[c-0x80][1];
-	}
-	*zdst++ = (char)c;
-}
 void zcpy(char* d, const char* s){
 	zdst = d;
-	while(*s) zput((uint8_t)*s++);
+	out(s);
 	*zdst = 0;
+	zdst = 0;
 }
 
 static const char* zin;
 static uint8_t zeq(uint8_t c){    //expands c against the input at zin
-	if(c>=0x80) return zeq(pfPairs[c-0x80][0])&&zeq(pfPairs[c-0x80][1]);
+	const uint8_t* p = pairOf(c);
+	if(p) return zeq(p[0])&&zeq(p[1]);
 	return *zin++==c;
 }
 
@@ -61,7 +70,8 @@ uint8_t eq(const char* in, const char* name){
 }
 
 static uint8_t zn(uint8_t c){
-	return c>=0x80 ? (uint8_t)(zn(pfPairs[c-0x80][0])+zn(pfPairs[c-0x80][1])) : 1;
+	const uint8_t* p = pairOf(c);
+	return p ? (uint8_t)(zn(p[0])+zn(p[1])) : 1;
 }
 
 uint8_t zlen(const char* s){
@@ -97,6 +107,7 @@ void outpin(uint16_t pin){
 
 void nl(void){
 	out("\r\n");
+	mute = 0;
 }
 
 void color(uint8_t c){
@@ -122,8 +133,8 @@ uint8_t aborted(void){
 }
 
 static uint8_t dots;    //TUI: progress dots on the current line (a result starts a new one)
-static void endDots(void){
-	if(dots) nl();
+static void endDots(void){    //the dots are a progress display: the result line takes their place
+	if(dots) out(ansi ? "\r\x1b[K" : "\r\n");
 	dots = 0;
 }
 
@@ -140,6 +151,8 @@ void kv(const char* key){
 }
 
 void kvi(const char* key, int32_t v){ kv(key); outi(v); nl(); }
+void kvd(const char* key){ endDots(); mute = !agent; kv(key); }
+void kvdi(const char* key, int32_t v){ kvd(key); outi(v); nl(); }
 void kvp(const char* key, uint16_t pin){ kv(key); outpin(pin); nl(); }
 void kvs(const char* key, const char* s){ kv(key); out(s); nl(); }
 

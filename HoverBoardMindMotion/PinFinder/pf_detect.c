@@ -105,7 +105,7 @@ void DetectHall(int32_t mv){
 	GatesOff();
 	progressEnd();
 	releasePins();
-	kvmv("voltage", mv);
+	kvd("voltage_mv"); outi(mv); nl();
 	//hall candidates: pins high in 4..8 of the 12 directions, as one block
 	static uint16_t bit[PINCOUNT], sure[PINCOUNT];    //per direction: majority level, all turns the same
 	uint8_t cand[6], nc = 0;
@@ -123,7 +123,7 @@ void DetectHall(int32_t mv){
 			edges = (uint8_t)(edges+((bit[p]>>k^bit[p]>>((k+1)%12))&1));
 		}
 		if(!active||ones==12) continue;
-		kv("counts"); outpin(p); outc(' ');
+		kvd("counts"); outpin(p); outc(' ');
 		for(uint8_t k=0;k<12;k++) outc((char)('0'+cnt[p][k]));
 		nl();
 		if(edges==2&&ones>=4&&ones<=8&&nc<6) cand[nc++] = (uint8_t)p;
@@ -153,8 +153,8 @@ void DetectHall(int32_t mv){
 	kvp("hallb", HALLBPIN);
 	kvp("hallc", HALLCPIN);
 	HALL_INVERT = inv ? 2 : 1;
-	kvi("hallinvert", HALL_INVERT);
-	kvi("lead90", best);    //directions at the ideal 90 deg lead (of up to 6 off the hall edges)
+	kv("hallinvert"); outi(HALL_INVERT); if(!agent) out(inv ? " (signals inverted)" : " (not inverted)"); nl();
+	kvdi("lead90", best);    //directions at the ideal 90 deg lead (of up to 6 off the hall edges)
 	uint8_t e[3];
 	int8_t t = HallTimEntries(e);    //the main firmware measures the speed with this timer's capture
 	kv(agent ? "halltimer" : "hall speed timer");    //agent: 2 / 3, 0 none
@@ -285,7 +285,7 @@ void DetectButton(uint32_t ms){
 	if(!ms) ms = 15000;
 	note("press and hold the power button");
 	uint16_t p = waitChange(BUTTONPIN, ms, &from, &to);
-	if(p==PIN_NONE){ err("no pin changed"); return; }
+	if(p==PIN_NONE){ err(abortKey ? "stopped" : "no pin changed (time is up)"); return; }
 	BUTTONPIN = p;
 	kvp("button", p);
 	kvi("released", from);
@@ -304,7 +304,7 @@ static uint8_t userInput(uint16_t* pin, uint32_t ms, uint8_t* level, uint8_t* pu
 	uint16_t keep = *pin;
 	*pin = PIN_NONE;
 	uint16_t p = waitChange(keep, ms ? ms : 30000, &from, &to);
-	if(p==PIN_NONE){ *pin = keep; err("no pin changed"); return 0; }
+	if(p==PIN_NONE){ *pin = keep; err(abortKey ? "stopped" : "no pin changed (time is up)"); return 0; }
 	*level = (uint8_t)((to==2 ? !from : to) ? 2 : 1);
 	*pull = to==2 ? (from ? 3 : 2) : (from==2 ? (to ? 3 : 2) : 1);
 	*pin = p;
@@ -678,7 +678,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		kvi("iphasecfg", IPHASE_CFG);
 		//current amplitude = mv / phase resistance: the gain with motorr (default 300 mOhm), information only
 		int32_t r = (int32_t)cfgOrDefault(MOTOR_R, 300);
-		kvi("iphasegain_from_motorr", mv*10000/r/((amp[a]+amp[b])/2));    //0.1 mA per count
+		kvdi("iphasegain_from_motorr", mv*10000/r/((amp[a]+amp[b])/2));    //0.1 mA per count
 	}
 	//bus current pin: phase X high, the others low (k = 4X-7: cos = 1 for X), sampled in the active vector.
 	//Without phase current pins the reference is the static field's current V / motorr (phase A high): it
@@ -724,7 +724,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	FieldVector(0, 0);
 	GatesOff();
 	progressEnd();
-	kvi("bus_test_current_ma", xs[7]/6);
+	kvdi("bus_test_current_ma", xs[7]/6);
 	uint16_t best = PIN_NONE;
 	int32_t slope = 0, z = 0;    //counts per A x 1000, zero counts x 100
 	for(uint8_t i=0;i<ADCCOUNT;i++){
@@ -757,7 +757,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 		FieldVector(0, 0);
 		GatesOff();
 		uint8_t filtered = zv*2>av;
-		kvi("itotal_filtered", filtered);
+		kvdi("itotal_filtered", filtered);
 		if(filtered){
 			for(uint8_t s=0;s<8;s++) xs[s] = xs[s]*dd[s]/PWM_PERIOD;
 			if(!busFit(avg, c, xs, &slope, &z)){ err("bus current pin: no fit"); return; }
@@ -767,8 +767,8 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	kvp("itotal", best);
 	int32_t vdd = VddMv();
 	int32_t div = (int32_t)(4096000000u/(uint32_t)(slope*vdd));    //divider = A / V = 1 / (counts per A x VDD / 4096)
-	kvi("counts_per_a_x100", slope/10);
-	kvi("zero_counts_x100", z);
+	kvdi("counts_per_a_x100", slope/10);
+	kvdi("zero_counts_x100", z);
 	if(nophase) div = 0;    //the reference was a model: no divider from it
 	if(shunt_uohm>0){
 		//the shunt value is the reference: counts per A = R x 4096 / VDD; the phase currents read the measured

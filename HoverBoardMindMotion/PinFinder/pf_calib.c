@@ -85,10 +85,8 @@ void CalHall(int32_t mv){
 		kvi(k, ang[h]);
 		//against the built-in table (centres +-30 deg), and the lag forward-backward, in 0.1 deg el
 		static const uint16_t def[7] = { 0, 38227, 60075, 49149, 16383, 27306, 5461 };    //centres - 30 deg
-		kv("deg_x10"); outi(h); outc(' ');
-		outi((int32_t)ang[h]*3600/65536); out(agent ? " offset " : " deg, off the built-in by ");
-		outi((int32_t)(int16_t)(ang[h]-def[h])*3600/65536); out(agent ? " lag " : ", lag ");
-		outi((f-b)*1800/65536); nl();
+		int32_t deg = (int32_t)ang[h]*3600/65536, off = (int32_t)(int16_t)(ang[h]-def[h])*3600/65536, lag = (f-b)*1800/65536;
+		kvd("deg_x10"); outi(h); outc(' '); outi(deg); out(" offset "); outi(off); out(" lag "); outi(lag); nl();
 	}
 	for(uint8_t h=1;h<=6;h++) HALL_ANG(h) = ang[h];
 	ok();
@@ -172,7 +170,7 @@ void CalRL(int32_t mv){
 		FieldAngle(th, s ? mv : mv/2);
 		Wait(80);
 		cur[s] = curRead(i3, 32);
-		kv("current_ma"); outi(cur[s]); out(agent ? " mv " : " mA at mV "); outi(s ? mv : mv/2); nl();
+		kv(agent ? "current_ma" : "current"); outi(cur[s]); out(agent ? " mv " : " mA at mV "); outi(s ? mv : mv/2); nl();
 	}
 	if(cur[1]-cur[0]<300){ GatesOff(); err("too little current (more mV)"); return; }
 	int32_t r = (mv-mv/2)*1000/(cur[1]-cur[0]);    //mOhm
@@ -198,7 +196,7 @@ void CalRL(int32_t mv){
 	int32_t per = ((int32_t)PWM_PERIOD+18)/36;    //us
 	int32_t tau = fin>0 ? area*per/2/fin : 0;    //us
 	int32_t l = r*tau/1000;    //uH
-	kvi("tau_us", tau);
+	kvdi("tau_us", tau);
 	MOTOR_R = (uint16_t)r;
 	kvi("motorr", r);
 	if(l>10&&l<20000){ PHASE_L = (uint16_t)l; kvi("phasel", l); }
@@ -262,7 +260,7 @@ void CalKv(const char* which, int32_t top){
 		if(rpm==-999999){ RotateStop(); GatesOff(); err("stopped"); return; }
 		x[s] = sine ? lvl*955/1000 : lvl;    //sine: q voltage mV (0.955 of the level), block: permille
 		y[s] = rpm;
-		kv("rpm"); outi(rpm); out(sine ? (agent ? " mv " : " rpm at mV ") : (agent ? " permille " : " rpm at permille ")); outi(lvl); nl();
+		kv(agent ? "rpm" : "speed"); outi(rpm); out(sine ? (agent ? " mv " : " rpm at mV ") : (agent ? " permille " : " rpm at permille ")); outi(lvl); nl();
 		progress(s+1, 3);
 	}
 	RotateStop();

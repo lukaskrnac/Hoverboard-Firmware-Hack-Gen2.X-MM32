@@ -36,6 +36,8 @@ extern uint8_t failed;                  //set by err(): clear it, run a detectio
 extern int abortKey;                    //the key aborted() consumed (0x1b: Esc)
 void kv(const char* key);               //starts a result line; the value follows, then nl()
 void kvi(const char* key, int32_t v);
+void kvd(const char* key);              //a measurement detail for scripts: agent only, the TUI skips the line
+void kvdi(const char* key, int32_t v);
 void kvp(const char* key, uint16_t pin);
 void kvs(const char* key, const char* s);
 void kvmv(const char* key, int32_t mv); //agent: key_mv=24100, TUI: key: 24.10 V
