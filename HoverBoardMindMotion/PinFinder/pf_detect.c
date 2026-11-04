@@ -546,6 +546,7 @@ void PowerOff(void){
 void Info(void){
 	static const char hex[] = "0123456789ABCDEF";
 	kvs("pinfinder", PF_VERSION);
+	kvs("mcu", MCU_NAME);    //the build target (the SPIN05 and F031 read the same IDCODE)
 	kv("idcode");
 	uint32_t id = *(volatile uint32_t*)0x40013400;    //DBGMCU_IDCODE
 	for(int8_t i=28;i>=0;i-=4) outc(hex[(id>>i)&15]);
