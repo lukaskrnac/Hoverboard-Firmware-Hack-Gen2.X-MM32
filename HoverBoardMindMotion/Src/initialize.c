@@ -249,15 +249,12 @@ uint32_t adcRest;
 __attribute__((noinline)) void adc_Init(void){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 	//adc clock pclk / 6 (72 MHz), 12 bit; right aligned, scan, TIM1 TRGO (every pwmDiv-th update, main.c), triggered
-	ADC1->ADCFG = (ADC1->ADCFG&~(ADC_CFGR_PRE|ADC_CFGR_RSLTCTL))|ADC_CFGR_PRE_6|ADC_CFGR_RSLTCTL_12;
-	ADC1->ADCR = (ADC1->ADCR&~(ADC_CR_ALIGN|ADC_CR_MODE|ADC_CR_TRGSEL))|ADC_CR_RIGHT|ADC_CR_T1_TRIG|ADC_CR_SCAN;
-	ADC1->ADCR |= ADC_CR_TRGEN;
 	//7.5 cycles sampling for every channel; the internal reference (channel 15) and the temperature sensor
-	//(channel 14, after the pins in the scan: busLead unchanged) on
-	ADC1->ADCFG = (ADC1->ADCFG&~ADC_CFGR_SAMCTL)|ADC_CFGR_SAMCTL_7_5;
-	ADC1->ADCHS |= ADC_CHSR_CHV;
-	ADC1->ADCFG |= ADC_CFGR_TEN|ADC_CFGR_VEN;
-	ADC1->ADCHS |= ADC_CHSR_CHT;
+	//(channel 14, after the pins in the scan: busLead unchanged) on. One write per register, ADEN last.
+	ADC1->ADCFG = (ADC1->ADCFG&~(ADC_CFGR_PRE|ADC_CFGR_RSLTCTL|ADC_CFGR_SAMCTL))|ADC_CFGR_PRE_6|ADC_CFGR_RSLTCTL_12|
+	              ADC_CFGR_SAMCTL_7_5|ADC_CFGR_TEN|ADC_CFGR_VEN;
+	ADC1->ADCR = (ADC1->ADCR&~(ADC_CR_ALIGN|ADC_CR_MODE|ADC_CR_TRGSEL))|ADC_CR_RIGHT|ADC_CR_T1_TRIG|ADC_CR_SCAN|ADC_CR_TRGEN;
+	ADC1->ADCHS |= ADC_CHSR_CHV|ADC_CHSR_CHT;
 	ADC1->ADCFG |= ADC_CFGR_ADEN;
 	//the battery, bus shunt and (both) phase current pins that have an adc channel: analog, in the scan
 	//adcRest: the channels before the last phase pin that are not phase pins (adcs[] in channel order), left
@@ -281,10 +278,8 @@ __attribute__((noinline)) void adc_Init(void){
 	for(uint8_t k=0;k<3;k++){
 		if(opOut[k]==ITOTALPIN||opOut[k]==IPHASEAPIN||opOut[k]==IPHASEBPIN) csr |= 1u<<(8*k);
 	}
-	if(csr){
-		RCC->APB2ENR |= 1u<<15;
-		*(volatile uint32_t*)0x40013C10 = csr;
-	}
+	RCC->APB2ENR |= 1u<<15;    //(also with none: csr 0 leaves them off)
+	*(volatile uint32_t*)0x40013C10 = csr;
 #endif
 
 	ADC1->ADCR |= ADC_CR_ADIE;    //end of conversion interrupt

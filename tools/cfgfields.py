@@ -95,6 +95,7 @@ FIELDS = {
     111: ("autooff", "num", "power off after this many minutes disarmed and without a command (set point / v1 frame; telemetry reads do not count); 0/65535 = off (the host decides)"),
     112: ("batdeadoff", "num", "power off at the low battery cut-off (batempty, DC_BUS_UNDER_VOLTAGE, standing): 2 = on, 1/0/65535 = off"),
     113: ("tempderate", "num", "temperature derating band below templimit, C: FOC current limit / block duty / sine modulation fall linearly to 0 at templimit (slewed ~2 s); 0/65535 = off"),
+    115: ("bootarmed", "num", "2 = armed at boot (closed loop: drives the saved mode, holds the wheel in position mode, before any master connected); 1/0/65535 = IDLE at boot until a master arms (Set_Axis_State CLOSED_LOOP, or a v1 frame without state bit 64)"),
     114: ("deadtime", "num", "TIM1 dead time between a half bridge's switches, ns, read at boot (restart); 0..1750; 0/65535 = 500 (the F031 board's FD2103S conducted through at 14 ns: hot MOSFETs)"),
     96: ("extmagic", "num", "0xDCAD = extension record valid"),
     97: ("imumount", "num", "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"),

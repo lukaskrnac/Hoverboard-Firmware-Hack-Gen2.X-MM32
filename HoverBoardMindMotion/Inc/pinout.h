@@ -62,6 +62,7 @@ extern uint16_t pinstorage[128];    //board configuration, loaded from the sim-E
 #define TEMP_DERATE pinstorage[113]      //derating band below templimit, C: the current limit (FOC) / max duty (block,
                                          //sine) falls linearly to 0 at templimit; 0/65535 = off
 #define DEAD_TIME pinstorage[114]        //TIM1 dead time, ns, read at boot; 0/65535 = 500 (initialize.c)
+#define BOOT_ARMED pinstorage[115]       //2: armed at boot (closed loop, drives its saved mode); else IDLE until a master arms
 #define HALL_INVERT pinstorage[95]       //2: the three hall signals inverted (detect hall), else as read
 static inline int cfgBool(uint16_t v, int def){ return v==2 ? 1 : (v==1 ? 0 : def); }
 

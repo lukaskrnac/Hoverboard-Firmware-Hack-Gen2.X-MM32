@@ -692,6 +692,12 @@
    "access": "rw",
    "unit": "TIM1 dead time between a half bridge's switches, ns, read at boot (restart); 0..1750; 0/65535 = 500 (the F031 board's FD2103S conducted through at 14 ns: hot MOSFETs)"
   },
+  "hoverboard.config.bootarmed": {
+   "id": 115,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "2 = armed at boot (closed loop: drives the saved mode, holds the wheel in position mode, before any master connected); 1/0/65535 = IDLE at boot until a master arms (Set_Axis_State CLOSED_LOOP, or a v1 frame without state bit 64)"
+  },
   "vbus_voltage": {
    "id": 256,
    "type": "float",

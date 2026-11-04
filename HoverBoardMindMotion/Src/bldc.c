@@ -29,8 +29,8 @@ volatile int32_t posVelFf;        //its velocity feed forward, rpm
 static uint32_t inT;              //last speedupdate(), for the input modes
 static int32_t vRamp;             //pwm control: the applied command, permille, slewed (VOLT_SLEW)
 #define VOLT_SLEW 1               //permille per ms: full scale in 1 s
-volatile uint8_t cmdSource = 1;   //protocol of the last command frame: 1 v1 ('/'), 2 CANSimple
-volatile uint8_t axisState = AXIS_CLOSED_LOOP;    //ODrive AxisState: IDLE 1 = gates off, CLOSED_LOOP 8
+volatile uint8_t cmdSource = 2;   //protocol of the last command frame: 1 v1 ('/'), 2 CANSimple (boot: axisState decides)
+volatile uint8_t axisState = AXIS_IDLE;    //ODrive AxisState: IDLE 1 = gates off, CLOSED_LOOP 8 (boot: BOOT_ARMED)
 volatile uint32_t axisErrors;     //ODrive Error bits, the conditions active now (see bldc.h)
 volatile uint32_t axisDisarm;     //the error that switched the axis to IDLE, until Clear_Errors
 volatile uint8_t posDone;         //position mode: at the target

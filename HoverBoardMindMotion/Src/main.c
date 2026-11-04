@@ -35,7 +35,7 @@ volatile uint8_t powerOffReq;    //CANSimple hoverboard.power_off: the power but
 volatile int speed=0;
 volatile int pwm=0;
 volatile int realspeed=0;
-volatile uint8_t  wState = STATE_LED_BATTLEVEL;    //battery LEDs until the remote sends a state
+volatile uint8_t  wState = STATE_LED_BATTLEVEL|STATE_DISABLE;    //battery LEDs, disarmed until the remote sends a state
 static uint8_t flicker=0;
 volatile uint8_t charging;    //charger connected (CHARGEPIN, debounced)
 volatile uint8_t footPads;    //infrared foot sensors covered: bit k = IR_PIN(k) (debounced)
@@ -111,6 +111,10 @@ s32 main(void){
 	//shorter low side time (foc.c). The RAM value only takes effect here (the code uses the timer's ARR).
 	if(PWM_RES<2048||PWM_RES>16383) PWM_RES = 8192;
 	pwmDiv = PWM_RES>=8192 ? 1 : (uint8_t)((8192+PWM_RES/2)/PWM_RES);
+	//disarmed at boot (ODrive's startup IDLE): nothing drives until a master arms, Set_Axis_State CLOSED_LOOP
+	//or a v1 command frame without state bit 64 (boot: cmdSource 2, axisState IDLE, wState disabled). It booted
+	//armed: in position mode it held the wheel with current before anything had connected. BOOT_ARMED 2: armed.
+	if(BOOT_ARMED==2) axisState = AXIS_CLOSED_LOOP;
 
 	//initialize normal gpio
 	io_init();

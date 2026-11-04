@@ -145,6 +145,7 @@ void ADC1_COMP_IRQHandler(void){
 				}
 			}
 			TIM1->SR = ~TIM_SR_BI;    //break events before this (start-up) do not count
+			gatesoff = 1;    //the gates stay off until speedupdate() (from the next pass) decides
 			poweron++;
 		}else{
 			//integer math only: this runs every pwm period, with soft-float double math the isr took 45% cpu (gcc).

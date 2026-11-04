@@ -248,6 +248,11 @@ Command line access over SWD: `python3 tools/mm32config.py show` / `set <name> <
 
 ## Safety: watchdog, faults, current and voltage limits
 
+- **Starts disarmed** (IDLE, gates off) like ODrive: nothing drives until a master arms it (CANSimple
+  `Set_Axis_State` CLOSED_LOOP_CONTROL, or a v1 command frame without state bit 64). `bootarmed=2` starts
+  armed in the saved mode instead (position mode then holds the wheel at power on).
+- Arming in position mode starts at the wheel's position: while disarmed the target follows the wheel
+  (`input_pos` = the position estimate), so a stale target cannot pull it away.
 - Independent watchdog ~0.5 s; any reset releases the power latch, so a hung board switches itself off.
 - A fault or unexpected interrupt switches the bridge off (TIM1 MOE) before the watchdog resets.
 - Hardware current limit: ADC watchdog and the break input (comparator) cut the gates for 2 control periods

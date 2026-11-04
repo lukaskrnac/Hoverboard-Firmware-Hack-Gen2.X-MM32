@@ -116,5 +116,6 @@
 	F(112, 0, "batdeadoff") \
 	F(113, 0, "tempderate") \
 	F(114, 0, "deadtime") \
+	F(115, 0, "bootarmed") \
 
-#define CFG_FIELD_COUNT 115
+#define CFG_FIELD_COUNT 116
