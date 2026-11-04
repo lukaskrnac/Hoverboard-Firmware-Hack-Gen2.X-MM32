@@ -11,7 +11,7 @@
 HALLType HALL1;
 volatile int32_t fastspeed;
 volatile uint8_t hallAngleSure;    //the angle is known: a regular edge, its interpolation not run out
-volatile uint16_t hallInvalid;    //invalid hall readings (diagnostic)
+uint16_t hallScore;      //hall fault score: HALL_TRIP and above = MISSING_ESTIMATE (speedupdate)
 volatile int16_t hallAngleSample;  //rotor angle at this period's current sample (Angle has the output lead)
 volatile int32_t hallPosFine;      //position, 1/POS_FINE hall step (odometer and the angle in the sector)
 static uint16_t bndLo[8], bndHi[8];  //per hall state its edges (lower: entered with rising angle, upper)
@@ -290,7 +290,14 @@ void HALLModuleCalc(HALLType *u){
 	//noise at high current) for one poll made the next edge compare against it and not count. The
 	//edge was lost (the odometer step too), the angle tracker waited a sector for it and then jumped
 	//85 deg: a 21 A trip with field weakening at 600 rpm.
-	if(hall_to_pos[raw]) u->PreRaw = raw; else hallInvalid++;
+	//hall fault: an invalid state scores 8, a valid poll takes 1 off. A broken or stuck sensor wire reads 0 / 7
+	//in one sector of six, a missing sensor supply 0 / 7 all the time: the speed and angle are gone, a speed
+	//loop on them drives full current (a runaway). Single invalid polls (noise at high current, above) stay
+	//near 0; it trips after 32 invalid polls in a row (7 ms) or with more than 1 in 9 invalid (a stuck wire at
+	//600 rpm: ~0.1 s, sooner when slower)
+	uint16_t hs = hallScore;
+	if(hall_to_pos[raw]){ u->PreRaw = raw; if(hs) hs--; }else if(hs<HALL_TRIP) hs += 8;
+	hallScore = hs;
 	//fine position: the odometer (the sector centre) plus the tracker's angle in the sector while it runs
 	//(the odometer counts up as the electrical angle falls); in the FOC position hold the angle the rotor
 	//is held at (foc.c); standing otherwise the sector centre

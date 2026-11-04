@@ -30,6 +30,8 @@ HALLType;
 extern HALLType HALL1;
 extern volatile uint8_t hallAngleSure;    //sine/FOC angle known (hallhandle.c); FOC applies d current only then
 extern volatile int32_t fastspeed;    //rpm from the last hall interval (hallhandle.c), signed like realspeed
+extern uint16_t hallScore;    //hall fault score (hallhandle.c); HALL_TRIP and above: MISSING_ESTIMATE
+#define HALL_TRIP 256
 
 extern void HALLModuleInit(HALLType *u);
 extern void HALLModuleCalc(HALLType *u);

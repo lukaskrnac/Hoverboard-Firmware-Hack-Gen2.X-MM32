@@ -725,7 +725,9 @@ void SetSysClockTo48_HSI(void)
 void SetSysClockToXX_HSI(void)
 {
     u32 temp;
+#if !defined(MCU_SPIN25)
     u8 plln, pllm;
+#endif
 
     RCC->CR |= RCC_CR_HSION;
 
@@ -765,9 +767,12 @@ void SetSysClockToXX_HSI(void)
     //MM32SPIN25: a real PLL from the HSI (48 MHz / 4 = 12 MHz), x6 = 72 MHz like the other MCUs (the vendor
     //file and the old Keil build ran it at 96 MHz). Bit 20 is PLLDIV here, not HSI_72M. As the SPIN2x pack's
     //SetSysClockToXX_HSI(): PLLMUL bits 26.., PLLDIV bits 20.., PLLON bit 24, PLLRDY bit 25.
-    AutoCalPllFactor(12000000, SystemCoreClock, &plln, &pllm);
-    RCC->CR &= (u32)0x000FFFFF;
-    RCC->CR |= ((u32)plln << 26) | ((u32)pllm << 20);
+    //12 MHz x 6 / 1: PLLMUL 5, PLLDIV 0, what AutoCalPllFactor(12000000, 72000000) finds (as constants: the
+    //search loop cost flash); the PLL fields were cleared just above
+#if SYSCLK_HSI_XXMHz != 72000000
+#error "SPIN25 PLL factors are for 72 MHz"
+#endif
+    RCC->CR |= 5U << 26;
     RCC->CR |= 1U << 24;
     while((RCC->CR & (1U << 25)) == 0) {
     }

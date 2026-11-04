@@ -188,13 +188,14 @@ void speedupdate(void){
 		}else spin = 0;
 		if(spin>=25) trip |= ERR_SPINOUT_DETECTED;
 		if(hwOcFault){ hwOcFault = 0; trip |= ERR_DRV_FAULT; }    //repeated breaks of the break input (interrupt.c)
+		if(*(volatile uint16_t*)&hallScore>=HALL_TRIP) trip |= ERR_MISSING_ESTIMATE;    //hall sensor fault (hallhandle.c), also disarmed
 		//CANSimple: disarm until Clear_Errors (IDLE from the next pass; the gates are off now). v1 masters
 		//cannot clear errors: the gates stay off until command 0 or a disarm (state bit 64), as the phase
 		//current trip (soft over-current and over-temperature clear by themselves, below)
 		static uint32_t v1Trip;
 		if(cmdSource==2||idle||(speed==0&&CONTROL(DRIVEMODE)!=CTRL_POSITION)) v1Trip = 0;
 		if(trip&&cmdSource==2) axisDisarm |= trip;
-		else v1Trip |= trip&(ERR_SPINOUT_DETECTED|ERR_DC_BUS_OVER_REGEN_CURRENT|ERR_DRV_FAULT);
+		else v1Trip |= trip&(ERR_SPINOUT_DETECTED|ERR_DC_BUS_OVER_REGEN_CURRENT|ERR_DRV_FAULT|ERR_MISSING_ESTIMATE);
 		gatesoff = lowbatperm || axisDisarm || v1Trip || idle || hot || (charging&&cfgFlag(CHARGE_LOCK, 0));
 		uint8_t coast = 0, brake = 0;
 		//regeneration (braking, slowing down in sine/FOC) into a supply that cannot take it back, e.g. a

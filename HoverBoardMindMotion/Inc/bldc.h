@@ -25,6 +25,7 @@ extern const uint8_t hall_to_pos[8];
 //CANSimple (ODrive) axis state and error bits, cansimple.c
 #define AXIS_IDLE 1
 #define AXIS_CLOSED_LOOP 8
+#define ERR_MISSING_ESTIMATE         0x8u      //hall sensor fault: invalid states / skipped sectors (hallhandle.c)
 #define ERR_DRV_FAULT                0x20u     //hardware current limit (adc watchdog / break input) repeating
 #define ERR_DC_BUS_OVER_VOLTAGE      0x100u
 #define ERR_DC_BUS_UNDER_VOLTAGE     0x200u

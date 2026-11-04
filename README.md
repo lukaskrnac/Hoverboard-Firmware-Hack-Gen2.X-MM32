@@ -255,6 +255,10 @@ Command line access over SWD: `python3 tools/mm32config.py show` / `set <name> <
   (`input_pos` = the position estimate), so a stale target cannot pull it away.
 - Independent watchdog ~0.5 s; any reset releases the power latch, so a hung board switches itself off.
 - A fault or unexpected interrupt switches the bridge off (TIM1 MOE) before the watchdog resets.
+- **Hall sensor fault:** invalid hall states (0 / 7: a broken or stuck sensor wire, a missing sensor supply)
+  disarm with MISSING_ESTIMATE (0x8) before the lost speed and angle can run the motor away: 32 bad readings
+  in a row (7 ms) or more than 1 in 9; single noisy readings do not count. Also reported while disarmed;
+  arming is refused while it lasts (Clear_Errors once the sensors read valid again).
 - Hardware current limit: ADC watchdog and the break input (comparator) cut the gates for 2 control periods
   per event; repeated break events raise DRV_FAULT and disarm.
 - Overvoltage: the board stops feeding energy into the bus above `batfull`. **A bench supply cannot sink
