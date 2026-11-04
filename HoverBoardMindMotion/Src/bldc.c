@@ -227,6 +227,10 @@ void speedupdate(void){
 		//voltage ramp from 1200 rpm (sine field weakening) pumped a bench supply to 46.6 V.
 		uint8_t regen = BAT_SET(BAT_FULL)&&fvbat*10>(int32_t)BAT_FULL;
 		if(held||ctl==CTRL_PWM||ctl==CTRL_TORQUE) InputTrack(hallPosFine, realspeed);
+		//disarmed: the position target follows the wheel too (ODrive sets input_pos to the estimate on arming).
+		//It kept the last one (0 after boot): Set_Axis_State CLOSED_LOOP drove the wheel back there before the
+		//master's first Set_Input_Pos, at up to vel_limit when it had been turned while idle (2026-11-04)
+		if(held) posCmd = hallPosFine;
 		//velocity set point; the command limited first, the ramp would wind up to it
 		int32_t vin = speed>vlim ? vlim : (speed<-vlim ? -vlim : speed);
 		int32_t spd = ctl==CTRL_SPEED ? InputVel(vin, dtms, regen, realspeed) : speed;
