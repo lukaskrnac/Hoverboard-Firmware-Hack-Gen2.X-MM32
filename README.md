@@ -69,7 +69,7 @@ Board photos: [MM32SPIN05PF](https://github.com/RoboDurden/Hoverboard-Firmware-H
 ## Quick start
 
 ```bash
-# 1. tools: Arm GNU toolchain (arm-none-eabi-gcc, tested 14.2.Rel1), make, python3, pyOCD
+# 1. tools: Arm GNU toolchain 14.2.Rel1 (arm-none-eabi-gcc; other versions may not fit), make, python3, pyOCD
 pip install pyocd
 
 # 2. build PinFinder + main firmware for your MCU (from the repo root)
@@ -103,6 +103,21 @@ The top-level `Makefile` forwards to `HoverBoardMindMotion/Makefile`; both work 
 A change of flags (`TRACE`, `CROSS`) rebuilds everything. Integer division uses the chip's hardware divider
 (`Src/hwdiv.S`), floats a compact soft float (`Src/softfloat.c`; PinFinder uses integers only); `-flto -Os`. The flash is nearly full
 (~31.6 of 31 KB used on every MCU), so new features need equal savings.
+
+Use **GCC 14.2.1** (Arm GNU Toolchain 14.2.Rel1): every compiler version generates a different size, and
+the Makefile warns about any other version. Measured for the SPIN05 main firmware: 14.2.1 31648 B,
+13.3.1 31704 B (still fits), 15.2.1 32036 B (does not fit). The link order is fixed in the Makefile because
+with `-flto` it changes the size too (a different order cost 152 B), so the same compiler builds the same
+image on every host.
+
+**Windows:** the Makefile needs GNU make and a POSIX `sh` (with `tr`, `cmp`, `mkdir -p`) on `PATH`, for
+example the [xPack Windows Build Tools](https://github.com/xpack-dev-tools/windows-build-tools-xpack/releases)
+(make + busybox sh) or Git for Windows / MSYS2, plus the Windows zip of
+[Arm GNU Toolchain 14.2.Rel1](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+(`arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-arm-none-eabi.zip`). PinFinder also needs Python on `PATH`;
+on Windows the Makefile calls `python` (override with `make PYTHON=...`). Tested from `cmd.exe` with xPack
+Build Tools 4.4.1 + Arm 14.2.Rel1 + Anaconda Python: `make release` builds all eight images byte-identical
+to the Linux build.
 
 Precompiled images are not kept in git; build them with `make release` or take them from the project's
 releases.

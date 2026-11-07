@@ -15,6 +15,12 @@ CROSS   ?= arm-none-eabi-
 CC      := $(CROSS)gcc
 OBJCOPY := $(CROSS)objcopy
 SIZE    := $(CROSS)size
+# the images fill the 31 KB to ~100 B; other GCC versions generate other sizes (13.3.1: SPIN05 56 B more,
+# 15.2.1: 388 B more = does not fit)
+GCC_VERSION := $(shell $(CC) -dumpversion 2>/dev/null)
+ifneq ($(filter-out 14.2.1,$(GCC_VERSION)),)
+$(warning warning: $(CC) $(GCC_VERSION): this firmware is sized for 14.2.1 (Arm GNU Toolchain 14.2.Rel1), it may not fit)
+endif
 
 # All MCUs share the SPIN05 register headers and HAL: their peripherals have the same register layout
 # (compared in the vendor SVD files). They differ in the pin tables (hardware.c), the clock (SPIN25: PLL)
@@ -31,11 +37,23 @@ BUILD   := build/$(call mcu_dir,$(MCU))
 TARGET  := $(BUILD)/hoverboard
 LDSCRIPT := Device/MM32SPIN0x/Source/mm32spin05.ld
 
-SRC := $(filter-out Src/i2c.c,$(wildcard Src/*.c)) \
-       $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
+# The link order is fixed: with -flto it changes GCC's inlining, and the image size with it (SPIN05 31648 B
+# in this order, 31800 B = 56 B too big with FOC_Math.c first). $(wildcard) is sorted differently by each
+# make (case-insensitive in a Linux UTF-8 locale, byte order with LC_ALL=C and on Windows), so Src/ is listed
+# by hand (a new file goes in here) and the other lists, all lower case, are $(sort)ed (byte order).
+HAL_SRC := $(sort $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c))
+SRC := $(addprefix Src/,bldc.c calculation.c cansimple.c delay.c foc.c FOC_Math.c hallhandle.c hardware.c \
+         i2chw.c imu.c imumath.c initialize.c inputmode.c interrupt.c ipark.c main.c pwm_gen.c \
+         remoteUartBus.c sim_eeprom.c softfloat.c uart.c) \
+       $(HAL_SRC) \
        Device/MM32SPIN0x/Source/system_mm32spin05.c \
        Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
-ASRC := $(wildcard Src/*.S)
+ASRC := Src/hwdiv.S
+# a source in Src/ that is in neither list (Src/i2c.c is PinFinder's) would silently be left out
+SRC_MISSING := $(filter-out $(SRC) Src/i2c.c,$(wildcard Src/*.c))
+ifneq ($(SRC_MISSING),)
+$(error $(SRC_MISSING) not in SRC (Makefile))
+endif
 
 # vendor and CMSIS headers as system headers: their warnings are not ours to fix
 INC := -IInc -isystem Library/MM32SPIN05/HAL_Lib/Inc -isystem Device/MM32SPIN0x/Include -isystem Device/CMSIS/Include
@@ -83,7 +101,12 @@ $(TARGET).bin: $(TARGET).elf
 $(TARGET).hex: $(TARGET).elf
 	$(OBJCOPY) -O ihex $< $@
 
+# Windows Python installs (python.org, Anaconda) have no python3 command
+ifeq ($(OS),Windows_NT)
+PYTHON ?= python
+else
 PYTHON ?= python3
+endif
 flash: $(TARGET).bin
 	$(PYTHON) ../tools/mm32flash.py $<
 
@@ -91,12 +114,12 @@ flash: $(TARGET).bin
 # hardware, config, uart and startup code. make pinfinder / make flash-pinfinder
 PF       := $(BUILD)/pinfinder
 PF_SRC   := Src/hardware.c Src/initialize.c Src/sim_eeprom.c Src/uart.c Src/i2c.c Src/imumath.c \
-            $(wildcard Library/MM32SPIN05/HAL_Lib/Src/*.c) \
+            $(HAL_SRC) \
             Device/MM32SPIN0x/Source/system_mm32spin05.c Device/MM32SPIN0x/Source/startup_mm32spin0x_gcc.c
 # PinFinder's own sources are compiled from copies with the messages compressed (../tools/pfstrings.py,
 # expanded by out() and eq()); the config names too (the copy of cfgnames.h there is found first); pfdict.c
 # is the pair table
-PF_C     := $(wildcard PinFinder/*.c)
+PF_C     := $(sort $(wildcard PinFinder/*.c))
 PFZ      := $(BUILD)/pfz
 PFZ_SRC  := $(addprefix $(PFZ)/,$(notdir $(PF_C)) pfdict.c)
 PF_OBJ   := $(addprefix $(BUILD)/,$(PF_SRC:.c=.o) Src/hwdiv.o) $(PFZ_SRC:.c=.o)
@@ -104,7 +127,7 @@ $(PFZ)/%.o: CFLAGS += $(WARN) -IPinFinder
 
 $(PFZ)/stamp: $(PF_C) PinFinder/cfgnames.h ../tools/pfstrings.py
 	$(PYTHON) ../tools/pfstrings.py $(PFZ) $(PF_C) PinFinder/cfgnames.h
-	@touch $@
+	@echo stamp> $@
 $(PFZ_SRC): $(PFZ)/stamp ;
 
 $(PFZ)/%.o: $(PFZ)/%.c Makefile $(FLAGS_STAMP)
@@ -145,7 +168,7 @@ release: targets
 	@ls -l $(RELEASE)/*
 
 help:
-	@sed -n '2,/^$$/{s/^# \{0,1\}//;p}' Makefile
+	@sed -n '2,/^$$/{s/^# \{0,1\}//;p}' < Makefile
 
 .PHONY: all both clean clean-all flash pinfinder flash-pinfinder targets release help
 -include $(PF_OBJ:.o=.d)
