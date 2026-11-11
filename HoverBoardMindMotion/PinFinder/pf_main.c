@@ -44,6 +44,8 @@ int main(void){
 		while(!UartFind());    //the user connects the board's TX and RX together
 	}
 	uartUsed = UART_GPIO_Init();
+	OWN_TX = TXPIN;
+	OWN_RX = RXPIN;
 	for(uint8_t i=0;i<UARTCOUNT;i++){    //push-pull: one terminal on the line, not the RemoteUartBus
 		if(uarts[i].io==TXPIN&&uarts[i].tx) pinMode(TXPIN, OUTPUT_AF);
 	}

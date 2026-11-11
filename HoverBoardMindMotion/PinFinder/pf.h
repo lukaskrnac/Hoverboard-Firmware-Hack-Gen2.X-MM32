@@ -58,7 +58,7 @@ void AdcScanAt(uint32_t chmask, uint16_t cnt);    //started at TIM1 counter cnt
 uint16_t AdcValue(uint8_t ch);          //the last conversion of a channel
 int8_t AdcChannel(uint16_t pin);        //-1: the pin has no adc channel
 int32_t VddMv(void);                    //MCU supply from the internal 1.2 V reference
-int32_t PinMv(uint16_t pin);            //voltage at an adc pin (VDD scaled)
+int32_t PinMv(uint16_t pin);            //voltage at a free or analog adc pin (VDD scaled), -1: no channel / pin in use
 int32_t VbatMv(void);                   //battery: VBATPIN x VBAT_DIVIDER, -1 without the pin
 void MotorInit(void);
 void GatesOff(void);
@@ -70,7 +70,12 @@ int32_t Sin16(uint16_t a);                   //Q15    //k = 0..11: field at k x 
 uint16_t DutyForMv(int32_t mv);         //duty for this average phase voltage at the measured (or assumed 42 V) battery
 int32_t Div64(int64_t n, int32_t d);   //n / d, truncated (no floats in PinFinder)
 int32_t MulDiv(int32_t a, int32_t b, int32_t c);    //a * b / c with a 64 bit product
-uint8_t PinFree(uint16_t pin);          //not SWD, not configured for anything (pins in words 0-17, 23, 24)
+uint8_t PinFree(uint16_t pin);          //not one of ownPins, in no pin word (cfgfields.py: pin = 1)
+#define OWN_PINS 5
+extern uint16_t ownPins[OWN_PINS];      //SWD PA13, PA14, then PinFinder's uart TX, RX and the latch it holds
+#define OWN_TX ownPins[2]
+#define OWN_RX ownPins[3]
+#define OWN_LATCH ownPins[4]
 uint8_t HallState(void);                //C*4 + B*2 + A, 7 - that with hallinvert (the main firmware's hallpos(1))
 const char* PinName(uint16_t pin);
 uint16_t PinByName(const char* s);      //PIN_NONE: not a pin name
@@ -80,6 +85,7 @@ extern uint8_t uartUsed;                //1: UART1, 2: UART2
 int16_t CfgIndex(const char* name);     //-1: unknown
 const char* CfgName(uint8_t idx);       //0: unnamed word
 uint8_t CfgIsPin(uint8_t idx);
+int16_t CfgPinWord(uint16_t pin, uint8_t skip);    //the pin word (not skip) set to pin, -1: none
 void CfgPrint(uint8_t idx);             //one result line
 uint8_t CfgChanged(void);               //differs from the saved record
 uint8_t CfgWordChanged(uint8_t idx);    //this word differs from the saved record

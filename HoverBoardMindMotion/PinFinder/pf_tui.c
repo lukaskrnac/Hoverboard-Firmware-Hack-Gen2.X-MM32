@@ -177,7 +177,7 @@ static void ledKey(int c){
 	if(c=='p'){ BUZZER_PASSIVE = 2; c = 'z'; }
 	else if(c=='z') BUZZER_PASSIVE = 1;
 	if(c=='\r'||c=='\n'){
-		for(uint16_t p=0;p<PINCOUNT;p++) if(PinFree(p)) pinMode((uint8_t)p, INPUT);
+		for(uint16_t p=0;p<PINCOUNT;p++) if(PinFree(p)) PinRest(p);
 		draw();
 		return;
 	}

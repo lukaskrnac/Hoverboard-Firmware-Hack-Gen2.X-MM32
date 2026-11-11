@@ -185,9 +185,9 @@ void ShowAdc(void){
 	kvmv("vdd", vdd);
 	for(uint8_t i=0;i<ADCCOUNT;i++){
 		uint16_t p = adcs[i].io;
-		if(!PinFree(p)&&p!=VBATPIN&&p!=ITOTALPIN&&p!=IPHASEAPIN&&p!=IPHASEBPIN) continue;
-		kv(PinName(p));
 		int32_t mv = PinMv(p);
+		if(mv<0) continue;    //a pin in use
+		kv(PinName(p));
 		if(agent){ outi(mv); out(" vbat_mv="); outi(mv*(int32_t)VBAT_DIVIDER); }
 		else{ outfix(mv, 3); out(" V  (x"); outi(VBAT_DIVIDER); out(" = "); outfix(mv*(int32_t)VBAT_DIVIDER/10, 2); out(" V)"); }
 		if(p==VBATPIN) out(agent ? " vbat" : "  <- vbat");
@@ -204,10 +204,13 @@ void ShowAdc(void){
 //reading changed in proportion (within 3 %) and calibrates its divider.
 int32_t vbLevelMv;    //the first level's voltage, 0: none stored (the TUI asks for the second)
 static int32_t vbLevel[ADCCOUNT];
+static int32_t vbRead(uint16_t p){    //candidates: free pins and the old battery pin (not the other analog inputs)
+	return PinFree(p)||p==VBATPIN ? PinMv(p) : 0;
+}
 void DetectVbat(int32_t mv){
 	if(mv<=0){ err("give the voltage you measure: detect vbat 36.5"); return; }
 	if(!vbLevelMv||(mv-vbLevelMv<300&&vbLevelMv-mv<300)){    //first level (or the same voltage again)
-		for(uint8_t i=0;i<ADCCOUNT;i++) vbLevel[i] = PinMv(adcs[i].io);
+		for(uint8_t i=0;i<ADCCOUNT;i++) vbLevel[i] = vbRead(adcs[i].io);
 		vbLevelMv = mv;
 		kvmv("level1", mv);
 		note("change the voltage (bench supply, or plug in the charger) and measure it again");
@@ -217,7 +220,7 @@ void DetectVbat(int32_t mv){
 	uint16_t best = PIN_NONE;
 	int32_t bestErr = 30, bestMv = 0;    //0.1 %
 	for(uint8_t i=0;i<ADCCOUNT;i++){
-		int32_t m = PinMv(adcs[i].io), m0 = vbLevel[i];
+		int32_t m = vbRead(adcs[i].io), m0 = vbLevel[i];
 		if(m0<50||m<50) continue;
 		int32_t e = (m*vbLevelMv-m0*mv)/(m0*mv/1000);    //the reading's change against the voltage's
 		if(e<0) e = -e;
@@ -227,6 +230,7 @@ void DetectVbat(int32_t mv){
 	kvmv("level2", mv);
 	vbLevelMv = 0;
 	if(best==PIN_NONE){ ShowAdc(); err("no pin followed the voltage change: detect vbat <V> again for a new first level"); return; }
+	PinRest(VBATPIN);    //the old battery pin is free now (the same pin: the next reading sets it analog again)
 	VBATPIN = best;
 	VBAT_GAIN = (uint16_t)(mv*1000/bestMv);
 	VBAT_DIVIDER = (uint16_t)((mv+bestMv/2)/bestMv);
@@ -430,7 +434,7 @@ uint8_t UartFind(void){
 		for(uint8_t r=0;r<UARTCOUNT;r++){
 			if(uarts[r].tx||uarts[r].uart!=uarts[t].uart||!PinFree(uarts[r].io)) continue;
 			for(uint8_t i=0;i<UARTCOUNT;i++){    //no other pin on a uart function
-				if(PinFree(uarts[i].io)){ pinMode(uarts[i].io, INPUT); pinModeAF(uarts[i].io, GPIO_AF_7); }
+				if(PinFree(uarts[i].io)){ PinRest(uarts[i].io); pinModeAF(uarts[i].io, GPIO_AF_7); }
 			}
 			UART_TypeDef* u = uarts[t].uart==2 ? UART2 : UART1;
 			UARTX_Init(PF_BAUD, uarts[t].uart);
@@ -456,6 +460,7 @@ uint8_t UartFind(void){
 
 //---------------------------------------------------------------- power latch
 void LatchHold(void){
+	OWN_LATCH = LATCHPIN;
 	if(LATCHPIN<PINCOUNT){
 		pinMode(LATCHPIN, OUTPUT);
 		digitalWrite(LATCHPIN, 1);
@@ -479,18 +484,13 @@ static uint8_t debuggerAttached(void){
 //released (pulled down) one at a time and STAY released; before each the pin is saved as LATCHPIN. The board
 //switches off when the last pin holding it is released (a board held by either of two pins too): the next
 //start drives that pin. Still on after all pins: no latch (slave board). Esc in phase 1 cancels.
-static uint8_t latchCand(uint16_t p){ return PinFree(p)&&p!=TXPIN&&p!=RXPIN; }
-static void latchRestore(void){
+static void latchRestore(void){    //no latch: every free pin pulled up (the old latch too: a candidate again)
 	LATCHPIN = PIN_NONE;
-	holdAll = 1;
-	master = 0;
-	releasePins();
+	LatchHold();
 }
 void LatchFind(void){
 	if(debuggerAttached()) warn("debugger attached: may power the MCU");
-	LATCHPIN = PIN_NONE;
-	holdAll = 1;
-	releasePins();    //pulled up
+	latchRestore();
 	note("all free pins pulled up: let go of the power button (remove the short), then press Continue (any key). Off at once: set the latch by hand");
 	for(uint32_t t=millis;!aborted();){
 		if(millis-t>120000){ latchRestore(); err("no Continue within 2 min"); return; }
@@ -502,7 +502,7 @@ void LatchFind(void){
 	//later pin: its capacitors kept it running for a while after the latch let go
 	int32_t vb0 = VbatMv(), vd0 = VddMv();
 	for(uint16_t p=0;p<PINCOUNT;p++){
-		if(!latchCand(p)) continue;
+		if(!PinFree(p)) continue;
 		LATCHPIN = p;
 		CfgSave();    //saved before the release: if the board goes off at once, the next start holds this pin
 		LATCHPIN = PIN_NONE;
@@ -533,7 +533,7 @@ void PowerOff(void){
 	GatesOff();
 	note("switching off");
 	Wait(50);
-	if(LATCHPIN<PINCOUNT){ digitalWrite(LATCHPIN, 0); pinMode(LATCHPIN, INPUT_PULLDOWN); }
+	if(OWN_LATCH<PINCOUNT){ digitalWrite(OWN_LATCH, 0); pinMode(OWN_LATCH, INPUT_PULLDOWN); }    //the pin held
 	for(uint16_t p=0;p<PINCOUNT;p++){
 		if(holdAll&&PinFree(p)) pinMode((uint8_t)p, INPUT_PULLDOWN);
 	}
@@ -624,7 +624,7 @@ static uint8_t busFit(uint16_t (*avg)[16], uint8_t c, const int32_t* xs, int32_t
 	return 1;
 }
 
-void DetectCurrent(int32_t mv, int32_t shunt_uohm){
+static void detectCurrent(int32_t mv, int32_t shunt_uohm){
 	if(mv<=0) mv = 1000;
 	uint32_t mask = freeAdcMask();
 	int32_t zero[16], v[16];
@@ -740,7 +740,7 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	}
 	if(best==PIN_NONE){
 		//a zero below adc 0 hides small currents (F031: a filtered pin reads 0 up to ~0.75 A average)
-		if(mv<1500){ note("no bus current pin above the adc zero: again at 1.5x the voltage"); DetectCurrent(mv*3/2, shunt_uohm); return; }
+		if(mv<1500){ note("no bus current pin above the adc zero: again at 1.5x the voltage"); detectCurrent(mv*3/2, shunt_uohm); return; }
 		err("no bus current pin found");
 		return;
 	}
@@ -785,3 +785,8 @@ void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	ok();
 }
 
+void DetectCurrent(int32_t mv, int32_t shunt_uohm){
+	detectCurrent(mv, shunt_uohm);
+	if(ITOTALPIN==IPHASEAPIN||ITOTALPIN==IPHASEBPIN) ITOTALPIN = PIN_NONE;    //no bus pin found: the old one is a phase pin now
+	releasePins();    //the free adc pins out of the analog mode
+}

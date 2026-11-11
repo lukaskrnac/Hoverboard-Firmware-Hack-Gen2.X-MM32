@@ -53,7 +53,7 @@ void DetectImu(void){
 	uint8_t cand[PINCOUNT], n = 0;
 	uint16_t keep[2] = { IMU_SDA, IMU_SCL };
 	IMU_SDA = IMU_SCL = PIN_NONE;
-	for(uint16_t p=0;p<PINCOUNT;p++) if(PinFree(p)&&p!=TXPIN&&p!=RXPIN) cand[n++] = (uint8_t)p;
+	for(uint16_t p=0;p<PINCOUNT;p++) if(PinFree(p)) cand[n++] = (uint8_t)p;
 	uint8_t found = 0;
 	for(uint8_t i=0;i<n&&IMU_SDA==PIN_NONE;i++){
 		progress(i+1, n);

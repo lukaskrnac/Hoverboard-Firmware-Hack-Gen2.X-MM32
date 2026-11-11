@@ -8,6 +8,9 @@
 #include <string.h>
 
 uint8_t uartUsed = 1;
+//the pins PinFinder runs on: SWD, its uart TX and RX (set at boot) and the latch it drives (LatchHold). Never
+//free, whatever the words say after set / revert / defaults: a detection that took one cut the link or the power
+uint16_t ownPins[OWN_PINS] = { PA13, PA14, PIN_NONE, PIN_NONE, PIN_NONE };
 
 //SysTick (1 ms) also feeds the watchdog: PinFinder blocks in long waits, and after a soft start from the
 //main firmware the watchdog is running (it cannot be stopped), a watchdog reset powers a latched board off
@@ -92,11 +95,17 @@ int32_t VddMv(void){
 	return v ? (int32_t)(1200u*4096u/v) : 0;
 }
 
+//only free pins and the analog inputs: the analog mode on a pin in use takes it from its function (uart AF,
+//latch output, hall pull-up). A free pin returns to its rest state after the reading (the pull-up that may hold
+//an unknown latch); it settles first: the rest pull-up charged a high impedance divider's capacitor
 int32_t PinMv(uint16_t pin){
 	int8_t ch = AdcChannel(pin);
-	if(ch<0) return -1;
+	uint8_t isFree = PinFree(pin);
+	if(ch<0||!(isFree||pin==VBATPIN||pin==ITOTALPIN||pin==IPHASEAPIN||pin==IPHASEBPIN)) return -1;
 	pinMode((uint8_t)pin, INPUT_ADC);
+	if(isFree) Wait(5);
 	AdcScan(1u<<15|1u<<ch);
+	if(isFree) PinRest(pin);
 	uint32_t ref = AdcValue(15);
 	return ref ? (int32_t)(AdcValue((uint8_t)ch)*1200u/ref) : 0;
 }
@@ -190,11 +199,8 @@ uint16_t DutyForMv(int32_t mv){
 }
 
 uint8_t PinFree(uint16_t pin){
-	if(pin>=PINCOUNT||pin==PA13||pin==PA14) return 0;    //SWD
-	for(uint8_t i=0;i<=17;i++){    //pins 0-17 (11 = charger), 23, 24, 83, 84, 101, 102
-		if(pinstorage[i]==pin) return 0;
-	}
-	return OCPPIN!=pin&&OCPREFPIN!=pin&&IMU_SDA!=pin&&IMU_SCL!=pin&&IR_PIN(0)!=pin&&IR_PIN(1)!=pin;
+	for(uint8_t i=0;i<OWN_PINS;i++) if(ownPins[i]==pin) return 0;
+	return pin<PINCOUNT&&CfgPinWord(pin, 0xFF)<0;
 }
 
 uint8_t HallState(void){    //as the main firmware reads it (hallpos(1)): inverted with hallinvert

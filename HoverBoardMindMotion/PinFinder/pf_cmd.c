@@ -73,6 +73,11 @@ static void setWord(const char* name, const char* val){
 		if(!g||v<0||v>65535){ err("value: 0..65535, a pin or none"); return; }
 		if(CfgIsPin((uint8_t)idx)&&v>=PINCOUNT&&v!=PIN_NONE){ err("not a pin"); return; }
 	}
+	if(CfgIsPin((uint8_t)idx)&&v<PINCOUNT){    //one role per pin: the word that had it is cleared
+		static const uint8_t ownWord[OWN_PINS] = { 0xFF, 0xFF, 14, 15, 10 };    //only tx, rx, latch may name their own pin
+		for(uint8_t k=0;k<OWN_PINS;k++) if(ownPins[k]==v&&ownWord[k]!=idx){ err("reserved: SWD, uart, latch"); return; }
+		for(int16_t i;(i=CfgPinWord((uint16_t)v, (uint8_t)idx))>=0;){ pinstorage[i] = PIN_NONE; CfgPrint((uint8_t)i); }
+	}
 	pinstorage[idx] = (uint16_t)v;
 	if(&pinstorage[idx]==&INVERT_LOWSIDE) MotorInit();    //the gate polarity at once (TIM1_init reads it)
 	if(&pinstorage[idx]==&LATCHPIN) LatchHold();    //a latch set by hand is driven at once (none: pull-ups again)
@@ -83,20 +88,16 @@ static void setWord(const char* name, const char* val){
 static void pinCmd(const char* name, const char* mode, const char* arg){
 	uint16_t p = name ? PinByName(name) : PIN_NONE;
 	if(p==PIN_NONE){ err("pin name, e.g. PB9"); return; }
+	int16_t w = CfgPinWord(p, 0xFF);    //its role (set keeps one per pin)
 	if(!mode||eq(mode, "read")){    //any pin, its mode unchanged: level, the voltage on adc pins, what it is
 		kvi(PinName(p), digitalRead((uint8_t)p));
-		uint8_t analog = p==VBATPIN||p==ITOTALPIN||p==IPHASEAPIN||p==IPHASEBPIN;
-		if(AdcChannel(p)>=0&&(analog||PinFree(p))){    //not on pins the board drives or reads digitally
-			kvmv("pin", PinMv(p));
-			if(!analog) pinMode((uint8_t)p, INPUT);
-		}
-		for(uint8_t i=0;i<128;i++){
-			if(CfgIsPin(i)&&pinstorage[i]==p) kvs("used_as", CfgName(i));
-		}
+		int32_t mv = PinMv(p);    //free and analog pins only: not on pins the board drives or reads digitally
+		if(mv>=0) kvmv("pin", mv);
+		if(w>=0) kvs("used_as", CfgName((uint8_t)w));
 		ok();
 		return;
 	}
-	if(!PinFree(p)&&p!=LEDRPIN&&p!=LEDGPIN&&p!=LEDBPIN&&p!=LEDUPIN&&p!=LEDDPIN&&p!=BUZZERPIN&&p!=pinstorage[11]){
+	if(!PinFree(p)&&!(w>=3&&w<=8)&&w!=11){    //in use, but not an LED, the buzzer, the charger pin
 		err("pin in use: read only");
 		return;
 	}

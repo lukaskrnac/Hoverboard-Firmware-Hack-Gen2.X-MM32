@@ -176,6 +176,11 @@ PinFinder works in software (GPIO reads, bit-banged I2C); the main firmware uses
 therefore warns when a pin works for it but not for the main firmware: halls not on CH1-CH3 of TIM2/TIM3, IMU
 not on I2C1 SDA/SCL, passive buzzer without a TIM14/16/17 output.
 
+Detections only try free pins: in no pin word, not SWD, not the UART PinFinder talks on and not the latch it
+holds (those two stay reserved after `set tx …`, `revert` or `defaults` too). Readings (`adc`, `pin … read`,
+`detect vbat`) leave a pin in use in its mode. `set <pin word> <pin>` keeps one role per pin: the word that
+had the pin is cleared (printed).
+
 Without a valid configuration the main firmware does not drive the motor: it blinks every pin (LEDs flash, an
 active buzzer beeps) and keeps a known power latch held.
 

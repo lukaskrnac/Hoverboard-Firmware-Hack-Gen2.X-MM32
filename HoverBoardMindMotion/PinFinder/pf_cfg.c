@@ -56,6 +56,14 @@ uint8_t CfgIsPin(uint8_t idx){
 	return f>=0&&fieldIdx[f]>>7;
 }
 
+int16_t CfgPinWord(uint16_t pin, uint8_t skip){
+	for(uint8_t f=0;f<CFG_FIELD_COUNT;f++){
+		uint8_t i = fieldIdx[f]&127;
+		if(fieldIdx[f]>>7&&i!=skip&&pinstorage[i]==pin) return i;
+	}
+	return -1;
+}
+
 void CfgPrint(uint8_t idx){
 	const char* n = CfgName(idx);
 	char b[8];
