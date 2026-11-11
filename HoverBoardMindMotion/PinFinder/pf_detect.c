@@ -625,7 +625,7 @@ static uint8_t busFit(uint16_t (*avg)[16], uint8_t c, const int32_t* xs, int32_t
 }
 
 static void detectCurrent(int32_t mv, int32_t shunt_uohm){
-	if(mv<=0) mv = 1000;
+	if(mv<=1) mv = 1000;    //1: the 1.5x retry below would never grow
 	uint32_t mask = freeAdcMask();
 	int32_t zero[16], v[16];
 	static int16_t d[12][16];
@@ -755,8 +755,7 @@ static void detectCurrent(int32_t mv, int32_t shunt_uohm){
 		Wait(150);
 		sampleAvg(1u<<c, 1, one, 192); zv = one[c];
 		sampleAvg(1u<<c, (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2), one, 192); av = one[c];
-		FieldVector(0, 0);
-		GatesOff();
+		FieldVector(0, 0);    //gates off: DetectCurrent()
 		uint8_t filtered = zv*2>av;
 		kvdi("itotal_filtered", filtered);
 		if(filtered){
@@ -787,6 +786,7 @@ static void detectCurrent(int32_t mv, int32_t shunt_uohm){
 
 void DetectCurrent(int32_t mv, int32_t shunt_uohm){
 	detectCurrent(mv, shunt_uohm);
+	GatesOff();    //every exit (an error left the 50 % field switching)
 	if(ITOTALPIN==IPHASEAPIN||ITOTALPIN==IPHASEBPIN) ITOTALPIN = PIN_NONE;    //no bus pin found: the old one is a phase pin now
 	releasePins();    //the free adc pins out of the analog mode
 }

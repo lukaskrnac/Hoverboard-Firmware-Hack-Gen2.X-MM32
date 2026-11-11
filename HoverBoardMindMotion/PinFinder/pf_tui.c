@@ -146,7 +146,8 @@ static void draw(void){
 
 static void ledNext(int8_t d){
 	uint8_t rest = ledLow ? INPUT : INPUT_PULLUP;
-	pinMode((uint8_t)sel, ledRole(sel)<0 ? rest : INPUT);    //set pins stay off: easy to see which LEDs are left
+	int8_t r = ledRole(sel);
+	if(r>=0||PinFree(sel)) pinMode((uint8_t)sel, r<0 ? rest : INPUT);    //set pins stay off: easy to see which LEDs are left (sel may have another role by now: untouched)
 	for(uint8_t n=0;n<PINCOUNT;n++){
 		sel = (uint16_t)((sel+PINCOUNT+d)%PINCOUNT);
 		if(PinFree(sel)||ledRole(sel)>=0) break;    //free pins and the ones already set here (to change them)

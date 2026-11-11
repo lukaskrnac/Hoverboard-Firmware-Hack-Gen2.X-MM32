@@ -103,7 +103,7 @@ int32_t PinMv(uint16_t pin){
 	uint8_t isFree = PinFree(pin);
 	if(ch<0||!(isFree||pin==VBATPIN||pin==ITOTALPIN||pin==IPHASEAPIN||pin==IPHASEBPIN)) return -1;
 	pinMode((uint8_t)pin, INPUT_ADC);
-	if(isFree) Wait(5);
+	if(isFree) Wait(20);
 	AdcScan(1u<<15|1u<<ch);
 	if(isFree) PinRest(pin);
 	uint32_t ref = AdcValue(15);
