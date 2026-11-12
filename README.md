@@ -155,9 +155,20 @@ FLASH registers and programs with a small RAM routine. The board configuration (
 the new firmware starts without a reset so a self-holding board stays powered. A read-protected chip needs a
 full chip erase first (installation guide above).
 
-**Windows, no Python:** `tools/mm32flash_gui.py` is a small window around `mm32flash.py` (pick the `.bin`, probe,
-backup / erase-config / start mode, plus a button for the full chip erase of a read-protected chip). The **Build Windows exe** workflow (Actions, run manually) packs it with
-PyInstaller into a single `MM32Flasher.exe` artifact; `build_exe.bat` does the same locally.
+### Windows tool (no Python needed)
+
+`MM32Flasher.exe` is a small window around `tools/mm32flash.py` (`tools/mm32flash_gui.py`): pick the `.bin`,
+pick the probe, tick backup / erase configuration, choose the start mode and press *Flashovat*. The
+*Odomknut cip (full chip erase)* button unlocks a read-protected chip with `pyocd erase -t mm32spin05pf --chip`
+(it downloads the MM32 pack the first time, so it needs internet; the window text is Slovak).
+
+**Download:** [Actions → Build Windows exe](https://github.com/lukaskrnac/Hoverboard-Firmware-Hack-Gen2.X-MM32/actions/workflows/windows-exe.yml)
+→ latest successful run → *Artifacts* → `MM32Flasher` (a zip containing `MM32Flasher.exe`; a GitHub login is
+needed to download artifacts). The workflow is started by hand (*Run workflow*) or by a `v*` tag. To build it
+yourself, run `build_exe.bat` in the repo root on Windows (needs Python only for the build).
+
+Notes: CMSIS-DAP / DAPLink probes need no driver; an ST-Link usually needs a WinUSB driver (for example via
+Zadig). The exe is not code-signed, so Windows SmartScreen or an antivirus may warn about it.
 
 ## PinFinder: auto-detect and configure a board
 
