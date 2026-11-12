@@ -64,8 +64,11 @@ jobs:
             dist/MM32_UART_Tester.exe.sha256
 
   release:
-    # only for a pushed v* tag: attach both executables to the GitHub release of that tag
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Also publish v1.1 from this integration push.
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+       github.event.head_commit.message == 'Publish MM32 Windows tools v1.1')
     needs: exe
     runs-on: ubuntu-24.04
     permissions:
@@ -80,17 +83,26 @@ jobs:
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1' }}
           REPO: ${{ github.repository }}
           TARGET: ${{ github.sha }}
+          REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           sha256sum -c MM32Flasher.exe.sha256 MM32_UART_Tester.exe.sha256
           assets=(MM32Flasher.exe MM32Flasher.exe.sha256 MM32_UART_Tester.exe MM32_UART_Tester.exe.sha256)
+          if [[ "$REF" == refs/heads/main ]]; then
+            # Create the tag at the tested default-branch commit.
+            [[ "$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)" == "$TARGET" ]]
+            if ! gh api "repos/$REPO/git/ref/tags/$TAG" --silent; then
+              gh api --method POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$TARGET" --silent
+            fi
+            [[ "$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha)" == "$TARGET" ]]
+          fi
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             gh release upload "$TAG" "${assets[@]}" --clobber --repo "$REPO"
           else
             gh release create "$TAG" "${assets[@]}" \
-              --repo "$REPO" --target "$TARGET" --title "MM32 Windows tools $TAG" \
+              --repo "$REPO" --verify-tag --title "MM32 Windows tools $TAG" \
               --notes "Windows SWD flasher and CANSimple UART tester for the MM32 hoverboard firmware. Both executables run without Python. SHA-256 files are included."
           fi
