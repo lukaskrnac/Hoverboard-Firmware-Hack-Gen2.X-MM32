@@ -64,11 +64,8 @@ jobs:
             dist/MM32_UART_Tester.exe.sha256
 
   release:
-    # Publish v1.1 on the integration push, then use the usual v* tags.
-    if: >-
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-       github.event.head_commit.message == 'Add UART tester to Windows builds and publish v1.1')
+    # only for a pushed v* tag: attach both executables to the GitHub release of that tag
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: exe
     runs-on: ubuntu-24.04
     permissions:
@@ -83,7 +80,7 @@ jobs:
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1' }}
+          TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
           TARGET: ${{ github.sha }}
         run: |
