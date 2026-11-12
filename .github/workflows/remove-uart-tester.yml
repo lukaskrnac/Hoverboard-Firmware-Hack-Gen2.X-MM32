@@ -1,0 +1,41 @@
+name: Remove retired UART tester downloads
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/remove-uart-tester.yml
+
+permissions: {}
+
+jobs:
+  release-assets:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Delete only the UART tester files from v1.1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          assets=$(gh api "repos/$REPO/releases/tags/v1.1" --jq '.assets[] | select(.name == "MM32_UART_Tester.exe" or .name == "MM32_UART_Tester.exe.sha256") | .id')
+          for id in $assets; do
+            gh api --method DELETE "repos/$REPO/releases/assets/$id"
+          done
+  build-artifacts:
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete only artifacts named MM32_UART_Tester
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          artifacts=$(gh api --paginate "repos/$REPO/actions/artifacts?name=MM32_UART_Tester&per_page=100" --jq '.artifacts[] | select(.name == "MM32_UART_Tester") | .id')
+          for id in $artifacts; do
+            gh api --method DELETE "repos/$REPO/actions/artifacts/$id"
+          done

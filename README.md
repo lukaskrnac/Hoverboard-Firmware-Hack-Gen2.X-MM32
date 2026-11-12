@@ -155,7 +155,7 @@ FLASH registers and programs with a small RAM routine. The board configuration (
 the new firmware starts without a reset so a self-holding board stays powered. A read-protected chip needs a
 full chip erase first (installation guide above).
 
-### Windows tools (no Python needed)
+### Windows tool (no Python needed)
 
 `MM32Flasher.exe` is a small window around `tools/mm32flash.py` (`tools/mm32flash_gui.py`): pick the `.bin`,
 pick the probe, tick backup / erase configuration, choose the start mode and press *Flash*. The
@@ -168,17 +168,13 @@ latest release → `MM32Flasher.exe` (with a `.sha256` file). If there is no rel
 → latest successful run → *Artifacts* → `MM32Flasher` (a zip; a GitHub login is needed there). To build it
 yourself, run `build_exe.bat` in the repo root on Windows (needs Python for the build only).
 
-**UART tester:** Download `MM32_UART_Tester.exe` from the same release, or the `MM32_UART_Tester` artifact
-from the same workflow. Use the main MM32 firmware and a 3.3 V USB–UART adapter: GND to GND,
-adapter TX to board RX and adapter RX to board TX. Leave the adapter's power pin disconnected.
-For open-drain board TX, the line needs a pull-up to 3.3 V if the adapter does not provide one.
-Select the COM port, baud and board ID (initial values: 115200 and 1). Connect to read telemetry,
-then enable the drive and set a low test speed with the wheel off the ground. The tester uses the
-original AI LIFE CANSimple v2 UART protocol. **Brake to 0** (Brzdiť na 0) keeps speed control active.
-**STOP / IDLE** or **Esc** requests drive disable; the motor may coast.
-For a source run, install `pyserial` and run `python tools/mm32_uart_test.py`.
+For USB–UART motor control, live telemetry and configuration, use the
+[upstream web console](https://gitlab.com/ailife8881/remoteuartbus-online).
+The console's `index.html` is for the main firmware, `pinfinder.html` is for setup,
+and `image.html` builds a firmware image with a saved board configuration.
 
-Publishing a release: push a new `v*` tag. The workflow attaches both executables and their SHA-256 files.
+Publishing a release: push a tag, for example `git tag v1.0 && git push origin v1.0`. The workflow builds the exe
+and attaches it to the release of that tag.
 
 Notes: CMSIS-DAP / DAPLink probes need no driver; an ST-Link usually needs a WinUSB driver (for example via
 Zadig). The exe is not code-signed, so Windows SmartScreen or an antivirus may warn about it.

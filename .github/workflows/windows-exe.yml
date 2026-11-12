@@ -4,12 +4,6 @@ on:
   workflow_dispatch:
   push:
     tags: ["v*"]
-    branches: [main]
-    paths:
-      - ".github/workflows/windows-exe.yml"
-      - "tools/mm32_uart_test.py"
-      - "tools/cansimple_uart.py"
-      - "tools/endpoints.json"
 
 permissions:
   contents: read
@@ -17,7 +11,6 @@ permissions:
 jobs:
   exe:
     runs-on: windows-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,45 +19,24 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install build deps
-        run: python -m pip install pyocd libusb-package pyinstaller pyserial==3.5
+        run: pip install pyocd libusb-package pyinstaller
       - name: Build MM32Flasher.exe
         run: >
           pyinstaller --onefile --noconsole --name MM32Flasher --paths tools
           --collect-all pyocd --collect-all cmsis_pack_manager --collect-all libusb_package
           --copy-metadata pyocd tools/mm32flash_gui.py
-      - name: Build MM32_UART_Tester.exe
-        run: >
-          python -m PyInstaller --onefile --noconsole --name MM32_UART_Tester --paths tools
-          --add-data "tools/endpoints.json:." tools/mm32_uart_test.py
-      - name: Smoke-test the packaged UART tester
-        shell: pwsh
-        run: |
-          $process = Start-Process -FilePath .\dist\MM32_UART_Tester.exe -ArgumentList '--self-test' -Wait -PassThru
-          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
       - name: SHA-256
         shell: bash
-        run: |
-          cd dist
-          sha256sum MM32Flasher.exe > MM32Flasher.exe.sha256
-          sha256sum MM32_UART_Tester.exe > MM32_UART_Tester.exe.sha256
+        run: cd dist && sha256sum MM32Flasher.exe > MM32Flasher.exe.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: MM32Flasher
-          if-no-files-found: error
           path: |
             dist/MM32Flasher.exe
             dist/MM32Flasher.exe.sha256
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: MM32_UART_Tester
-          if-no-files-found: error
-          path: |
-            dist/MM32_UART_Tester.exe
-            dist/MM32_UART_Tester.exe.sha256
-
   release:
-    # only for a pushed v* tag: attach both executables to the GitHub release of that tag
+    # only for a pushed v* tag: attach the exe to the GitHub release of that tag
     if: startsWith(github.ref, 'refs/tags/v')
     needs: exe
     runs-on: ubuntu-24.04
@@ -74,9 +46,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: MM32Flasher
-      - uses: actions/download-artifact@v4
-        with:
-          name: MM32_UART_Tester
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,12 +53,10 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          sha256sum -c MM32Flasher.exe.sha256 MM32_UART_Tester.exe.sha256
-          assets=(MM32Flasher.exe MM32Flasher.exe.sha256 MM32_UART_Tester.exe MM32_UART_Tester.exe.sha256)
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${assets[@]}" --clobber --repo "$REPO"
+            gh release upload "$TAG" MM32Flasher.exe MM32Flasher.exe.sha256 --clobber --repo "$REPO"
           else
-            gh release create "$TAG" "${assets[@]}" \
-              --repo "$REPO" --verify-tag --title "MM32 Windows tools $TAG" \
-              --notes "Windows SWD flasher and CANSimple UART tester for the MM32 hoverboard firmware. Both executables run without Python. SHA-256 files are included."
+            gh release create "$TAG" MM32Flasher.exe MM32Flasher.exe.sha256 \
+              --repo "$REPO" --title "MM32Flasher $TAG" \
+              --notes "Windows flasher for the MM32 hoverboard firmware (no Python needed). SHA-256 in MM32Flasher.exe.sha256."
           fi
