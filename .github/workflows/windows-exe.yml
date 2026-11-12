@@ -25,7 +25,38 @@ jobs:
           pyinstaller --onefile --noconsole --name MM32Flasher --paths tools
           --collect-all pyocd --collect-all cmsis_pack_manager --collect-all libusb_package
           --copy-metadata pyocd tools/mm32flash_gui.py
+      - name: SHA-256
+        shell: bash
+        run: cd dist && sha256sum MM32Flasher.exe > MM32Flasher.exe.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: MM32Flasher
-          path: dist/MM32Flasher.exe
+          path: |
+            dist/MM32Flasher.exe
+            dist/MM32Flasher.exe.sha256
+
+  release:
+    # only for a pushed v* tag: attach the exe to the GitHub release of that tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: exe
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MM32Flasher
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" MM32Flasher.exe MM32Flasher.exe.sha256 --clobber --repo "$REPO"
+          else
+            gh release create "$TAG" MM32Flasher.exe MM32Flasher.exe.sha256 \
+              --repo "$REPO" --title "MM32Flasher $TAG" \
+              --notes "Windows flasher for the MM32 hoverboard firmware (no Python needed). SHA-256 in MM32Flasher.exe.sha256."
+          fi

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""MM32 Flasher - okienko okolo tools/mm32flash.py (flash MM32SPIN05/06 cez SWD, pyOCD).
+"""MM32 Flasher - a small window around tools/mm32flash.py (flash MM32SPIN05/06 over SWD, pyOCD).
 
-Poloz tento subor do priecinka tools/ vedla mm32flash.py a mm32cfgstore.py.
-Spustenie:  python tools/mm32flash_gui.py     (alebo zabalene do .exe, pozri build_exe.bat)
+Keep this file in tools/ next to mm32flash.py and mm32cfgstore.py.
+Run:  python tools/mm32flash_gui.py     (or packed into an .exe, see build_exe.bat)
 """
 import contextlib
 import io
@@ -49,29 +49,29 @@ class App(tk.Tk):
         ttk.Label(frm, text="Firmware (.bin):").grid(row=0, column=0, sticky="w")
         self.path = tk.StringVar()
         ttk.Entry(frm, textvariable=self.path).grid(row=0, column=1, sticky="ew", padx=6)
-        ttk.Button(frm, text="Vybrat...", command=self.pick).grid(row=0, column=2)
+        ttk.Button(frm, text="Browse...", command=self.pick).grid(row=0, column=2)
 
-        ttk.Label(frm, text="Programator:").grid(row=1, column=0, sticky="w")
-        self.probe = tk.StringVar(value="automaticky")
+        ttk.Label(frm, text="Probe:").grid(row=1, column=0, sticky="w")
+        self.probe = tk.StringVar(value="auto")
         self.probe_cb = ttk.Combobox(frm, textvariable=self.probe, state="readonly",
-                                     values=["automaticky"])
+                                     values=["auto"])
         self.probe_cb.grid(row=1, column=1, sticky="ew", padx=6)
-        ttk.Button(frm, text="Obnovit", command=self.refresh_probes).grid(row=1, column=2)
+        ttk.Button(frm, text="Refresh", command=self.refresh_probes).grid(row=1, column=2)
 
-        opt = ttk.LabelFrame(self, text="Moznosti")
+        opt = ttk.LabelFrame(self, text="Options")
         opt.pack(fill="x", **pad)
         self.erase_cfg = tk.BooleanVar(value=False)
         self.backup = tk.BooleanVar(value=True)
-        ttk.Checkbutton(opt, text="Zalohovat 32 KB flash pred zapisom (backup_*.bin vedla firmwaru)",
+        ttk.Checkbutton(opt, text="Back up the 32 KB flash before writing (backup_*.bin next to the firmware)",
                         variable=self.backup).pack(anchor="w", padx=8, pady=2)
-        ttk.Checkbutton(opt, text="Zmazat aj konfiguraciu dosky (--erase-config)",
+        ttk.Checkbutton(opt, text="Also erase the board configuration (--erase-config)",
                         variable=self.erase_cfg).pack(anchor="w", padx=8, pady=2)
         self.under_reset = tk.BooleanVar(value=False)
-        ttk.Checkbutton(opt, text="Odomknutie: pripojit pod resetom (treba zapojit nRST)",
+        ttk.Checkbutton(opt, text="Unlock: connect under reset (nRST must be wired)",
                         variable=self.under_reset).pack(anchor="w", padx=8, pady=2)
         row = ttk.Frame(opt)
         row.pack(anchor="w", padx=8, pady=2)
-        ttk.Label(row, text="Start po zapise:").pack(side="left")
+        ttk.Label(row, text="Start after write:").pack(side="left")
         self.start = tk.StringVar(value="soft")
         ttk.Combobox(row, textvariable=self.start, state="readonly", width=8,
                      values=["soft", "reset", "none"]).pack(side="left", padx=6)
@@ -81,9 +81,9 @@ class App(tk.Tk):
 
         bar = ttk.Frame(self)
         bar.pack(pady=6)
-        self.btn = ttk.Button(bar, text="Flashovat", command=self.go)
+        self.btn = ttk.Button(bar, text="Flash", command=self.go)
         self.btn.pack(side="left", padx=6)
-        self.btn_unlock = ttk.Button(bar, text="Odomknut cip (full chip erase)", command=self.unlock)
+        self.btn_unlock = ttk.Button(bar, text="Unlock chip (full chip erase)", command=self.unlock)
         self.btn_unlock.pack(side="left", padx=6)
 
         self.log = tk.Text(self, height=14, state="disabled", wrap="word")
@@ -91,7 +91,7 @@ class App(tk.Tk):
 
         self.after(100, self.pump)
         self.after(300, self.refresh_probes)
-        self.say("Vyber .bin, zapoj SWD (GND, SWDIO, SWCLK) a klikni na Flashovat.\n")
+        self.say("Pick a .bin, connect SWD (GND, SWDIO, SWCLK) and click Flash.\n")
 
     def say(self, s):
         self.log.configure(state="normal")
@@ -113,7 +113,7 @@ class App(tk.Tk):
 
     def pick(self):
         p = filedialog.askopenfilename(title="Firmware",
-                                       filetypes=[("Binary", "*.bin"), ("Vsetky", "*.*")])
+                                       filetypes=[("Binary", "*.bin"), ("All files", "*.*")])
         if p:
             self.path.set(p)
 
@@ -122,29 +122,29 @@ class App(tk.Tk):
             from pyocd.core.helpers import ConnectHelper
             found = ConnectHelper.get_all_connected_probes(blocking=False, print_wait_message=False)
         except Exception as e:
-            self.say("Nepodarilo sa nacitat programatory: %s\n" % e)
+            self.say("Could not list probes: %s\n" % e)
             return
         self.probes = {"%s [%s]" % (p.description, p.unique_id): p.unique_id for p in found}
-        self.probe_cb.configure(values=["automaticky"] + list(self.probes))
+        self.probe_cb.configure(values=["auto"] + list(self.probes))
         if self.probe.get() not in self.probes:
-            self.probe.set("automaticky")
-        self.say("Najdenych programatorov: %d\n" % len(self.probes))
+            self.probe.set("auto")
+        self.say("Probes found: %d\n" % len(self.probes))
 
     def go(self):
         if self.busy:
             return
         fw = self.path.get().strip()
         if not os.path.isfile(fw):
-            messagebox.showerror("MM32 Flasher", "Vyber existujuci .bin subor.")
+            messagebox.showerror("MM32 Flasher", "Pick an existing .bin file.")
             return
         try:
             freq = int(self.freq.get())
         except ValueError:
-            messagebox.showerror("MM32 Flasher", "SWD frekvencia musi byt cislo.")
+            messagebox.showerror("MM32 Flasher", "SWD frequency must be a number.")
             return
         argv = ["mm32flash", fw, "--start", self.start.get(), "--frequency", str(freq)]
         if self.erase_cfg.get():
-            if not messagebox.askyesno("MM32 Flasher", "Naozaj zmazat aj konfiguraciu dosky?"):
+            if not messagebox.askyesno("MM32 Flasher", "Really erase the board configuration too?"):
                 return
             argv.append("--erase-config")
         if self.backup.get():
@@ -172,12 +172,12 @@ class App(tk.Tk):
         try:
             freq = int(self.freq.get())
         except ValueError:
-            messagebox.showerror("MM32 Flasher", "SWD frekvencia musi byt cislo.")
+            messagebox.showerror("MM32 Flasher", "SWD frequency must be a number.")
             return
         if not messagebox.askyesno(
                 "MM32 Flasher",
-                "Full chip erase zmaze CELY flash vratane povodneho firmwaru a konfiguracie dosky.\n"
-                "U zamknuteho cipu sa povodny firmware zalohovat neda.\n\nPokracovat?"):
+                "Full chip erase wipes the WHOLE flash, including the original firmware and the board configuration.\n"
+                "The original firmware of a locked chip cannot be backed up.\n\nContinue?"):
             return
         uid = self.probes.get(self.probe.get())
         under_reset = self.under_reset.get()
@@ -190,13 +190,13 @@ class App(tk.Tk):
                 print(">> pyocd " + " ".join(args))
                 rc = PyOCDTool().run(args)
                 if rc not in (None, 0):
-                    raise SystemExit("pyocd %s skoncil s kodom %s" % (args[0], rc))
+                    raise SystemExit("pyocd %s exited with code %s" % (args[0], rc))
 
             listed = io.StringIO()
             with contextlib.redirect_stdout(listed):
                 PyOCDTool().run(["list", "--targets"])
             if target not in listed.getvalue().lower():
-                print("Stahujem definiciu cipu %s (treba internet)..." % target)
+                print("Downloading the chip definition %s (internet needed)..." % target)
                 run(["pack", "update"])
                 run(["pack", "install", target])
             args = ["erase", "-t", target, "--chip", "-f", str(freq)]
@@ -205,7 +205,7 @@ class App(tk.Tk):
             if under_reset:
                 args += ["-M", "under-reset"]
             run(args)
-            print("Cip zmazany. Teraz ho mozes flashnut tlacidlom Flashovat.")
+            print("Chip erased. You can now flash it with the Flash button.")
 
         self.start_job(job)
 
@@ -232,12 +232,12 @@ class App(tk.Tk):
                     if e.code in (None, 0):
                         ok = True
                     else:
-                        self.q.put("CHYBA: %s\n" % e.code)
+                        self.q.put("ERROR: %s\n" % e.code)
                 except Exception as e:
-                    self.q.put("CHYBA: %s: %s\n" % (type(e).__name__, e))
+                    self.q.put("ERROR: %s: %s\n" % (type(e).__name__, e))
         finally:
             root.removeHandler(handler)
-        self.q.put("--- HOTOVO ---\n" if ok else "--- ZLYHALO ---\n")
+        self.q.put("--- DONE ---\n" if ok else "--- FAILED ---\n")
         self.q.put(None)                                    # sentinel: the job is over
 
     def done(self):

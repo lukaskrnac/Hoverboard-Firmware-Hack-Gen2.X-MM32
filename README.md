@@ -158,14 +158,18 @@ full chip erase first (installation guide above).
 ### Windows tool (no Python needed)
 
 `MM32Flasher.exe` is a small window around `tools/mm32flash.py` (`tools/mm32flash_gui.py`): pick the `.bin`,
-pick the probe, tick backup / erase configuration, choose the start mode and press *Flashovat*. The
-*Odomknut cip (full chip erase)* button unlocks a read-protected chip with `pyocd erase -t mm32spin05pf --chip`
-(it downloads the MM32 pack the first time, so it needs internet; the window text is Slovak).
+pick the probe, tick backup / erase configuration, choose the start mode and press *Flash*. The
+*Unlock chip (full chip erase)* button unlocks a read-protected chip with `pyocd erase -t mm32spin05pf --chip`
+(it downloads the MM32 pack the first time, so it needs internet).
 
-**Download:** [Actions → Build Windows exe](https://github.com/lukaskrnac/Hoverboard-Firmware-Hack-Gen2.X-MM32/actions/workflows/windows-exe.yml)
-→ latest successful run → *Artifacts* → `MM32Flasher` (a zip containing `MM32Flasher.exe`; a GitHub login is
-needed to download artifacts). The workflow is started by hand (*Run workflow*) or by a `v*` tag. To build it
-yourself, run `build_exe.bat` in the repo root on Windows (needs Python only for the build).
+**Download:** [Releases](https://github.com/lukaskrnac/Hoverboard-Firmware-Hack-Gen2.X-MM32/releases) →
+latest release → `MM32Flasher.exe` (with a `.sha256` file). If there is no release yet, get the newest build from
+[Actions → Build Windows exe](https://github.com/lukaskrnac/Hoverboard-Firmware-Hack-Gen2.X-MM32/actions/workflows/windows-exe.yml)
+→ latest successful run → *Artifacts* → `MM32Flasher` (a zip; a GitHub login is needed there). To build it
+yourself, run `build_exe.bat` in the repo root on Windows (needs Python for the build only).
+
+Publishing a release: push a tag, for example `git tag v1.0 && git push origin v1.0`. The workflow builds the exe
+and attaches it to the release of that tag.
 
 Notes: CMSIS-DAP / DAPLink probes need no driver; an ST-Link usually needs a WinUSB driver (for example via
 Zadig). The exe is not code-signed, so Windows SmartScreen or an antivirus may warn about it.
