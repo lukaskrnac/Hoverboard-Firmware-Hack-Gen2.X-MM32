@@ -24,6 +24,7 @@ jobs:
           for id in $assets; do
             gh api --method DELETE "repos/$REPO/releases/assets/$id"
           done
+          gh release edit v1.1 --repo "$REPO" --notes "Windows SWD flasher for the MM32 hoverboard firmware. No Python needed. A SHA-256 file is included. For USB-UART motor control and telemetry, use the [upstream web console](https://gitlab.com/ailife8881/remoteuartbus-online)."
   build-artifacts:
     runs-on: ubuntu-24.04
     permissions:
