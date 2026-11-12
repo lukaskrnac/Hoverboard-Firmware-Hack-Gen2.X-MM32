@@ -155,6 +155,10 @@ FLASH registers and programs with a small RAM routine. The board configuration (
 the new firmware starts without a reset so a self-holding board stays powered. A read-protected chip needs a
 full chip erase first (installation guide above).
 
+**Windows, no Python:** `tools/mm32flash_gui.py` is a small window around `mm32flash.py` (pick the `.bin`, probe,
+backup / erase-config / start mode). The **Build Windows exe** workflow (Actions, run manually) packs it with
+PyInstaller into a single `MM32Flasher.exe` artifact; `build_exe.bat` does the same locally.
+
 ## PinFinder: auto-detect and configure a board
 
 PinFinder is a separate firmware (the main firmware has no room for it) that finds the board's pins and
@@ -317,6 +321,7 @@ HoverBoardMindMotion/
   Device/, Library/               MindMotion register headers, CMSIS, HAL, startup, linker script
 tools/
   mm32flash.py                    SWD flasher (pyOCD), keeps the board configuration
+  mm32flash_gui.py                window around mm32flash.py (packed to MM32Flasher.exe by build_exe.bat)
   mm32config.py, mm32cfgstore.py  read / write the configuration over SWD
   pinfinder.py                    PinFinder agent-mode client
   cansimple_uart.py               CANSimple over UART host library
