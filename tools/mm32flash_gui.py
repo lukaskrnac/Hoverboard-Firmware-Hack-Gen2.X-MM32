@@ -66,6 +66,9 @@ class App(tk.Tk):
                         variable=self.backup).pack(anchor="w", padx=8, pady=2)
         ttk.Checkbutton(opt, text="Zmazat aj konfiguraciu dosky (--erase-config)",
                         variable=self.erase_cfg).pack(anchor="w", padx=8, pady=2)
+        self.under_reset = tk.BooleanVar(value=False)
+        ttk.Checkbutton(opt, text="Odomknutie: pripojit pod resetom (treba zapojit nRST)",
+                        variable=self.under_reset).pack(anchor="w", padx=8, pady=2)
         row = ttk.Frame(opt)
         row.pack(anchor="w", padx=8, pady=2)
         ttk.Label(row, text="Start po zapise:").pack(side="left")
@@ -76,8 +79,12 @@ class App(tk.Tk):
         self.freq = tk.StringVar(value="1000000")
         ttk.Entry(row, textvariable=self.freq, width=10).pack(side="left", padx=6)
 
-        self.btn = ttk.Button(self, text="Flashovat", command=self.go)
-        self.btn.pack(pady=6)
+        bar = ttk.Frame(self)
+        bar.pack(pady=6)
+        self.btn = ttk.Button(bar, text="Flashovat", command=self.go)
+        self.btn.pack(side="left", padx=6)
+        self.btn_unlock = ttk.Button(bar, text="Odomknut cip (full chip erase)", command=self.unlock)
+        self.btn_unlock.pack(side="left", padx=6)
 
         self.log = tk.Text(self, height=14, state="disabled", wrap="word")
         self.log.pack(fill="both", expand=True, **pad)
@@ -95,7 +102,11 @@ class App(tk.Tk):
     def pump(self):
         try:
             while True:
-                self.say(self.q.get_nowait())
+                item = self.q.get_nowait()
+                if item is None:
+                    self.done()
+                else:
+                    self.say(item)
         except queue.Empty:
             pass
         self.after(100, self.pump)
@@ -142,23 +153,80 @@ class App(tk.Tk):
         uid = self.probes.get(self.probe.get())
         if uid:
             argv += ["--probe", uid]
+        def job():
+            old_argv = sys.argv
+            sys.argv = argv
+            try:
+                mm32flash.main()
+            finally:
+                sys.argv = old_argv
+
+        self.start_job(job)
+
+    def unlock(self):
+        """Full chip erase of a read-protected chip: the same as the installation guide's
+        `pyocd erase -t mm32spin05pf --chip` (the chip definition comes from a CMSIS pack that
+        is downloaded once, internet needed the first time). Erases everything, config included."""
+        if self.busy:
+            return
+        try:
+            freq = int(self.freq.get())
+        except ValueError:
+            messagebox.showerror("MM32 Flasher", "SWD frekvencia musi byt cislo.")
+            return
+        if not messagebox.askyesno(
+                "MM32 Flasher",
+                "Full chip erase zmaze CELY flash vratane povodneho firmwaru a konfiguracie dosky.\n"
+                "U zamknuteho cipu sa povodny firmware zalohovat neda.\n\nPokracovat?"):
+            return
+        uid = self.probes.get(self.probe.get())
+        under_reset = self.under_reset.get()
+
+        def job():
+            from pyocd.__main__ import PyOCDTool
+            target = "mm32spin05pf"
+
+            def run(args):
+                print(">> pyocd " + " ".join(args))
+                rc = PyOCDTool().run(args)
+                if rc not in (None, 0):
+                    raise SystemExit("pyocd %s skoncil s kodom %s" % (args[0], rc))
+
+            listed = io.StringIO()
+            with contextlib.redirect_stdout(listed):
+                PyOCDTool().run(["list", "--targets"])
+            if target not in listed.getvalue().lower():
+                print("Stahujem definiciu cipu %s (treba internet)..." % target)
+                run(["pack", "update"])
+                run(["pack", "install", target])
+            args = ["erase", "-t", target, "--chip", "-f", str(freq)]
+            if uid:
+                args += ["-u", uid]
+            if under_reset:
+                args += ["-M", "under-reset"]
+            run(args)
+            print("Cip zmazany. Teraz ho mozes flashnut tlacidlom Flashovat.")
+
+        self.start_job(job)
+
+    def start_job(self, job):
         self.busy = True
         self.btn.configure(state="disabled")
+        self.btn_unlock.configure(state="disabled")
         self.say("\n--- start ---\n")
-        threading.Thread(target=self.work, args=(argv,), daemon=True).start()
+        threading.Thread(target=self.work, args=(job,), daemon=True).start()
 
-    def work(self, argv):
+    def work(self, job):
         w = QueueWriter(self.q)
         handler = logging.StreamHandler(w)
         root = logging.getLogger()
         root.addHandler(handler)
         root.setLevel(logging.WARNING)
-        old_argv, sys.argv = sys.argv, argv
         ok = False
         try:
             with contextlib.redirect_stdout(w), contextlib.redirect_stderr(w):
                 try:
-                    mm32flash.main()
+                    job()
                     ok = True
                 except SystemExit as e:
                     if e.code in (None, 0):
@@ -168,14 +236,14 @@ class App(tk.Tk):
                 except Exception as e:
                     self.q.put("CHYBA: %s: %s\n" % (type(e).__name__, e))
         finally:
-            sys.argv = old_argv
             root.removeHandler(handler)
         self.q.put("--- HOTOVO ---\n" if ok else "--- ZLYHALO ---\n")
-        self.after(0, self.done)
+        self.q.put(None)                                    # sentinel: the job is over
 
     def done(self):
         self.busy = False
         self.btn.configure(state="normal")
+        self.btn_unlock.configure(state="normal")
 
 
 if __name__ == "__main__":

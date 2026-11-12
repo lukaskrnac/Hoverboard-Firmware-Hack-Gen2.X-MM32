@@ -156,7 +156,7 @@ the new firmware starts without a reset so a self-holding board stays powered. A
 full chip erase first (installation guide above).
 
 **Windows, no Python:** `tools/mm32flash_gui.py` is a small window around `mm32flash.py` (pick the `.bin`, probe,
-backup / erase-config / start mode). The **Build Windows exe** workflow (Actions, run manually) packs it with
+backup / erase-config / start mode, plus a button for the full chip erase of a read-protected chip). The **Build Windows exe** workflow (Actions, run manually) packs it with
 PyInstaller into a single `MM32Flasher.exe` artifact; `build_exe.bat` does the same locally.
 
 ## PinFinder: auto-detect and configure a board
