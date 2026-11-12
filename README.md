@@ -1,3 +1,22 @@
+# Unofficial GitHub fork — MM32 hoverboard firmware
+
+**Original project and ongoing development: [AILIFE's GitLab repository](https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32).**
+
+This independent GitHub fork is maintained by [Lukáš Krnáč](https://github.com/lukaskrnac) for GitHub Actions builds and experiments. It is not the official repository and is not endorsed by the original authors. All original authorship, Git history, copyright notices and licenses are preserved. Credit belongs to the upstream authors and contributors.
+
+Imported upstream commit: [8b21b8f](https://gitlab.com/ailife8881/Hoverboard-Firmware-Hack-Gen2.x-MM32/-/commit/8b21b8f0c26ed9e218b7004c4efcdede6c7f6d1c).
+
+## GitHub Actions builds
+
+Open **Actions → Build and compare upstream**. Each run builds SPIN05 main firmware and PinFinder using Arm GNU Toolchain 14.2.Rel1 (GCC 14.2.1), independently builds the pinned upstream commit, and compares the binary files byte for byte. Download the **SPIN05-firmware-and-comparison** artifact for binaries, ELF/HEX files, build logs and SHA-256 results.
+
+The comparison is against a fresh build of upstream source, not a claim of equality with an author's separately published binary. Firmware source and build settings are initially unchanged. Future intentional firmware changes will require reviewing/updating the comparison baseline. No flashing is performed by CI.
+
+To build locally with the same toolchain: `make MCU=SPIN05 both`.
+The upstream instructions follow unchanged below.
+
+---
+
 # Hoverboard Firmware Hack Gen2.x MM32 — open-source FOC motor controller firmware for MindMotion MM32SPIN05 / SPIN06 / SPIN25 / MM32F031 hoverboard boards
 
 Open-source replacement firmware for **split (Gen2.x) hoverboard mainboards** that use a **MindMotion MM32**
