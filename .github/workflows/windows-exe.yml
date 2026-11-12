@@ -16,7 +16,6 @@ permissions:
 
 jobs:
   exe:
-    if: github.event.head_commit.message != 'Attach verified Windows executables to v1.1'
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -66,30 +65,22 @@ jobs:
 
   release:
     # only for a pushed v* tag: attach both executables to the GitHub release of that tag
-    if: >-
-      always() && ((startsWith(github.ref, 'refs/tags/v') && needs.exe.result == 'success') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-       github.event.head_commit.message == 'Attach verified Windows executables to v1.1'))
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: exe
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      actions: read
     steps:
       - uses: actions/download-artifact@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ github.ref == 'refs/heads/main' && '43262533808' || github.run_id }}
           name: MM32Flasher
       - uses: actions/download-artifact@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ github.ref == 'refs/heads/main' && '43262533808' || github.run_id }}
           name: MM32_UART_Tester
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1' }}
+          TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
