@@ -1,0 +1,24 @@
+#ifndef REMOTEUARTBUS_H
+#define REMOTEUARTBUS_H
+
+#include "mcu.h"
+
+// wState bits of the type 0/1 command frames (same as the Gen2.x-GD32 firmware)
+#define STATE_LED_GREEN      1
+#define STATE_LED_ORANGE     2      //the "blue/orange" LED (LEDB)
+#define STATE_LED_RED        4
+#define STATE_LED_UP         8
+#define STATE_LED_DOWN       16
+#define STATE_LED_BATTLEVEL  32     //green/orange/red show the battery level instead of the bits above
+#define STATE_DISABLE        64     //gates off, motor coasts (disarmed)
+#define STATE_SHUTOFF        128    //switch off: the power button's shutdown (boards with a latch)
+
+void RemoteUpdate(void);
+uint8_t RemoteTimedOut(void);
+extern uint32_t iTimeLastRx;    //millis of the last command (the command timeout's feed)
+int32_t BusCurrent(void);         //0.01 A, filtered
+void RemoteFeedWatchdog(void);     //a command arrived (command timeout)
+void RemoteSaveConfig(void);       //store pinstorage once the wheel stands still    //no command frame within SERIAL_TIMEOUT
+void RemotePoll(void);    //main loop: parse received bytes, answer
+
+#endif

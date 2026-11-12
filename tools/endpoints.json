@@ -1,0 +1,1140 @@
+{
+ "fw_version": "2.0.0",
+ "protocol": 2,
+ "endpoints": {
+  "hoverboard.config.halla": {
+   "id": 0,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall sensor A"
+  },
+  "hoverboard.config.hallb": {
+   "id": 1,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall sensor B"
+  },
+  "hoverboard.config.hallc": {
+   "id": 2,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall sensor C"
+  },
+  "hoverboard.config.ledr": {
+   "id": 3,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "red LED"
+  },
+  "hoverboard.config.ledg": {
+   "id": 4,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "green LED"
+  },
+  "hoverboard.config.ledb": {
+   "id": 5,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "blue / orange LED"
+  },
+  "hoverboard.config.ledu": {
+   "id": 6,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "upper LED"
+  },
+  "hoverboard.config.ledd": {
+   "id": 7,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "lower LED"
+  },
+  "hoverboard.config.buzzer": {
+   "id": 8,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "buzzer"
+  },
+  "hoverboard.config.button": {
+   "id": 9,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power button sense"
+  },
+  "hoverboard.config.latch": {
+   "id": 10,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power self-hold"
+  },
+  "hoverboard.config.charge": {
+   "id": 11,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "charger detect (chargelevel, chargepull)"
+  },
+  "hoverboard.config.vbat": {
+   "id": 12,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "battery voltage adc"
+  },
+  "hoverboard.config.itotal": {
+   "id": 13,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "bus current adc"
+  },
+  "hoverboard.config.tx": {
+   "id": 14,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart tx"
+  },
+  "hoverboard.config.rx": {
+   "id": 15,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart rx"
+  },
+  "hoverboard.config.iphasea": {
+   "id": 16,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current adc 1 (phase: iphasecfg)"
+  },
+  "hoverboard.config.iphaseb": {
+   "id": 17,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current adc 2 (phase: iphasecfg)"
+  },
+  "hoverboard.config.poskp": {
+   "id": 18,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position: 0.1 rpm per hall step of error; 0/65535 = default block 20, sine 60, FOC 133"
+  },
+  "hoverboard.config.posrpm": {
+   "id": 19,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "velocity limit (vel_limit) in position and velocity modes, rpm; 0/65535 = default 300"
+  },
+  "hoverboard.config.motorr": {
+   "id": 20,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase resistance incl. mosfets, mOhm; 0/65535 = default 300"
+  },
+  "hoverboard.config.fwimax": {
+   "id": 21,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC field weakening: max negative d current 0.1 A; 0/65535 = off"
+  },
+  "hoverboard.config.fwadvance": {
+   "id": 22,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "sine field weakening: max phase advance, degrees electrical; 0/65535 = off"
+  },
+  "hoverboard.config.ocp": {
+   "id": 23,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TIM1 break input (hardware overcurrent)"
+  },
+  "hoverboard.config.ocpref": {
+   "id": 24,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "overcurrent comparator reference"
+  },
+  "hoverboard.config.itotalzero": {
+   "id": 25,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "shunt zero below adc 0 (the adc clips), 0.01 counts; 0/65535 = 0"
+  },
+  "hoverboard.config.torqueconst": {
+   "id": 26,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "torque constant mNm/A (CANSimple torque units); 0/65535 = 8270 / sine kv"
+  },
+  "hoverboard.config.curtrip": {
+   "id": 27,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current trip (current_hard_max) 0.1 A; 0/65535 = 2 x focimax, at least 15 A"
+  },
+  "hoverboard.config.inputmode": {
+   "id": 28,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "ODrive input mode 1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP; 0/65535 = 1"
+  },
+  "hoverboard.config.velramprate": {
+   "id": 29,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "VEL_RAMP 0.01 turns/s^2; 0/65535 = 100"
+  },
+  "hoverboard.config.filterbw": {
+   "id": 30,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "POS_FILTER bandwidth 0.01 /s; 0/65535 = 200"
+  },
+  "hoverboard.config.trajvel": {
+   "id": 31,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TRAP_TRAJ velocity limit 0.01 turns/s; 0/65535 = 200"
+  },
+  "hoverboard.config.magicnum": {
+   "id": 32,
+   "type": "uint16",
+   "access": "r",
+   "unit": "0xDCAB = valid"
+  },
+  "hoverboard.config.vbatdivider": {
+   "id": 33,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "vbat = divider * Vadc"
+  },
+  "hoverboard.config.itotaldivider": {
+   "id": 34,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "itotal = divider * Vadc (1/shunt ohm: R003 = 333; detect current with the shunt value)"
+  },
+  "hoverboard.config.trajaccel": {
+   "id": 35,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TRAP_TRAJ acceleration 0.01 turns/s^2; 0/65535 = 50"
+  },
+  "hoverboard.config.baud": {
+   "id": 36,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart baud / 100 (config version 2: 192 = 19200, 1152 = 115200); 12..20000, else 1152"
+  },
+  "hoverboard.config.pwmres": {
+   "id": 37,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TIM1 period 2048..16383 (17.6..2.2 kHz), read at boot; the control stays at ~4.39 kHz, FOC modulation limit 94 % at 8192, 76 % at 2048"
+  },
+  "hoverboard.config.slaveid": {
+   "id": 38,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "RemoteUartBus slave id, 0..62 (63 = CANSimple broadcast)"
+  },
+  "hoverboard.config.windings": {
+   "id": 39,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "motor poles, 2..200 (else 30)"
+  },
+  "hoverboard.config.invlowside": {
+   "id": 40,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "1 = low side gate drive inverted, anything else (0, unset) not"
+  },
+  "hoverboard.config.softocp": {
+   "id": 41,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "A, averaged bus current limit, 0 = off"
+  },
+  "hoverboard.config.hardocp": {
+   "id": 42,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "adc watchdog current limit, adc counts above zero"
+  },
+  "hoverboard.config.trajdecel": {
+   "id": 43,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TRAP_TRAJ deceleration 0.01 turns/s^2; 0/65535 = 50"
+  },
+  "hoverboard.config.drivemode": {
+   "id": 44,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "commutation*4 + control: 0 COM_VOLT, 1 COM_SPEED, 4 SINE_VOLT, 5 SINE_SPEED, 3/7/11 COM/SINE/FOC_POSITION, 8 FOC_VOLT, 9 FOC_SPEED, 10 FOC_TORQUE (control 0 pwm, 1 speed, 2 torque, 3 position; commutation 0 block, 1 sine, 2 FOC)"
+  },
+  "hoverboard.config.batfull": {
+   "id": 45,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "mV, <= 12000 = not set (no regen / overvoltage limit)"
+  },
+  "hoverboard.config.batempty": {
+   "id": 46,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "mV, <= 12000 disables the low battery cut-off"
+  },
+  "hoverboard.config.timeout": {
+   "id": 47,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "ms without a command until speed = 0"
+  },
+  "hoverboard.config.speedkp": {
+   "id": 48,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED: 0.1 permille duty per rpm, 0 = default 50"
+  },
+  "hoverboard.config.speedki": {
+   "id": 49,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED: 0.1 permille duty per rpm*s, 0 = default 100"
+  },
+  "hoverboard.config.speedkv": {
+   "id": 50,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED feed forward: 0.1 rpm/V at 100% duty, 0 = default 355"
+  },
+  "hoverboard.config.speedd0": {
+   "id": 51,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED feed forward: dead band permille duty, 0 = default 53"
+  },
+  "hoverboard.config.sinekp": {
+   "id": 52,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED: 0.1 permille modulation per rpm, 0 = default 5"
+  },
+  "hoverboard.config.sineki": {
+   "id": 53,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED: 0.1 permille per rpm*s, 0 = default 85"
+  },
+  "hoverboard.config.sinekv": {
+   "id": 54,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED feed forward: 0.1 rpm/V at 100% modulation, 0 = default 242"
+  },
+  "hoverboard.config.sined0": {
+   "id": 55,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED feed forward: dead band permille, 0 = default 10"
+  },
+  "hoverboard.config.iphasegain": {
+   "id": 56,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC: 0.1 mA per adc count, 0 = default 515"
+  },
+  "hoverboard.config.iphasecfg": {
+   "id": 57,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC: phases on iphasea/b 0 = A,B 1 = B,C 2 = A,C; +4: adc rises with current into the motor"
+  },
+  "hoverboard.config.focimax": {
+   "id": 58,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC: phase current limit 0.1 A, 0 = default 100; trips at twice that"
+  },
+  "hoverboard.config.curkp": {
+   "id": 59,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC current loop: mV per A, 0 = default 400"
+  },
+  "hoverboard.config.curki": {
+   "id": 60,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC current loop: V per A*s, 0 = default 300"
+  },
+  "hoverboard.config.focspdkp": {
+   "id": 61,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC_SPEED: mA per rpm, 0 = default 30"
+  },
+  "hoverboard.config.focspdki": {
+   "id": 62,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC_SPEED: mA per rpm*s, 0 = default 100"
+  },
+  "hoverboard.config.cfgversion": {
+   "id": 63,
+   "type": "uint16",
+   "access": "r",
+   "unit": "config layout version, migrated at boot: 1 drive mode numbers, 2 baud/100, 3 input mode words reset"
+  },
+  "hoverboard.config.holdcurrent": {
+   "id": 64,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position hold current (stiffness) 0.1 A, <= 90 % of focimax; 0/65535 = 40"
+  },
+  "hoverboard.config.holdenable": {
+   "id": 65,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position hold: 1 off, 2 on; 0/65535 = on"
+  },
+  "hoverboard.config.holdwindow": {
+   "id": 66,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position: hold within 0.01 hall step of the target; 0/65535 = 150"
+  },
+  "hoverboard.config.posaccel": {
+   "id": 67,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC position approach acceleration / braking 0.01 turns/s^2; 0/65535 = 2000"
+  },
+  "hoverboard.config.torqueramp": {
+   "id": 68,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TORQUE_RAMP 0.01 Nm/s; 0/65535 = 1"
+  },
+  "hoverboard.config.inertia": {
+   "id": 69,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "torque feed forward of the trajectory acceleration 0.0001 Nm/(turn/s^2); 0/65535 = 0"
+  },
+  "hoverboard.config.vellimittol": {
+   "id": 70,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "overspeed error above vel_limit times this, 0.01; 0/65535 = 120"
+  },
+  "hoverboard.config.overspeederr": {
+   "id": 71,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "enable_overspeed_error: 1 off, 2 on; 0/65535 = off"
+  },
+  "hoverboard.config.torquevellim": {
+   "id": 72,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "enable_torque_mode_vel_limit: 1 off, 2 on; 0/65535 = on"
+  },
+  "hoverboard.config.phasel": {
+   "id": 73,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase inductance uH; 0/65535 = 460"
+  },
+  "hoverboard.config.poski": {
+   "id": 74,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position I: 0.1 rpm per (hall step * s), within 4 steps of the target; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.poskd": {
+   "id": 75,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "position D: 0.01 rpm per rpm of speed error (trajectory - wheel); 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.focspdkd": {
+   "id": 76,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "FOC velocity D: 0.01 mA per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.sinekd": {
+   "id": 77,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "SINE_SPEED D: 0.01 permille modulation per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.speedkd": {
+   "id": 78,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "COM_SPEED D: 0.01 permille duty per rpm/s of the measured speed; 0/65535 = 0 (off)"
+  },
+  "hoverboard.config.buzzerpassive": {
+   "id": 79,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "buzzer without its own oscillator, driven with 2.2 kHz: 1 off, 2 on; 0/65535 = off"
+  },
+  "hoverboard.config.chargelevel": {
+   "id": 80,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "charger pin while the charger is connected: 1 low, 2 high; 0/65535 = high"
+  },
+  "hoverboard.config.chargepull": {
+   "id": 81,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "charger pin input: 1 floating, 2 pull-up, 3 pull-down; 0/65535 = floating"
+  },
+  "hoverboard.config.chargelock": {
+   "id": 82,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "no driving while the charger is connected: 1 off, 2 on; 0/65535 = off"
+  },
+  "hoverboard.config.imusda": {
+   "id": 83,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU I2C SDA (PinFinder detect imu); read by the firmware at 0x68/0x69 (InvenSense register map), after a restart"
+  },
+  "hoverboard.config.imuscl": {
+   "id": 84,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU I2C SCL"
+  },
+  "hoverboard.config.imuaddr": {
+   "id": 85,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU 7 bit I2C address"
+  },
+  "hoverboard.config.imuid": {
+   "id": 86,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU id register value (WHO_AM_I / CHIP_ID)"
+  },
+  "hoverboard.config.hallang1": {
+   "id": 87,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "angle (65536 per electrical turn) where hall state 1 starts, rising angle (calibrate hall); 0/65535 = built-in"
+  },
+  "hoverboard.config.hallang2": {
+   "id": 88,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 2 edge (calibrate hall)"
+  },
+  "hoverboard.config.hallang3": {
+   "id": 89,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 3 edge"
+  },
+  "hoverboard.config.hallang4": {
+   "id": 90,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 4 edge"
+  },
+  "hoverboard.config.hallang5": {
+   "id": 91,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 5 edge"
+  },
+  "hoverboard.config.hallang6": {
+   "id": 92,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall state 6 edge"
+  },
+  "hoverboard.config.vbatgain": {
+   "id": 93,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "battery divider in 0.001 (detect vbat <V>); 0/65535 = vbatdivider"
+  },
+  "hoverboard.config.txpushpull": {
+   "id": 94,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "uart TX push-pull: 2 = on (one board alone on the line, fast edges above 230400 baud), 1/0/65535 = open drain (shared bus line, needs a pull-up)"
+  },
+  "hoverboard.config.hallinvert": {
+   "id": 95,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "hall signals inverted (all three; a 180 deg el shift no pin order gives): 2 = on, 1/0/65535 = off; detect hall sets it"
+  },
+  "hoverboard.config.extmagic": {
+   "id": 96,
+   "type": "uint16",
+   "access": "r",
+   "unit": "0xDCAD = extension record valid"
+  },
+  "hoverboard.config.imumount": {
+   "id": 97,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU mounting (PinFinder calibrate imu): 1 + up*6 + forward, chip axes 0..5 = +x +y +z -x -y -z; 0/65535 = chip axes"
+  },
+  "hoverboard.config.imurestx": {
+   "id": 98,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU gravity when level (calibrate imu), chip x, int16, 1024 = 1 g: zero pitch and roll"
+  },
+  "hoverboard.config.imuresty": {
+   "id": 99,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU gravity when level, chip y"
+  },
+  "hoverboard.config.imurestz": {
+   "id": 100,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "IMU gravity when level, chip z"
+  },
+  "hoverboard.config.ir1": {
+   "id": 101,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "infrared foot sensor 1 (PinFinder detect ir; irmode)"
+  },
+  "hoverboard.config.ir2": {
+   "id": 102,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "infrared foot sensor 2"
+  },
+  "hoverboard.config.irmode": {
+   "id": 103,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "foot sensors, 4 bits each (ir1 bits 0-3, ir2 4-7): level while covered 1 low / 2 high (default high), + 4 x input 1 floating / 2 pull-up / 3 pull-down"
+  },
+  "hoverboard.config.holdidle": {
+   "id": 104,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "smart FOC position hold: d current at the target after holdidledelay, 0.1 A; pushed off the current rises again, full hold_current at 1.5 hall steps; 0/65535 = off (hold_current all the time)"
+  },
+  "hoverboard.config.holdidledelay": {
+   "id": 105,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "smart hold: ms in the target's hall sector before the current falls to holdidle (~4.4 A/s); 0/65535 = 500"
+  },
+  "hoverboard.config.curpull": {
+   "id": 106,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "phase current pullback limit 0.1 A: above it the current loop pulls the current back, no error; it only trips (curtrip, CURRENT_LIMIT_VIOLATION) if the current rises anyway; kept between focimax and curtrip; 0/65535 = 3/4 of curtrip"
+  },
+  "hoverboard.config.templimit": {
+   "id": 107,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "MCU temperature limit, C: above it INVERTER_OVER_TEMP and the gates off; 0/65535 = 85"
+  },
+  "hoverboard.config.regenmax": {
+   "id": 108,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "regenerated bus current limit, 0.1 A (from the phase currents): DC_BUS_OVER_REGEN_CURRENT; 0/65535 = off"
+  },
+  "hoverboard.config.spinelec": {
+   "id": 109,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "spinout detection (FOC): electrical power above this, W, ...; 0/65535 = 10"
+  },
+  "hoverboard.config.spinmech": {
+   "id": 110,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "... while the mechanical power (Iq * kt * speed) is below minus this, W, for 50 ms: SPINOUT_DETECTED; 0/65535 = 10"
+  },
+  "hoverboard.config.autooff": {
+   "id": 111,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power off after this many minutes disarmed and without a command (set point / v1 frame; telemetry reads do not count); 0/65535 = off (the host decides)"
+  },
+  "hoverboard.config.batdeadoff": {
+   "id": 112,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "power off at the low battery cut-off (batempty, DC_BUS_UNDER_VOLTAGE, standing): 2 = on, 1/0/65535 = off"
+  },
+  "hoverboard.config.tempderate": {
+   "id": 113,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "temperature derating band below templimit, C: FOC current limit / block duty / sine modulation fall linearly to 0 at templimit (slewed ~2 s); 0/65535 = off"
+  },
+  "hoverboard.config.deadtime": {
+   "id": 114,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "TIM1 dead time between a half bridge's switches, ns, read at boot (restart); 0..1750; 0/65535 = 500 (the F031 board's FD2103S conducted through at 14 ns: hot MOSFETs)"
+  },
+  "hoverboard.config.bootarmed": {
+   "id": 115,
+   "type": "uint16",
+   "access": "rw",
+   "unit": "2 = armed at boot (closed loop: drives the saved mode, holds the wheel in position mode, before any master connected); 1/0/65535 = IDLE at boot until a master arms (Set_Axis_State CLOSED_LOOP, or a v1 frame without state bit 64)"
+  },
+  "vbus_voltage": {
+   "id": 256,
+   "type": "float",
+   "access": "r",
+   "unit": "V"
+  },
+  "ibus": {
+   "id": 257,
+   "type": "float",
+   "access": "r",
+   "unit": "A, bus current"
+  },
+  "axis0.pos_estimate": {
+   "id": 258,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns; writing shifts the position (Set_Absolute_Position)"
+  },
+  "axis0.vel_estimate": {
+   "id": 259,
+   "type": "float",
+   "access": "r",
+   "unit": "turns/s"
+  },
+  "axis0.motor.foc.Iq_measured": {
+   "id": 260,
+   "type": "float",
+   "access": "r",
+   "unit": "A (FOC; NaN otherwise)"
+  },
+  "axis0.motor.foc.Iq_setpoint": {
+   "id": 261,
+   "type": "float",
+   "access": "r",
+   "unit": "A"
+  },
+  "axis0.current_state": {
+   "id": 262,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 IDLE, 8 CLOSED_LOOP_CONTROL; writing = requested_state"
+  },
+  "axis0.active_errors": {
+   "id": 263,
+   "type": "uint32",
+   "access": "r",
+   "unit": "ODrive Error bits"
+  },
+  "axis0.disarm_reason": {
+   "id": 264,
+   "type": "uint32",
+   "access": "r",
+   "unit": "ODrive Error bits"
+  },
+  "hoverboard.odometer": {
+   "id": 265,
+   "type": "int32",
+   "access": "r",
+   "unit": "hall steps since boot"
+  },
+  "axis0.controller.config.control_mode": {
+   "id": 266,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "0 VOLTAGE, 1 TORQUE, 2 VELOCITY, 3 POSITION"
+  },
+  "axis0.controller.config.input_mode": {
+   "id": 267,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 PASSTHROUGH, 2 VEL_RAMP, 3 POS_FILTER, 5 TRAP_TRAJ, 6 TORQUE_RAMP"
+  },
+  "hoverboard.commutation": {
+   "id": 268,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "0 block, 1 sine, 2 FOC"
+  },
+  "axis0.controller.input_pos": {
+   "id": 269,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns"
+  },
+  "axis0.controller.input_vel": {
+   "id": 270,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s"
+  },
+  "axis0.controller.input_torque": {
+   "id": 271,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm"
+  },
+  "hoverboard.input_voltage": {
+   "id": 272,
+   "type": "float",
+   "access": "rw",
+   "unit": "fraction of the maximum voltage, -1..1"
+  },
+  "hoverboard.torque_constant_in_use": {
+   "id": 273,
+   "type": "float",
+   "access": "r",
+   "unit": "Nm/A"
+  },
+  "hoverboard.id_setpoint": {
+   "id": 274,
+   "type": "int32",
+   "access": "rw",
+   "unit": "mA, FOC d current"
+  },
+  "hoverboard.fast_speed": {
+   "id": 275,
+   "type": "int32",
+   "access": "r",
+   "unit": "rpm, last hall interval"
+  },
+  "hoverboard.charger_connected": {
+   "id": 276,
+   "type": "uint8",
+   "access": "r",
+   "unit": "1 while the charger is connected (charge pin; also heartbeat byte 7 bit 0)"
+  },
+  "hoverboard.foot_sensors": {
+   "id": 277,
+   "type": "uint8",
+   "access": "r",
+   "unit": "bit 0 / 1: infrared foot sensor ir1 / ir2 covered (PinFinder detect ir); also heartbeat byte 7 bits 1-2"
+  },
+  "axis0.controller.config.vel_limit": {
+   "id": 288,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s, position and velocity modes"
+  },
+  "axis0.controller.config.pos_gain": {
+   "id": 289,
+   "type": "float",
+   "access": "rw",
+   "unit": "(turns/s)/turn: position loop; FOC default 20, then the hold within 1.5 hall steps"
+  },
+  "axis0.controller.config.vel_gain": {
+   "id": 290,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/(turns/s), FOC velocity loop; 0 = default (position mode 3.3x the velocity mode's)"
+  },
+  "axis0.controller.config.vel_integrator_gain": {
+   "id": 291,
+   "type": "float",
+   "access": "rw",
+   "unit": "(Nm/s)/(turns/s), FOC velocity loop"
+  },
+  "axis0.config.motor.current_soft_max": {
+   "id": 292,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, FOC current limit"
+  },
+  "axis0.config.motor.current_hard_max": {
+   "id": 293,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, phase current trip (CURRENT_LIMIT_VIOLATION)"
+  },
+  "axis0.config.motor.torque_constant": {
+   "id": 294,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/A; 0 = 8.27 / kv"
+  },
+  "axis0.config.motor.pole_pairs": {
+   "id": 295,
+   "type": "uint32",
+   "access": "rw",
+   "unit": "after a restart"
+  },
+  "axis0.config.motor.phase_resistance": {
+   "id": 296,
+   "type": "float",
+   "access": "rw",
+   "unit": "Ohm incl. mosfets (sine torque model)"
+  },
+  "axis0.config.watchdog_timeout": {
+   "id": 297,
+   "type": "float",
+   "access": "rw",
+   "unit": "s without a set point -> 0 / hold position"
+  },
+  "config.dc_bus_undervoltage_trip_level": {
+   "id": 298,
+   "type": "float",
+   "access": "rw",
+   "unit": "V, low battery cut-off; <= 20 V off"
+  },
+  "config.dc_bus_overvoltage_trip_level": {
+   "id": 299,
+   "type": "float",
+   "access": "rw",
+   "unit": "V, coasts above (battery full + 3 V)"
+  },
+  "axis0.config.can.node_id": {
+   "id": 300,
+   "type": "uint32",
+   "access": "rw",
+   "unit": "the bus id (slave id), after a restart"
+  },
+  "config.uart0_baudrate": {
+   "id": 301,
+   "type": "uint32",
+   "access": "rw",
+   "unit": "baud, after a restart"
+  },
+  "axis0.controller.config.vel_ramp_rate": {
+   "id": 302,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, VEL_RAMP; 0 = default 1"
+  },
+  "axis0.controller.config.input_filter_bandwidth": {
+   "id": 303,
+   "type": "float",
+   "access": "rw",
+   "unit": "1/s, POS_FILTER; 0 = default 2"
+  },
+  "axis0.trap_traj.config.vel_limit": {
+   "id": 304,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s, TRAP_TRAJ; 0 = default 2"
+  },
+  "axis0.trap_traj.config.accel_limit": {
+   "id": 305,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, TRAP_TRAJ; 0 = default 0.5"
+  },
+  "axis0.trap_traj.config.decel_limit": {
+   "id": 306,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, TRAP_TRAJ; 0 = default 0.5"
+  },
+  "hoverboard.foc.field_weakening_current": {
+   "id": 307,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, max negative d current at the voltage limit (FOC); 0 = off, at most 90 % of current_soft_max"
+  },
+  "hoverboard.sine.field_weakening_advance": {
+   "id": 308,
+   "type": "float",
+   "access": "rw",
+   "unit": "degrees electrical, max phase advance beyond 100 % modulation (sine); 0 = off"
+  },
+  "axis0.controller.pos_setpoint": {
+   "id": 309,
+   "type": "float",
+   "access": "r",
+   "unit": "turns, after the input mode"
+  },
+  "axis0.controller.vel_setpoint": {
+   "id": 310,
+   "type": "float",
+   "access": "r",
+   "unit": "turns/s, after the input mode (position: feed forward)"
+  },
+  "hoverboard.foc.Id_measured": {
+   "id": 311,
+   "type": "float",
+   "access": "r",
+   "unit": "A, d current (FOC, sine on phase current pins), ~7 ms average"
+  },
+  "hoverboard.position.hold_current": {
+   "id": 312,
+   "type": "float",
+   "access": "rw",
+   "unit": "A, FOC position hold stiffness (d current at the target angle); default 4, at most 90 % of current_soft_max"
+  },
+  "hoverboard.position.hold_window": {
+   "id": 313,
+   "type": "float",
+   "access": "rw",
+   "unit": "hall steps: the hold takes over within this of the target (and below 25 rpm); default 1.5"
+  },
+  "hoverboard.position.accel_limit": {
+   "id": 314,
+   "type": "float",
+   "access": "rw",
+   "unit": "turns/s^2, FOC position approach acceleration and braking curve; default 20"
+  },
+  "axis0.controller.config.torque_ramp_rate": {
+   "id": 315,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/s, TORQUE_RAMP input mode; default 0.01"
+  },
+  "axis0.controller.config.inertia": {
+   "id": 316,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/(turn/s^2): torque feed forward of the TRAP_TRAJ / POS_FILTER acceleration (FOC); default 0"
+  },
+  "axis0.controller.config.vel_limit_tolerance": {
+   "id": 317,
+   "type": "float",
+   "access": "rw",
+   "unit": "overspeed error above vel_limit times this; default 1.2"
+  },
+  "axis0.config.motor.phase_inductance": {
+   "id": 318,
+   "type": "float",
+   "access": "rw",
+   "unit": "H, FOC decoupling and current_control_bandwidth; default 0.00046"
+  },
+  "hoverboard.position.hold_enable": {
+   "id": 319,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 = hold at the target's electrical angle (FOC position), 0 = position loop only; default 1"
+  },
+  "axis0.controller.config.enable_overspeed_error": {
+   "id": 320,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 = VELOCITY_LIMIT_VIOLATION (disarm) above vel_limit * vel_limit_tolerance; default 0"
+  },
+  "axis0.controller.config.enable_torque_mode_vel_limit": {
+   "id": 321,
+   "type": "uint8",
+   "access": "rw",
+   "unit": "1 = torque control limits the speed to vel_limit (torque falls with vel_gain); default 1"
+  },
+  "hoverboard.controller.pos_integrator_gain": {
+   "id": 323,
+   "type": "float",
+   "access": "rw",
+   "unit": "((turns/s)/turn)/s: position I, within 4 hall steps of the target; default 0 (off)"
+  },
+  "hoverboard.controller.pos_derivative_gain": {
+   "id": 324,
+   "type": "float",
+   "access": "rw",
+   "unit": "(turns/s)/(turns/s): position D on trajectory speed - wheel speed; default 0 (off)"
+  },
+  "hoverboard.controller.vel_derivative_gain": {
+   "id": 325,
+   "type": "float",
+   "access": "rw",
+   "unit": "Nm/(turns/s^2): FOC velocity D on the measured speed (20 ms filter); default 0 (off)"
+  },
+  "axis0.config.motor.current_control_bandwidth": {
+   "id": 322,
+   "type": "float",
+   "access": "rw",
+   "unit": "rad/s: sets the current loop gains kp = L*bw, ki = R*bw (reads back kp / L); default gains ~870"
+  },
+  "hoverboard.imu.state": {
+   "id": 336,
+   "type": "uint8",
+   "access": "r",
+   "unit": "0 no IMU configured (imusda/imuscl/imuaddr 0x68/0x69), 1 running, 2 no answer, 3 pins not I2C1 SDA/SCL (pcb)"
+  },
+  "hoverboard.imu.accel_x": {
+   "id": 337,
+   "type": "float",
+   "access": "r",
+   "unit": "m/s^2 (+-4 g), 100 Hz, board axes after calibrate imu (X forward, Y left, Z up; else the chip's); NaN unless running"
+  },
+  "hoverboard.imu.accel_y": {
+   "id": 338,
+   "type": "float",
+   "access": "r",
+   "unit": "m/s^2"
+  },
+  "hoverboard.imu.accel_z": {
+   "id": 339,
+   "type": "float",
+   "access": "r",
+   "unit": "m/s^2"
+  },
+  "hoverboard.imu.gyro_x": {
+   "id": 340,
+   "type": "float",
+   "access": "r",
+   "unit": "deg/s (+-1000), board axes, bias from the first 0.5 s standing still"
+  },
+  "hoverboard.imu.gyro_y": {
+   "id": 341,
+   "type": "float",
+   "access": "r",
+   "unit": "deg/s"
+  },
+  "hoverboard.imu.gyro_z": {
+   "id": 342,
+   "type": "float",
+   "access": "r",
+   "unit": "deg/s"
+  },
+  "hoverboard.imu.temperature": {
+   "id": 343,
+   "type": "float",
+   "access": "r",
+   "unit": "C (MPU-6050 scale)"
+  },
+  "hoverboard.imu.pitch": {
+   "id": 344,
+   "type": "float",
+   "access": "r",
+   "unit": "deg, front down positive, 0 = the level of calibrate imu (gyro + accelerometer, 0.5 s)"
+  },
+  "hoverboard.imu.roll": {
+   "id": 345,
+   "type": "float",
+   "access": "r",
+   "unit": "deg, right side down positive, 0 = the level of calibrate imu"
+  },
+  "save_configuration": {
+   "id": 512,
+   "type": "function",
+   "access": "w",
+   "unit": "store everything (when the wheel stands still)"
+  },
+  "clear_errors": {
+   "id": 513,
+   "type": "function",
+   "access": "w",
+   "unit": ""
+  },
+  "hoverboard.power_off": {
+   "id": 514,
+   "type": "function",
+   "access": "w",
+   "unit": "switches the board off (the power button's shutdown; boards with a power latch)"
+  }
+ }
+}

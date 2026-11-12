@@ -1,0 +1,792 @@
+//PinFinder detections. Each one prints its results (config names) and ends with ok() or err(); the
+//config words are changed in RAM only (save: the "save" command / the TUI's save question).
+#include "pf.h"
+#include "main.h"
+#include "initialize.h"
+#include "sim_eeprom.h"
+#include "commutation.h"
+
+uint8_t master;           //the board holds its own power (latch pin)
+static uint8_t holdAll;   //no latch known: every free pin is pulled up (one of them may be the latch)
+
+//free pins back to their idle state after a detection
+//a free pin's rest state: pulled up while the latch is unknown (it may be this pin; a pin left low or
+//floating lets the board switch off: the F031 bench board did after a tone)
+void PinRest(uint16_t p){
+	pinMode((uint8_t)p, holdAll ? INPUT_PULLUP : INPUT);
+}
+static void releasePins(void){
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		if(PinFree(p)) PinRest(p);
+	}
+}
+
+void Tone(uint16_t pin, uint32_t ms, uint32_t hz){    //square wave on a pin (passive buzzer)
+	if(pin>=PINCOUNT) return;
+	pinMode((uint8_t)pin, OUTPUT);
+	uint32_t half = 500000/hz;
+	for(uint32_t t=millis;millis-t<ms;){
+		digitalWrite((uint8_t)pin, 1);
+		WaitUs(half);
+		digitalWrite((uint8_t)pin, 0);
+		WaitUs(half);
+	}
+	if(PinFree(pin)) PinRest(pin);
+}
+
+//---------------------------------------------------------------- hall sensors
+//The field is turned open loop in 12 directions per electrical turn (FieldVector: 30 deg el apart) and
+//the rotor follows. Every free pin is read at each direction (majority over several turns): a hall pin
+//is high for one block of ~6 of the 12. Which pin is A, B, C: the assignment for which the main firmware's
+//block commutation (hall_to_pos, commutation.h) puts the field 60..120 deg ahead of the rotor at every
+//direction (90 deg ideal). Some directions lie on a hall edge (bench motor: the block steps' own vectors),
+//so the 6 block steps alone were ambiguous.
+#define DIR_MS 100
+#define TURNS 4
+static const uint8_t hallToPos[8] = HALL_TO_POS_INIT;
+
+//pins: candidate pins A, B, C; returns the number of directions at 90 deg lead, -1 if any is off 60..120
+static int8_t leadScore(const uint16_t* bit, const uint16_t* sure, const uint8_t* pins, uint8_t invert){
+	int8_t score = 0;
+	for(uint8_t k=0;k<12;k++){
+		if(!((sure[pins[0]]&sure[pins[1]]&sure[pins[2]])>>k&1)) continue;    //on an edge
+		uint8_t h = (uint8_t)((bit[pins[0]]>>k&1)|(bit[pins[1]]>>k&1)<<1|(bit[pins[2]]>>k&1)<<2);
+		if(invert) h = (uint8_t)(7-h);
+		uint8_t st = hallToPos[h];
+		if(!st) return -1;
+		uint8_t lead = (uint8_t)((2*(st-1)+12-k)%12);    //step st's field is direction 2*(st-1)
+		if(lead<2||lead>4) return -1;
+		if(lead==3) score++;
+	}
+	return score;
+}
+
+void DetectHall(int32_t mv){
+	uint16_t old[3] = { HALLAPIN, HALLBPIN, HALLCPIN };
+	static uint8_t cnt[PINCOUNT][12];
+	if(mv<=0) mv = 1000;
+	HALLAPIN = HALLBPIN = HALLCPIN = PIN_NONE;
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		if(PinFree(p)) pinMode((uint8_t)p, INPUT_PULLUP);    //open collector hall outputs
+	}
+	note("motor turns; keep the wheel free");
+	uint8_t turns = 0, stop = 0;
+	for(uint8_t n=0;n<16&&turns<TURNS&&!stop;n++){
+		uint16_t pat[PINCOUNT];
+		uint8_t moved = 0;
+		if(!turns) for(uint16_t p=0;p<PINCOUNT;p++) for(uint8_t k=0;k<12;k++) cnt[p][k] = 0;
+		for(uint16_t p=0;p<PINCOUNT;p++) pat[p] = 0;
+		for(uint8_t k=0;k<12;k++){
+			FieldVector(k, mv);
+			Wait(DIR_MS);
+			for(uint16_t p=0;p<PINCOUNT;p++){
+				if(PinFree(p)&&digitalRead((uint8_t)p)) pat[p] |= (uint16_t)(1u<<k);
+			}
+		}
+		for(uint16_t p=0;p<PINCOUNT;p++){    //moved: a pin with one block of 4..8 highs (2 edges)
+			if(!PinFree(p)||!pat[p]||pat[p]==0xFFF) continue;
+			uint8_t edges = 0, ones = 0;
+			for(uint8_t k=0;k<12;k++){
+				ones = (uint8_t)(ones+((pat[p]>>k)&1));
+				edges = (uint8_t)(edges+(((pat[p]>>k)^(pat[p]>>((k+1)%12)))&1));
+			}
+			if(edges==2&&ones>=4&&ones<=8) moved = 1;
+		}
+		if(!moved){    //the rotor does not follow: more voltage, count again
+			turns = 0;
+			if(mv<3000) mv = mv*5/4;
+		}else{
+			for(uint16_t p=0;p<PINCOUNT;p++) for(uint8_t k=0;k<12;k++) cnt[p][k] = (uint8_t)(cnt[p][k]+((pat[p]>>k)&1));
+			turns++;
+		}
+		progress(n+1, 16);
+		stop = aborted();
+	}
+	GatesOff();
+	progressEnd();
+	releasePins();
+	kvd("voltage_mv"); outi(mv); nl();
+	//hall candidates: pins high in 4..8 of the 12 directions, as one block
+	static uint16_t bit[PINCOUNT], sure[PINCOUNT];    //per direction: majority level, all turns the same
+	uint8_t cand[6], nc = 0;
+	for(uint16_t p=0;p<PINCOUNT&&turns==TURNS;p++){
+		if(!PinFree(p)) continue;
+		uint8_t ones = 0, edges = 0, active = 0;
+		bit[p] = sure[p] = 0;
+		for(uint8_t k=0;k<12;k++){
+			if(cnt[p][k]*2>TURNS) bit[p] |= (uint16_t)(1u<<k);
+			if(cnt[p][k]==0||cnt[p][k]==TURNS) sure[p] |= (uint16_t)(1u<<k);
+			if(cnt[p][k]) active = 1;
+		}
+		for(uint8_t k=0;k<12;k++){
+			ones = (uint8_t)(ones+(bit[p]>>k&1));
+			edges = (uint8_t)(edges+((bit[p]>>k^bit[p]>>((k+1)%12))&1));
+		}
+		if(!active||ones==12) continue;
+		kvd("counts"); outpin(p); outc(' ');
+		for(uint8_t k=0;k<12;k++) outc((char)('0'+cnt[p][k]));
+		nl();
+		if(edges==2&&ones>=4&&ones<=8&&nc<6) cand[nc++] = (uint8_t)p;
+	}
+	//the assignment of 3 candidates to A, B, C with every direction at 60..120 deg lead, best at 90
+	int8_t best = -1, bestInv = -1;
+	uint8_t pick[3] = { 0, 0, 0 }, pickInv[3] = { 0, 0, 0 };
+	for(uint8_t i=0;i<nc;i++) for(uint8_t j=0;j<nc;j++) for(uint8_t m=0;m<nc;m++){
+		if(i==j||j==m||i==m) continue;
+		uint8_t pins[3] = { cand[i], cand[j], cand[m] };
+		int8_t sc = leadScore(bit, sure, pins, 0);
+		if(sc>best){ best = sc; pick[0] = pins[0]; pick[1] = pins[1]; pick[2] = pins[2]; }
+		sc = leadScore(bit, sure, pins, 1);    //the same with the signals inverted (hallinvert)
+		if(sc>bestInv){ bestInv = sc; pickInv[0] = pins[0]; pickInv[1] = pins[1]; pickInv[2] = pins[2]; }
+	}
+	uint8_t inv = best<0&&bestInv>=0;
+	if(inv){ best = bestInv; pick[0] = pickInv[0]; pick[1] = pickInv[1]; pick[2] = pickInv[2]; }
+	if(stop||turns<TURNS||best<0){
+		HALLAPIN = old[0]; HALLBPIN = old[1]; HALLCPIN = old[2];
+		if(stop) err("stopped");
+		else if(turns<TURNS) err("motor did not follow (more mV)");
+		else err(nc<3 ? "fewer than 3 hall pins found" : "no hall order fits the commutation");
+		return;
+	}
+	HALLAPIN = pick[0]; HALLBPIN = pick[1]; HALLCPIN = pick[2];
+	kvp("halla", HALLAPIN);
+	kvp("hallb", HALLBPIN);
+	kvp("hallc", HALLCPIN);
+	HALL_INVERT = inv ? 2 : 1;
+	kv("hallinvert"); outi(HALL_INVERT); if(!agent) out(inv ? " (signals inverted)" : " (not inverted)"); nl();
+	kvdi("lead90", best);    //directions at the ideal 90 deg lead (of up to 6 off the hall edges)
+	uint8_t e[3];
+	int8_t t = HallTimEntries(e);    //the main firmware measures the speed with this timer's capture
+	kv(agent ? "halltimer" : "hall speed timer");    //agent: 2 / 3, 0 none
+	if(!agent) out("TIM");
+	outi(t<0 ? 0 : 3-t);
+	nl();
+	if(t<0) warn("halls not on CH1-3 of TIM2/3: the main firmware cannot measure the speed");
+	ok();
+}
+
+//PinFinder finds pins in software (gpio reads, bit-banged I2C, a gpio square wave); the main firmware uses
+//the peripherals, so a pin wired elsewhere on the pcb (datasheet AF tables, hardware.c) works here and not
+//there: hall speed = CH1-CH3 of TIM2 or TIM3 (HallTimEntries), the IMU = I2C1 SDA / SCL, a passive buzzer =
+//a TIM14 / TIM16 / TIM17 output. After the detections and at save.
+static uint8_t onI2c(uint16_t p, uint8_t scl){
+	for(uint8_t i=0;i<I2CCOUNT;i++) if(i2cs[i].io==p&&i2cs[i].scl==scl) return 1;
+	return 0;
+}
+
+void HwCheck(void){
+	if(IMU_SDA<PINCOUNT&&!(onI2c(IMU_SDA, 0)&&onI2c(IMU_SCL, 1))) warn("imu pins not I2C1 SDA/SCL: no imu");
+	if(BUZZERPIN<PINCOUNT&&BUZZER_PASSIVE==2&&BuzzerEntry()<0) warn("passive buzzer pin: no timer, silent");
+}
+
+//---------------------------------------------------------------- battery voltage
+void ShowAdc(void){
+	int32_t vdd = VddMv();
+	kvmv("vdd", vdd);
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint16_t p = adcs[i].io;
+		int32_t mv = PinMv(p);
+		if(mv<0) continue;    //a pin in use
+		kv(PinName(p));
+		if(agent){ outi(mv); out(" vbat_mv="); outi(mv*(int32_t)VBAT_DIVIDER); }
+		else{ outfix(mv, 3); out(" V  (x"); outi(VBAT_DIVIDER); out(" = "); outfix(mv*(int32_t)VBAT_DIVIDER/10, 2); out(" V)"); }
+		if(p==VBATPIN) out(agent ? " vbat" : "  <- vbat");
+		else if(p==ITOTALPIN) out(agent ? " itotal" : "  <- itotal");
+		else if(p==IPHASEAPIN||p==IPHASEBPIN) out(agent ? " iphase" : "  <- phase current");
+		nl();
+	}
+}
+
+//the pin whose voltage times VBAT_DIVIDER is closest to expect_mv (or the only one between 20 and 45 V)
+//Battery pin: two voltage levels, nothing guessed from the readings' size (the divider is unknown; a supply
+//behind the power switch reads like a battery too). "detect vbat <V>" stores every adc pin at that voltage;
+//after the voltage changed (bench supply, charger plugged in) "detect vbat <new V>" takes the pin whose
+//reading changed in proportion (within 3 %) and calibrates its divider.
+int32_t vbLevelMv;    //the first level's voltage, 0: none stored (the TUI asks for the second)
+static int32_t vbLevel[ADCCOUNT];
+static int32_t vbRead(uint16_t p){    //candidates: free pins and the old battery pin (not the other analog inputs)
+	return PinFree(p)||p==VBATPIN ? PinMv(p) : 0;
+}
+void DetectVbat(int32_t mv){
+	if(mv<=0){ err("give the voltage you measure: detect vbat 36.5"); return; }
+	if(!vbLevelMv||(mv-vbLevelMv<300&&vbLevelMv-mv<300)){    //first level (or the same voltage again)
+		for(uint8_t i=0;i<ADCCOUNT;i++) vbLevel[i] = vbRead(adcs[i].io);
+		vbLevelMv = mv;
+		kvmv("level1", mv);
+		note("change the voltage (bench supply, or plug in the charger) and measure it again");
+		ok();
+		return;
+	}
+	uint16_t best = PIN_NONE;
+	int32_t bestErr = 30, bestMv = 0;    //0.1 %
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		int32_t m = vbRead(adcs[i].io), m0 = vbLevel[i];
+		if(m0<50||m<50) continue;
+		int32_t e = (m*vbLevelMv-m0*mv)/(m0*mv/1000);    //the reading's change against the voltage's
+		if(e<0) e = -e;
+		if(e<bestErr){ bestErr = e; best = adcs[i].io; bestMv = m; }
+	}
+	kvmv("level1", vbLevelMv);
+	kvmv("level2", mv);
+	vbLevelMv = 0;
+	if(best==PIN_NONE){ ShowAdc(); err("no pin followed the voltage change: detect vbat <V> again for a new first level"); return; }
+	PinRest(VBATPIN);    //the old battery pin is free now (the same pin: the next reading sets it analog again)
+	VBATPIN = best;
+	VBAT_GAIN = (uint16_t)(mv*1000/bestMv);
+	VBAT_DIVIDER = (uint16_t)((mv+bestMv/2)/bestMv);
+	kvp("vbat", VBATPIN);
+	kvi("vbatgain", VBAT_GAIN);
+	kvmv("battery", VbatMv());
+	ok();
+}
+
+//---------------------------------------------------------------- inputs the user operates
+//A pin's state: 0 / 1 when something drives it (the same with pull-up and pull-down), 2 when floating
+static uint8_t pinState(uint16_t p){
+	pinMode((uint8_t)p, INPUT_PULLUP);
+	WaitUs(30);
+	uint8_t up = digitalRead((uint8_t)p);
+	pinMode((uint8_t)p, INPUT_PULLDOWN);
+	WaitUs(30);
+	uint8_t down = digitalRead((uint8_t)p);
+	PinRest(p);
+	return up==down ? up : 2;
+}
+
+//waits for a free pin (or 'also') whose state changes and stays changed for 50 ms; pins that change by
+//themselves in the first 0.5 s are ignored
+static uint16_t waitChange(uint16_t also, uint32_t ms, uint8_t* from, uint8_t* to){
+	uint8_t st[PINCOUNT], noisy[PINCOUNT];
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		noisy[p] = 0;
+		if(PinFree(p)||p==also) st[p] = pinState(p);
+	}
+	for(uint32_t t=millis;millis-t<500;){
+		for(uint16_t p=0;p<PINCOUNT;p++){
+			if((PinFree(p)||p==also)&&pinState(p)!=st[p]) noisy[p] = 1;
+		}
+	}
+	note("now ...");
+	for(uint32_t t=millis;millis-t<ms;){
+		for(uint16_t p=0;p<PINCOUNT;p++){
+			if(!(PinFree(p)||p==also)||noisy[p]) continue;
+			uint8_t s = pinState(p);
+			if(s==st[p]) continue;
+			uint32_t t2 = millis;
+			while(millis-t2<50&&pinState(p)==s);
+			if(millis-t2<50) continue;    //a bounce
+			*from = st[p];
+			*to = s;
+			return p;
+		}
+		if(aborted()) return PIN_NONE;
+	}
+	return PIN_NONE;
+}
+
+void DetectButton(uint32_t ms){
+	uint8_t from, to;
+	if(!ms) ms = 15000;
+	note("press and hold the power button");
+	uint16_t p = waitChange(BUTTONPIN, ms, &from, &to);
+	if(p==PIN_NONE){ err(abortKey ? "stopped" : "no pin changed (time is up)"); return; }
+	BUTTONPIN = p;
+	kvp("button", p);
+	kvi("released", from);
+	kvi("pressed", to);
+	if(to!=1) warn("reads 0 when pressed (expects 1)");
+	ok();
+}
+
+//start with the charger disconnected: the pin that changes when it is connected, and how to read it
+//(the main firmware: CHARGE_LEVEL, CHARGE_PULL)
+//an input the user switches (charger, infrared foot sensor): the pin that changes, its level while active
+//(1 low, 2 high) and its input mode (1 floating, 2 pull-up, 3 pull-down; states 0 / 1 driven, 2 floating:
+//floating while active, it is pulled towards the other level). 0: no pin changed (the old pin stays)
+static uint8_t userInput(uint16_t* pin, uint32_t ms, uint8_t* level, uint8_t* pull){
+	uint8_t from, to;
+	uint16_t keep = *pin;
+	*pin = PIN_NONE;
+	uint16_t p = waitChange(keep, ms ? ms : 30000, &from, &to);
+	if(p==PIN_NONE){ *pin = keep; err(abortKey ? "stopped" : "no pin changed (time is up)"); return 0; }
+	*level = (uint8_t)((to==2 ? !from : to) ? 2 : 1);
+	*pull = to==2 ? (from ? 3 : 2) : (from==2 ? (to ? 3 : 2) : 1);
+	*pin = p;
+	return 1;
+}
+
+void DetectCharger(uint32_t ms){
+	uint8_t level, pull;
+	note("plug in the charger (any key cancels)");
+	if(!userInput(&CHARGEPIN, ms, &level, &pull)) return;
+	CHARGE_LEVEL = level;
+	CHARGE_PULL = pull;
+	kvp("charge", CHARGEPIN);
+	kvi("chargelevel", level);
+	kvi("chargepull", pull);
+	ok();
+}
+
+//the two infrared foot sensors, one after the other (the first one is no longer free for the second)
+void DetectIr(uint32_t ms){
+	uint16_t mode = 0;
+	for(uint8_t k=0;k<2;k++){
+		uint8_t level, pull;
+		note(k ? "now cover the other one" : "cover one infrared foot sensor");
+		if(!userInput(&IR_PIN(k), ms, &level, &pull)) return;
+		mode = (uint16_t)(mode|(level|pull<<2)<<(4*k));
+		kvp(k ? "ir2" : "ir1", IR_PIN(k));
+	}
+	IR_MODE = mode;
+	kvi("irmode", mode);
+	ok();
+}
+
+//one block step (s 1..6) or field direction (s 101..112 = k 0..11, FieldVector) held for ms, then the hall
+//state and the currents (diagnostics)
+void StepHold(uint8_t s, int32_t mv, uint32_t ms){
+	if(s>=101&&s<=112) FieldVector((uint8_t)(s-101), mv>0 ? mv : 1000);
+	else if(s>=1&&s<=6) BlockStep(s, DutyForMv(mv>0 ? mv : 2000));
+	else{ err("step 1..6 or 101..112"); return; }
+	Wait(ms ? ms : 300);
+	uint8_t h = HallState();
+	//current at the end of the hold: averaged triggered samples of the shunt and phase current pins
+	static const uint8_t which[3] = { 13, 16, 17 };    //itotal, iphasea, iphaseb
+	static const char* const names[3] = { T("itotal_counts"), T("iphasea_counts"), T("iphaseb_counts") };
+	int32_t sum[3] = { 0, 0, 0 };
+	uint32_t mask = 0;
+	for(uint8_t i=0;i<3;i++){ int8_t ch = AdcChannel(pinstorage[which[i]]); if(ch>=0){ mask |= 1u<<ch; pinMode((uint8_t)pinstorage[which[i]], INPUT_ADC); } }
+	for(uint8_t n=0;n<16&&mask;n++){
+		AdcScanTriggered(mask);
+		for(uint8_t i=0;i<3;i++){ int8_t ch = AdcChannel(pinstorage[which[i]]); if(ch>=0) sum[i] += AdcValue((uint8_t)ch); }
+	}
+	GatesOff();
+	kvi("step", s);
+	kvi("hall", h);
+	for(uint8_t i=0;i<3;i++) if(AdcChannel(pinstorage[which[i]])>=0) kvi(names[i], sum[i]/16);
+	ok();
+}
+
+//---------------------------------------------------------------- test rotation (hall commutation)
+//hall state -> position in the sequence of rising steps (1,3,2,6,4,5); 7 = invalid state
+static const uint8_t hallPos[8] = { 7, 0, 2, 1, 4, 5, 3, 7 };
+static uint8_t rotPrev;
+static int32_t rotFwd, rotBack, rotBad;
+
+void RotateRun(int32_t permille){
+	uint8_t h = HallState();
+	uint16_t duty = (uint16_t)((permille<0 ? -permille : permille)*(int32_t)PWM_PERIOD/1000);
+	if(h!=rotPrev&&rotPrev){
+		uint8_t d = (uint8_t)((hallPos[h]+6-hallPos[rotPrev])%6);
+		if(hallPos[h]>5||hallPos[rotPrev]>5) rotBad++;
+		else if(d==1) rotFwd++;
+		else if(d==5) rotBack++;
+		else rotBad++;
+	}
+	rotPrev = h;
+	if(!permille){ GatesOff(); return; }
+	BlockStep(hallToPos[permille>0 ? h : 7-h], duty);    //the main firmware: hall_to_pos[hallpos(dir)]
+}
+
+void RotateStop(void){
+	GatesOff();
+	rotPrev = 0;
+	rotFwd = rotBack = rotBad = 0;
+}
+
+void Rotate(int32_t permille, uint32_t ms){
+	if(HALLAPIN>=PINCOUNT||HALLBPIN>=PINCOUNT||HALLCPIN>=PINCOUNT){ err("hall pins not set: detect hall first"); return; }
+	if(permille>1000||permille<-1000){ err("permille -1000..1000"); return; }
+	if(!ms) ms = 2000;
+	pinMode(HALLAPIN, INPUT); pinMode(HALLBPIN, INPUT); pinMode(HALLCPIN, INPUT);
+	RotateStop();
+	uint32_t t = millis;
+	while(millis-t<ms&&!aborted()) RotateRun(permille);
+	int32_t f = rotFwd, b = rotBack, bad = rotBad;
+	RotateStop();
+	kvi("hall_steps_forward", f);
+	kvi("hall_steps_backward", b);
+	kvi("hall_errors", bad);
+	if(VBATPIN<PINCOUNT) kvmv("battery", VbatMv());
+	if(f+b<6) err("motor did not turn (more duty? halls?)");
+	else if(bad*10>f+b) err("hall sequence errors");
+	else ok();
+}
+
+//---------------------------------------------------------------- uart search (boot, no uart pins known)
+//The user connects the board's uart TX and RX together: every tx/rx pin pair of one uart is tried until
+//the test bytes come back; the pins are saved at once, then the board waits until the loop is removed.
+//The loop can also be the host: the web PinFinder echoes the test bytes (not '.'), so the wait for a byte
+//covers a USB round trip (FTDI latency timer 16 ms, Firefox Web Serial add-on ~40 ms).
+static uint8_t loopback(UART_TypeDef* u, uint8_t c){
+	while(u->CSR&UART_CSR_RXAVL) (void)u->RDR;
+	u->TDR = c;
+	for(uint32_t t=millis;millis-t<150;){
+		if(u->CSR&UART_CSR_RXAVL) return (uint8_t)u->RDR==c;
+	}
+	return 0;
+}
+
+uint8_t UartFind(void){
+	static const uint8_t test[] = { 0x11, 0x55, 0xAA, 0x12, 0xF0, 0x0F };
+	for(uint8_t t=0;t<UARTCOUNT;t++){
+		if(!uarts[t].tx||!PinFree(uarts[t].io)) continue;
+		for(uint8_t r=0;r<UARTCOUNT;r++){
+			if(uarts[r].tx||uarts[r].uart!=uarts[t].uart||!PinFree(uarts[r].io)) continue;
+			for(uint8_t i=0;i<UARTCOUNT;i++){    //no other pin on a uart function
+				if(PinFree(uarts[i].io)){ PinRest(uarts[i].io); pinModeAF(uarts[i].io, GPIO_AF_7); }
+			}
+			UART_TypeDef* u = uarts[t].uart==2 ? UART2 : UART1;
+			UARTX_Init(PF_BAUD, uarts[t].uart);
+			u->GCR &= ~UART_GCR_DMA;    //polled: the dma serves the rx request even with its channel off (takes RDR)
+			pinModeAF(uarts[t].io, uarts[t].af);
+			pinModeAF(uarts[r].io, uarts[r].af);
+			pinMode(uarts[t].io, OUTPUT_AF);
+			pinMode(uarts[r].io, INPUT_PULLUP);
+			uint8_t good = 1;
+			for(uint8_t i=0;i<sizeof(test)&&good;i++) good = loopback(u, test[i]);
+			if(!good) continue;
+			TXPIN = uarts[t].io;
+			RXPIN = uarts[r].io;
+			CfgSave();    //found: kept even if the board loses power before the menu
+			while(loopback(u, '.')) Wait(200);    //until the loop is removed
+			Wait(500);
+			uartUsed = uarts[t].uart;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+//---------------------------------------------------------------- power latch
+void LatchHold(void){
+	OWN_LATCH = LATCHPIN;
+	if(LATCHPIN<PINCOUNT){
+		pinMode(LATCHPIN, OUTPUT);
+		digitalWrite(LATCHPIN, 1);
+		master = 1;
+		holdAll = 0;
+	}else{
+		holdAll = 1;    //might be the latch: hold every free pin up (pull-up, not a hard high)
+		master = 0;
+		releasePins();
+	}
+}
+
+static uint8_t debuggerAttached(void){
+	return (*(volatile uint32_t*)0xE000EDF0&1u)!=0;    //DHCSR C_DEBUGEN (no CoreDebug in core_cm0.h)
+}
+
+//Two phases, the user in between. 1: every free pin is pulled up (never driven: no pin is an output before
+//it is known) and PinFinder waits: the user lets go of the power button (removes the short) and sends any
+//key / Continue. If the pull-ups cannot hold the board it goes off here: the latch is then set by hand
+//(set latch <pin>, driven at once). 2: the free pins are
+//released (pulled down) one at a time and STAY released; before each the pin is saved as LATCHPIN. The board
+//switches off when the last pin holding it is released (a board held by either of two pins too): the next
+//start drives that pin. Still on after all pins: no latch (slave board). Esc in phase 1 cancels.
+static void latchRestore(void){    //no latch: every free pin pulled up (the old latch too: a candidate again)
+	LATCHPIN = PIN_NONE;
+	LatchHold();
+}
+void LatchFind(void){
+	if(debuggerAttached()) warn("debugger attached: may power the MCU");
+	latchRestore();
+	note("all free pins pulled up: let go of the power button (remove the short), then press Continue (any key). Off at once: set the latch by hand");
+	for(uint32_t t=millis;!aborted();){
+		if(millis-t>120000){ latchRestore(); err("no Continue within 2 min"); return; }
+	}
+	if(abortKey==0x1b){ latchRestore(); err("cancelled"); return; }
+	note("still on: releasing the pins one at a time; at the latch the supply drops and the pin is held again");
+	//the latch pin is found by the supply dropping right after its release (battery pin, else the MCU supply):
+	//the pin is pulled up again at once and the board stays on. Waiting for the board to die instead saved a
+	//later pin: its capacitors kept it running for a while after the latch let go
+	int32_t vb0 = VbatMv(), vd0 = VddMv();
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		if(!PinFree(p)) continue;
+		LATCHPIN = p;
+		CfgSave();    //saved before the release: if the board goes off at once, the next start holds this pin
+		LATCHPIN = PIN_NONE;
+		kvp("trying", p);
+		pinMode((uint8_t)p, INPUT_PULLDOWN);    //stays released
+		for(uint32_t t=millis;millis-t<(vb0>0 ? 400u : 1500u);){
+			int32_t vb = VbatMv(), vd = VddMv();
+			if((vb0>0&&vb<vb0*9/10)||vd<vd0-150){    //the supply falls: this is the latch
+				pinMode((uint8_t)p, INPUT_PULLUP);
+				LATCHPIN = p;
+				LatchHold();    //confirmed: driven from now on
+				CfgSave();
+				if(vb0>0) kvmv("battery_dropped_to", vb);
+				kvp("latch", p);
+				ok();
+				return;
+			}
+		}
+	}
+	CfgSave();    //LATCHPIN none again
+	latchRestore();
+	kvp("latch", PIN_NONE);
+	note("still powered with every pin released: no latch (slave board, or the button still held)");
+	ok();
+}
+
+void PowerOff(void){
+	GatesOff();
+	note("switching off");
+	Wait(50);
+	if(OWN_LATCH<PINCOUNT){ digitalWrite(OWN_LATCH, 0); pinMode(OWN_LATCH, INPUT_PULLDOWN); }    //the pin held
+	for(uint16_t p=0;p<PINCOUNT;p++){
+		if(holdAll&&PinFree(p)) pinMode((uint8_t)p, INPUT_PULLDOWN);
+	}
+	Wait(1500);
+	LatchHold();
+	err("still powered (no latch, button held, debugger)");
+}
+
+//---------------------------------------------------------------- info
+void Info(void){
+	static const char hex[] = "0123456789ABCDEF";
+	kvs("pinfinder", PF_VERSION);
+	kvs("mcu", MCU_NAME);    //the build target (the SPIN05 and F031 read the same IDCODE)
+	kv("idcode");
+	uint32_t id = *(volatile uint32_t*)0x40013400;    //DBGMCU_IDCODE
+	for(int8_t i=28;i>=0;i-=4) outc(hex[(id>>i)&15]);
+	nl();
+	kv("uid");
+	for(uint8_t i=0;i<12;i++){ uint8_t b = ((const volatile uint8_t*)0x1FFFF7E8)[i]; outc(hex[b>>4]); outc(hex[b&15]); }
+	nl();
+	kvs("board", master ? "master" : "slave");
+	kvp("latch", LATCHPIN);
+	kvi("debugger", debuggerAttached());
+	kvmv("vdd", VddMv());
+	if(VBATPIN<PINCOUNT) kvmv("battery", VbatMv());
+	if(HALLAPIN<PINCOUNT&&HALLBPIN<PINCOUNT&&HALLCPIN<PINCOUNT) kvi("hall", HallState());
+	kvp("tx", TXPIN);
+	kvp("rx", RXPIN);
+	kvi("baud", PF_BAUD);
+	kvi("config_changed", CfgChanged());
+}
+
+//---------------------------------------------------------------- current sensing
+//Phase currents: a static field (complementary PWM) in 12 directions; every free adc pin is sampled where
+//the main firmware samples (low sides on). A phase current pin follows cos(theta - 120 X) of its phase X
+//(theta = 210 + 30 k, FieldVector), rising or falling with current into the motor (iphasecfg bit 2).
+//Bus current: one phase high, two low (the active vector) carries that phase's current through the shunt;
+//sampled in the middle of the active vector at several amplitudes against the phase current pins.
+static const int16_t cos12[12] = { 1000, 866, 500, 0, -500, -866, -1000, -866, -500, 0, 500, 866 };
+
+static uint32_t freeAdcMask(void){
+	uint32_t m = 0;
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint16_t p = adcs[i].io;
+		if(PinFree(p)||p==ITOTALPIN||p==IPHASEAPIN||p==IPHASEBPIN){
+			pinMode((uint8_t)p, INPUT_ADC);
+			m |= 1u<<adcs[i].channel;
+		}
+	}
+	return m;
+}
+
+static void sampleAvg(uint32_t mask, uint16_t at, int32_t* avg, uint16_t n){    //avg per channel (x n)
+	for(uint8_t c=0;c<16;c++) avg[c] = 0;
+	for(uint16_t i=0;i<n;i++){
+		AdcScanAt(mask, at);
+		for(uint8_t c=0;c<16;c++) if(mask>>c&1) avg[c] += AdcValue(c);
+	}
+}
+
+//least squares of the bus pin's readings (counts x 8) over the reference current xs (mA x 6), the points
+//above the adc's zero (a shunt's zero can be below it), rising steadily. Integer (PinFinder has no floats):
+//centred (u = np x - sum x, v = np y - sum y), slope = suv / suu, both halved until suu fits 31 bits.
+//a: counts per A x 1000, z: the reading at 0 A, counts x 100
+static uint8_t busFit(uint16_t (*avg)[16], uint8_t c, const int32_t* xs, int32_t* a, int32_t* z){
+	int32_t sx = 0, sy = 0;
+	uint8_t np = 0, use = 0;
+	for(uint8_t s=0;s<8;s++){
+		if(s&&avg[s][c]+4<avg[s-1][c]) return 0;    //falls by more than half a count
+		if(avg[s][c]<24) continue;    //below 3 counts
+		use |= (uint8_t)(1<<s);
+		np++;
+		sx += xs[s];
+		sy += avg[s][c];
+	}
+	if(np<3) return 0;
+	int64_t suu = 0, suv = 0;
+	for(uint8_t s=0;s<8;s++){
+		if(!(use>>s&1)) continue;
+		int32_t u = np*xs[s]-sx;
+		suu += (int64_t)u*u;
+		suv += (int64_t)u*(np*avg[s][c]-sy);
+	}
+	if(suu<3600*100*np) return 0;    //the currents spread less than 0.1 A (rms)
+	while(suu>0x7FFFFFFF){ suu >>= 1; suv >>= 1; }
+	*a = Div64(suv*750000, (int32_t)suu);    //(counts x 8 per mA x 6) x 6000 / 8 x 1000
+	*z = (sy*100-Div64(suv*sx*100, (int32_t)suu))/(8*np);
+	return 1;
+}
+
+static void detectCurrent(int32_t mv, int32_t shunt_uohm){
+	if(mv<=1) mv = 1000;    //1: the 1.5x retry below would never grow
+	uint32_t mask = freeAdcMask();
+	int32_t zero[16], v[16];
+	static int16_t d[12][16];
+	note("a few A static current; wheel may move");
+	FieldVector(0, 0);    //all phases at 50 %: no current, low sides on at the sample
+	Wait(50);
+	sampleAvg(mask, 1, zero, 16);
+	for(uint8_t k=0;k<12;k++){
+		FieldVector(k, mv);
+		Wait(60);
+		sampleAvg(mask, 1, v, 16);
+		for(uint8_t c=0;c<16;c++) d[k][c] = (int16_t)((v[c]-zero[c])/16);
+		progress(k+1, 12);
+	}
+	FieldVector(0, 0);
+	progressEnd();
+	//per pin: the phase and sign with the largest correlation; amplitude = corr / 6000 counts
+	uint16_t pin[3] = { PIN_NONE, PIN_NONE, PIN_NONE };
+	int32_t amp[3] = { 0, 0, 0 };
+	int8_t sign[3] = { 0, 0, 0 };
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint8_t c = (uint8_t)adcs[i].channel;
+		if(!(mask>>c&1)) continue;
+		int32_t best = 0, bx = 0, total = 0;
+		for(uint8_t k=0;k<12;k++) total += (int32_t)d[k][c]*d[k][c];
+		for(uint8_t x=0;x<3;x++){
+			int32_t corr = 0;
+			for(uint8_t k=0;k<12;k++) corr += d[k][c]*cos12[(7+k+12-4*x)%12];
+			if((corr<0 ? -corr : corr)>(best<0 ? -best : best)){ best = corr; bx = x; }
+		}
+		int32_t a = (best<0 ? -best : best)/6000;
+		//fit quality: the sinusoid's energy (6 a^2) against the total
+		if(a<8||6*a*a*10<total*7) continue;
+		kv("phase_current"); outpin(adcs[i].io); out(agent ? " phase=" : " phase "); outc((char)('A'+bx));
+		out(agent ? " amplitude=" : " amplitude "); outi(a); out(best>0 ? " rises" : " falls"); nl();
+		if(a>amp[bx]){ amp[bx] = a; pin[bx] = adcs[i].io; sign[bx] = (int8_t)(best>0 ? 1 : -1); }
+	}
+	uint8_t n = (pin[0]!=PIN_NONE)+(pin[1]!=PIN_NONE)+(pin[2]!=PIN_NONE);
+	if(n<2){
+		IPHASEAPIN = IPHASEBPIN = PIN_NONE;
+		note("no phase current pins: no FOC");
+	}else{
+		uint8_t a = pin[0]!=PIN_NONE ? 0 : 1, b = pin[2]!=PIN_NONE ? 2 : 1;    //pairs A,B / B,C / A,C
+		if(a==0&&pin[1]!=PIN_NONE&&b==2&&amp[1]>amp[2]) b = 1;
+		if(sign[a]!=sign[b]){ err("phase current pins of opposite sign"); return; }
+		IPHASEAPIN = pin[a];
+		IPHASEBPIN = pin[b];
+		IPHASE_CFG = (uint16_t)((a==0&&b==1 ? 0 : a==1 ? 1 : 2)|(sign[a]>0 ? 4 : 0));
+		kvp("iphasea", IPHASEAPIN);
+		kvp("iphaseb", IPHASEBPIN);
+		kvi("iphasecfg", IPHASE_CFG);
+		//current amplitude = mv / phase resistance: the gain with motorr (default 300 mOhm), information only
+		int32_t r = (int32_t)cfgOrDefault(MOTOR_R, 300);
+		kvdi("iphasegain_from_motorr", mv*10000/r/((amp[a]+amp[b])/2));    //0.1 mA per count
+	}
+	//bus current pin: phase X high, the others low (k = 4X-7: cos = 1 for X), sampled in the active vector.
+	//Without phase current pins the reference is the static field's current V / motorr (phase A high): it
+	//finds the pin and its zero (the intercept, whatever the scale); the divider then needs the shunt value
+	uint8_t nophase = IPHASEAPIN>=PINCOUNT;
+	int32_t rm = (int32_t)cfgOrDefault(MOTOR_R, 300);
+	int32_t gain = (int32_t)cfgOrDefault(IPHASE_GAIN, 515);    //0.1 mA per count
+	uint8_t pa = (uint8_t)(IPHASE_CFG&3), ph[2] = { (uint8_t)(pa==1 ? 1 : 0), (uint8_t)(pa==0 ? 1 : 2) };
+	int8_t ca = AdcChannel(IPHASEAPIN), cb = AdcChannel(IPHASEBPIN);
+	int8_t sg = (IPHASE_CFG&4) ? 1 : -1;
+	uint8_t x = nophase ? 0 : (uint8_t)(3-ph[0]-ph[1]);    //the phase without a pin is high: I = -(Ia + Ib)
+	uint8_t kx = (uint8_t)((4*x+12-7)%12);
+	//phase x's current from the phase current pins (I_x = -(I_a + I_b)), mA
+	#define PHASE_X_MA() (nophase ? mv*(s+3)/4*1000/rm : -(((v[ca]-zero[ca])/16)*sg+((v[cb]-zero[cb])/16)*sg)*gain/10)
+	//8 levels (0.75 .. 2.5 x mv), every candidate pin sampled in the middle of the active vector, one channel
+	//per conversion (a scan converts its channels ~1.7 us apart, the window is ~+-7 us). The bus pin is the
+	//one that rises steadily with the current (op-amp inputs read high-impedance noise there: flat or jumpy)
+	static uint16_t avg[8][16];    //counts x 8, summed over the passes
+	int32_t xs[8], dd[8];    //phase x's current, mA x 6 (3 passes, before and after); duty x - duty others
+	for(uint8_t s=0;s<8;s++){ xs[s] = 0; for(uint8_t c=0;c<16;c++) avg[s][c] = 0; }
+	FieldVector(kx, mv*5/2);    //the rotor aligns first: a swinging rotor changed the current between the samples
+	Wait(500);
+	//3 passes: a 3 mOhm shunt is ~2.4 counts per A, the slope of one pass varied +-3 %
+	for(uint8_t pass=0;pass<3;pass++){
+		for(uint8_t s=0;s<8;s++){
+			FieldVector(kx, mv*(s+3)/4);
+			Wait(150);
+			uint16_t at = (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2);    //middle of the active vector
+			dd[s] = fieldCcr[(x+1)%3]-fieldCcr[x];
+			sampleAvg(mask, 1, v, 16);
+			int32_t before = PHASE_X_MA();
+			for(uint8_t c=0;c<16;c++){
+				int32_t one[16];
+				if(!(mask>>c&1)) continue;
+				sampleAvg(1u<<c, at, one, 192);
+				avg[s][c] = (uint16_t)(avg[s][c]+one[c]/72);
+			}
+			sampleAvg(mask, 1, v, 16);
+			xs[s] += before+PHASE_X_MA();    //before and after the bus samples
+			progress(pass*8+s+1, 24);
+		}
+	}
+	FieldVector(0, 0);
+	GatesOff();
+	progressEnd();
+	kvdi("bus_test_current_ma", xs[7]/6);
+	uint16_t best = PIN_NONE;
+	int32_t slope = 0, z = 0;    //counts per A x 1000, zero counts x 100
+	for(uint8_t i=0;i<ADCCOUNT;i++){
+		uint8_t c = (uint8_t)adcs[i].channel;
+		uint16_t p = adcs[i].io;
+		if(!(mask>>c&1)||p==IPHASEAPIN||p==IPHASEBPIN) continue;
+		int32_t a, zz;
+		if(!busFit(avg, c, xs, &a, &zz)) continue;
+		//(a filtered pin, below, rises only by its average: ~0.5 counts per A here) the configured pin first, else the steepest (best==PIN_NONE first: with no pin configured ITOTALPIN is
+		//PIN_NONE too, and "best!=ITOTALPIN" alone never let a pin in)
+		if(a>200&&(best==PIN_NONE||(best!=ITOTALPIN&&(a>slope||p==ITOTALPIN)))){ slope = a; z = zz; best = p; }
+	}
+	if(best==PIN_NONE){
+		//a zero below adc 0 hides small currents (F031: a filtered pin reads 0 up to ~0.75 A average)
+		if(mv<1500){ note("no bus current pin above the adc zero: again at 1.5x the voltage"); detectCurrent(mv*3/2, shunt_uohm); return; }
+		err("no bus current pin found");
+		return;
+	}
+	//a filtered bus pin (RC on the shunt signal) reads the period's average everywhere, also in the zero
+	//vector where the shunt carries nothing: fitted against the active vector's current it read the average
+	//as that current, the phase gain came out ~3x low (F031 board: 98 instead of 283, a "4 A" hold was
+	//~11.6 A). Then the reference is the average bus current: I_x x (duty x - duty others).
+	{
+		uint8_t c = (uint8_t)AdcChannel(best);
+		int32_t one[16], zv, av;
+		FieldVector(kx, mv*5/2);
+		Wait(150);
+		sampleAvg(1u<<c, 1, one, 192); zv = one[c];
+		sampleAvg(1u<<c, (uint16_t)((fieldCcr[x]+fieldCcr[(x+1)%3])/2), one, 192); av = one[c];
+		FieldVector(0, 0);    //gates off: DetectCurrent()
+		uint8_t filtered = zv*2>av;
+		kvdi("itotal_filtered", filtered);
+		if(filtered){
+			for(uint8_t s=0;s<8;s++) xs[s] = xs[s]*dd[s]/PWM_PERIOD;
+			if(!busFit(avg, c, xs, &slope, &z)){ err("bus current pin: no fit"); return; }
+		}
+	}
+	ITOTALPIN = best;
+	kvp("itotal", best);
+	int32_t vdd = VddMv();
+	int32_t div = (int32_t)(4096000000u/(uint32_t)(slope*vdd));    //divider = A / V = 1 / (counts per A x VDD / 4096)
+	kvdi("counts_per_a_x100", slope/10);
+	kvdi("zero_counts_x100", z);
+	if(nophase) div = 0;    //the reference was a model: no divider from it
+	if(shunt_uohm>0){
+		//the shunt value is the reference: counts per A = R x 4096 / VDD; the phase currents read the measured
+		//slope / that too high, so the phase gain scales by it
+		//true counts per A = uOhm x 4.096 / VDD mV
+		int32_t g = MulDiv(gain*slope, vdd, shunt_uohm*4096);    //(the zero is in counts: unchanged)
+		div = 1000000/shunt_uohm;
+		if(!nophase&&g>50&&g<5000){ IPHASE_GAIN = (uint16_t)g; kvi("iphasegain", g); }
+	}else if(nophase) note("no phase current pins: give the shunt value for the divider (detect current <mV> <mOhm>)");
+	if(div>0&&div<65535){ ITOTAL_DIVIDER = (uint16_t)div; kvi("itotaldivider", div); }
+	ITOTAL_ZERO = (uint16_t)(z<0 ? -z : 0);
+	kvi("itotalzero", ITOTAL_ZERO);
+	ok();
+}
+
+void DetectCurrent(int32_t mv, int32_t shunt_uohm){
+	detectCurrent(mv, shunt_uohm);
+	GatesOff();    //every exit (an error left the 50 % field switching)
+	if(ITOTALPIN==IPHASEAPIN||ITOTALPIN==IPHASEBPIN) ITOTALPIN = PIN_NONE;    //no bus pin found: the old one is a phase pin now
+	releasePins();    //the free adc pins out of the analog mode
+}
